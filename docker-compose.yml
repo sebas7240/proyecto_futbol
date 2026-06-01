@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    restart: always
+
+  # Note: Frontend is usually deployed to Cloudflare Pages as discussed,
+  # but this compose file is useful for local production testing.

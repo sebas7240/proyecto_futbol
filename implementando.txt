@@ -1,0 +1,99 @@
+He realizado el análisis de viabilidad y he diseñado un plan para el desarrollo de la web agregadora. Aquí
+  tienes la propuesta detallada:
+
+  Análisis de Viabilidad y Planeación: Web Agregadora de Streaming
+
+  Este documento detalla el análisis técnico para la creación de una plataforma web que extraiga y centralice
+  señales de streaming desde mundofutbolcol.online.
+
+  1. Objetivo
+  Desarrollar un prototipo funcional (PoC) capaz de:
+   - Identificar y extraer automáticamente enlaces de streaming (.m3u8) y sus tokens temporales.
+   - Presentar una interfaz de usuario limpia para navegar entre canales.
+   - Reproducir el contenido superando las restricciones de seguridad (Referer y Origin).
+
+  2. Arquitectura Propuesta
+
+  Backend (Extractor & Proxy)
+   - Tecnología: Node.js con Express.
+   - Motor de Automatización: Playwright (con playwright-extra y stealth plugin).
+   - Funciones:
+       - Scraper: Visita la web fuente, simula la interacción humana y captura los eventos de red para filtrar
+         archivos .m3u8.
+       - Token Manager: Almacena en caché los enlaces extraídos para evitar cargar el navegador en cada
+         petición del usuario.
+       - Stream Proxy (Opcional): El backend podría actuar como un túnel que recibe la petición del cliente y
+         la reenvía al servidor de streaming con las cabeceras (Referer) correctas, ya que los navegadores
+         bloquean esto por seguridad (CORS).
+
+  Frontend (Dashboard)
+   - Tecnología: React + Tailwind CSS.
+   - Reproductor: Video.js con soporte para HLS.
+   - Interfaz: Grid de canales con logos y modal de reproducción.
+
+  3. Desafíos Técnicos y Riesgos
+
+  ┌──────────────┬───────────────────────────┬──────────────────────────────────────────────────────┐
+  │ Desafío      │ Impacto                   │ Estrategia de Mitigación                             │
+  ├──────────────┼───────────────────────────┼──────────────────────────────────────────────────────┤
+  │ Protecciones │ Bloqueo de IP por         │ Uso de stealth-plugin y proxies si fuera necesario.  │
+  │ Anti-Bot     │ Cloudflare.               │                                                      │
+  │ Cabeceras de │ El stream falla si no hay │ Implementación de un proxy en el backend.            │
+  │ Seguridad    │ un Referer válido.        │                                                      │
+  │ Caducidad de │ Los canales dejan de      │ Renovación automática de enlaces al detectar error   │
+  │ Tokens       │ funcionar tras N minutos. │ 403.                                                 │
+  │ Legalidad    │ Riesgo de infracción de   │ Nota importante: Este proyecto se plantea            │
+  │              │ derechos de autor.        │ exclusivamente como una prueba de concepto técnica y │
+  │              │                           │ educativa.                                           │
+  └──────────────┴───────────────────────────┴──────────────────────────────────────────────────────┘
+  4. Plan de Implementación (Fases)
+
+   1. Fase 1 (Backend): Configurar Playwright para extraer la lista de canales y sus URLs dinámicas.
+   2. Fase 2 (Frontend): Crear la interfaz en React para listar y seleccionar canales.
+   3. Fase 3 (Integración): Conectar el reproductor con el backend y resolver el problema del Referer.
+
+  ---
+
+  ¿Estás de acuerdo con este enfoque para proceder con la creación del prototipo? Ten en cuenta que, debido a
+  la naturaleza dinámica de la web fuente, el sistema podría requerir ajustes frecuentes si ellos cambian su
+  código.
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ > ok continua                                                                                                
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+
+  Plan de Implementación: Agregador de Canales Futbolcol: 
+  Crear el plan de implementación detallado para el desarrollo del agregador de canales.
+
+
+✦ He diseñado el plan de implementación detallado para el proyecto. Aquí tienes los pasos específicos que
+  seguiré:
+
+  Plan de Implementación: Agregador de Canales Futbolcol
+
+  Este plan detalla los pasos técnicos y los archivos que se crearán para desarrollar el prototipo funcional
+  de la web agregadora.
+
+  1. Estructura del Proyecto
+   - Backend: Node.js con Express y Playwright para la extracción de enlaces.
+   - Frontend: React con Video.js para la visualización de los canales.
+
+  2. Pasos de Implementación
+
+  Fase 1: Backend y Extracción (Core)
+   1. Inicialización: Configurar el entorno de Node.js e instalar dependencias de automatización (Playwright +
+      Stealth).
+   2. Lógica del Scraper (scraper.js): Crear el script que navega por la web fuente, intercepta el tráfico de
+      red y captura los enlaces .m3u8 y sus tokens.
+   3. Servidor API (server.js): Crear endpoints para que el frontend pueda solicitar la lista de canales
+      actualizada.
+
+  Fase 2: Frontend (Interfaz)
+   1. Dashboard de Canales: Crear una interfaz limpia en React que muestre los canales disponibles.
+   2. Reproductor de Video: Implementar Video.js para manejar el flujo HLS, asegurando que se envíen las
+      cabeceras de seguridad necesarias para evitar el bloqueo (403).
+
+  Fase 3: Pruebas de Estabilidad
+   - Verificar que los enlaces se renueven automáticamente cuando caduquen.
+   - Asegurar que la extracción sea lo suficientemente rápida para una buena experiencia de usuario.
+
+  ---
