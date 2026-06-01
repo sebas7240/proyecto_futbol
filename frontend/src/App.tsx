@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight } from 'lucide-react';
-import ChannelCard from './components/ChannelCard';
 import VideoPlayer from './components/VideoPlayer';
 
 interface Channel {
@@ -11,7 +10,11 @@ interface Channel {
   logo: string;
 }
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const DEFAULT_API_URL =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3001/api'
+    : '';
+const API_URL = (process.env.REACT_APP_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
 function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -30,6 +33,11 @@ function App() {
   const fetchChannels = async () => {
     try {
       setLoading(true);
+      if (!API_URL) {
+        setChannels([]);
+        setError('Configura REACT_APP_API_URL en Cloudflare Pages para conectar el backend.');
+        return;
+      }
       const response = await axios.get(`${API_URL}/channels`);
       setChannels(response.data);
       setError(null);
@@ -56,6 +64,10 @@ function App() {
 
   const handleSelectChannel = async (channel: Channel) => {
     try {
+      if (!API_URL) {
+        alert('Configura REACT_APP_API_URL en Cloudflare Pages para conectar el backend.');
+        return;
+      }
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
