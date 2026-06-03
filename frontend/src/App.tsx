@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 
@@ -18,6 +18,7 @@ interface AgendaEvent {
   status: string;
   language: string;
   channelId: string | null;
+  date: string;
 }
 
 const DEFAULT_API_URL =
@@ -39,6 +40,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const loadingMessages = [
     'Sincronizando señal en vivo...',
@@ -48,6 +50,11 @@ function App() {
     'Preparando buffer de alta calidad...',
     'La carga puede tardar hasta 30 segundos, espera un poco...'
   ];
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let interval: any;
@@ -111,7 +118,7 @@ function App() {
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
-      setActiveTab('channels'); // Auto-switch to channels if we play from agenda
+      setActiveTab('channels'); 
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
@@ -127,7 +134,6 @@ function App() {
 
   const handleSelectAgendaEvent = (event: AgendaEvent) => {
     if (event.channelId) {
-      // Find the channel in our list that matches the ID or part of it
       const targetChannel = channels.find(c => 
         c.id.toLowerCase().includes(event.channelId!.toLowerCase()) || 
         event.channelId!.toLowerCase().includes(c.id.toLowerCase())
@@ -141,6 +147,30 @@ function App() {
       }
     } else {
       alert('Este evento no tiene un canal asignado todavía.');
+    }
+  };
+
+  // Helper to calculate dynamic event status
+  const getEventStatus = (event: AgendaEvent) => {
+    try {
+        const [year, month, day] = event.date.split('-').map(Number);
+        const [hour, minute] = event.time.split(':').map(Number);
+        
+        // We assume the source is in GMT-5 (Colombia/Peru)
+        // We create a date object for the event in that timezone
+        // A simple way without libraries:
+        const eventDate = new Date(year, month - 1, day, hour, minute);
+        
+        // Difference in minutes
+        const diffMs = currentTime.getTime() - eventDate.getTime();
+        const diffMin = diffMs / (1000 * 60);
+
+        if (diffMin < -60) return { label: 'PRONTO', color: 'bg-slate-700 text-slate-400', active: true };
+        if (diffMin < 0) return { label: 'EN BREVE', color: 'bg-blue-500/20 text-blue-400', active: true };
+        if (diffMin <= 130) return { label: 'EN VIVO', color: 'bg-red-500/10 text-red-500 animate-pulse', active: true };
+        return { label: 'FINALIZADO', color: 'bg-slate-800 text-slate-600', active: false };
+    } catch (e) {
+        return { label: 'PROGRAMADO', color: 'bg-slate-700 text-slate-400', active: true };
     }
   };
 
@@ -348,43 +378,42 @@ function App() {
                     <div className="px-1">
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Partidos de Hoy</h3>
                     </div>
-                    {agenda.map((event, idx) => (
-                      <div 
-                        key={idx}
-                        className="bg-slate-800 border border-slate-700 rounded-xl p-3 hover:border-blue-500/50 transition-all group"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="flex items-center gap-1.5 text-blue-400 text-xs font-bold">
-                            <Clock className="w-3 h-3" />
-                            {event.time}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                            event.status.toLowerCase().includes('vivo') 
-                            ? 'bg-red-500/10 text-red-500 animate-pulse' 
-                            : 'bg-slate-700 text-slate-400'
-                          }`}>
-                            {event.status}
-                          </span>
+                    {agenda.map((event, idx) => {
+                      const status = getEventStatus(event);
+                      return (
+                        <div 
+                          key={idx}
+                          className="bg-slate-800 border border-slate-700 rounded-xl p-3 hover:border-blue-500/50 transition-all group"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="flex items-center gap-1.5 text-blue-400 text-xs font-bold">
+                              <Clock className="w-3 h-3" />
+                              {event.time}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${status.color}`}>
+                              {status.label}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-200 leading-tight mb-3">
+                            {event.title}
+                          </h4>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {event.category} • {event.language}
+                            </span>
+                            {event.channelId && status.active && (
+                              <button 
+                                onClick={() => handleSelectAgendaEvent(event)}
+                                className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1"
+                              >
+                                <PlayCircle className="w-3 h-3" />
+                                VER AHORA
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <h4 className="text-sm font-bold text-slate-200 leading-tight mb-3">
-                          {event.title}
-                        </h4>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            {event.category} • {event.language}
-                          </span>
-                          {event.channelId && (
-                            <button 
-                              onClick={() => handleSelectAgendaEvent(event)}
-                              className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1"
-                            >
-                              <PlayCircle className="w-3 h-3" />
-                              VER AHORA
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
