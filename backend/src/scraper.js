@@ -1,6 +1,6 @@
-const { chromium } = require('playwright-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const needle = require('needle');
+const { chromium } = require("playwright-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const needle = require("needle");
 
 chromium.use(StealthPlugin());
 
@@ -8,101 +8,122 @@ let browser;
 
 async function getBrowser() {
   if (!browser || !browser.isConnected()) {
-    console.log('[Scraper] Launching browser...');
+    console.log("[Scraper] Lanzando navegador...");
     browser = await chromium.launch({ 
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
   }
   return browser;
 }
 
-async function getChannels() {
-  console.log('[Scraper] getChannels() started');
+async function getChannelsFromLa14() {
   try {
-    const response = await needle('get', 'https://la14hd.com/status.json', {
+    const response = await needle("get", "https://la14hd.com/status.json", {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
     });
-    
     const data = response.body;
-    let allChannels = [];
-    
+    let channels = [];
     for (const category in data) {
         data[category].forEach(item => {
-            allChannels.push({
-                id: item.Link,
-                name: item.Canal,
-                category: category, // Keep category separate
-                status: item.Estado,
-                logo: ''
-            });
+            if (item.Estado === "Activo") {
+                channels.push({
+                    id: item.Link,
+                    name: item.Canal,
+                    category: category,
+                    source: "la14"
+                });
+            }
         });
     }
-
-    // Filter only active channels if preferred, or show all
-    const activeChannels = allChannels.filter(c => c.status === 'Activo');
-    console.log(`[Scraper] Found ${activeChannels.length} active channels out of ${allChannels.length}`);
-    return activeChannels;
+    return channels;
   } catch (err) {
-    console.error('[Scraper Error] getChannels:', err.message);
-    throw err;
+    console.error("[Scraper] Error en Fuente A:", err.message);
+    return [];
   }
 }
 
+async function getChannelsFromFutbolLibre() {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://futbol-libre.su/", { waitUntil: "networkidle", timeout: 30000 });
+    const channels = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a"));
+      return links
+        .map(link => ({ text: link.innerText.trim(), href: link.href }))
+        .filter(l => l.text.length > 2 && (
+            l.href.includes("/espn") || l.href.includes("/tnt") || l.href.includes("/fox") || l.href.includes("/tyc") || l.href.includes("/win") || l.href.includes("/dsports")
+        ))
+        .map(l => ({
+            id: l.href,
+            name: l.text,
+            category: "Deportes",
+            source: "futbollibre"
+        }));
+    });
+    return channels;
+  } catch (err) {
+    console.error("[Scraper] Error en Fuente B:", err.message);
+    return [];
+  } finally {
+    await page.close();
+  }
+}
+
+async function getChannels() {
+  console.log("[Scraper] Actualizando lista de canales...");
+  const [sourceA, sourceB] = await Promise.all([
+    getChannelsFromLa14(),
+    getChannelsFromFutbolLibre()
+  ]);
+
+  const masterMap = new Map();
+  [...sourceA, ...sourceB].forEach(ch => {
+    const normalizedName = ch.name.toUpperCase().replace(" HD", "").replace(" PREMIUM", "").trim();
+    if (!masterMap.has(normalizedName)) {
+      masterMap.set(normalizedName, { ...ch, name: normalizedName, backups: [] });
+    } else {
+      masterMap.get(normalizedName).backups.push(ch.id);
+    }
+  });
+
+  return Array.from(masterMap.values()).map(ch => ({
+    id: ch.id,
+    name: ch.name,
+    category: ch.category,
+    logo: "",
+    backups: ch.backups
+  }));
+}
+
 async function getStreamUrl(channelUrl) {
-  console.log(`[Scraper] getStreamUrl(${channelUrl}) started`);
+  console.log("[Scraper] Obteniendo señal para: " + channelUrl);
   const browser = await getBrowser();
   const context = await browser.newContext();
   const page = await context.newPage();
   let m3u8s = [];
 
   try {
-    // Intercept requests
-    page.on('request', request => {
-      const url = request.url();
-      if (url.includes('.m3u8')) {
-        console.log(`[Scraper] Detected m3u8: ${url.substring(0, 60)}...`);
-        m3u8s.push({
-          url: url,
-          headers: request.headers()
-        });
+    page.on("request", request => {
+      if (request.url().includes(".m3u8")) {
+        m3u8s.push({ url: request.url(), headers: request.headers() });
       }
     });
 
-    console.log(`[Scraper] Navigating to ${channelUrl}...`);
-    await page.goto(channelUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    
-    // Sometimes we need to click a play button or wait for an iframe
-    await page.waitForTimeout(3000);
-
-    // Wait for m3u8 (max 15 seconds)
-    console.log('[Scraper] Waiting for m3u8 signals...');
-    for (let i = 0; i < 30; i++) {
-      if (m3u8s.length > 0) {
-        const hasMaster = m3u8s.some(m => m.url.toLowerCase().includes('master'));
-        if (hasMaster && m3u8s.length > 1) break; 
-      }
-      await page.waitForTimeout(500);
-    }
+    await page.goto(channelUrl, { waitUntil: "networkidle", timeout: 30000 });
+    await page.waitForTimeout(5000);
 
     if (m3u8s.length > 0) {
-        console.log(`[Scraper] Found ${m3u8s.length} m3u8 signals`);
-        const master = m3u8s.find(m => m.url.toLowerCase().includes('master'));
-        const index = m3u8s.find(m => m.url.toLowerCase().includes('index'));
-        const playlist = m3u8s.find(m => m.url.toLowerCase().includes('playlist'));
-        
-        const selected = master || index || playlist || m3u8s[m3u8s.length - 1];
-        console.log(`[Scraper] Selected: ${selected.url.substring(0, 60)}...`);
-        return selected;
-    } else {
-        console.warn('[Scraper] Signal NOT found after timeout');
+        const master = m3u8s.find(m => m.url.includes("master"));
+        const index = m3u8s.find(m => m.url.includes("index"));
+        return master || index || m3u8s[m3u8s.length - 1];
     }
-
     return null;
   } catch (err) {
-    console.error(`[Scraper Error] getStreamUrl:`, err.message);
+    console.error("[Scraper Error] getStreamUrl:", err.message);
     throw err;
   } finally {
     await page.close();
