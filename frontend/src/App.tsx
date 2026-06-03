@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 
@@ -9,6 +9,15 @@ interface Channel {
   name: string;
   category: string;
   logo: string;
+}
+
+interface AgendaEvent {
+  category: string;
+  title: string;
+  time: string;
+  status: string;
+  language: string;
+  channelId: string | null;
 }
 
 const DEFAULT_API_URL =
@@ -21,12 +30,15 @@ function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Todos');
+  const [activeTab, setActiveTab] = useState<'channels' | 'agenda'>('channels');
   const [searchTerm, setSearchTerm] = useState('');
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingStream, setLoadingStream] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
   const [error, setError] = useState<string | null>(null);
+  const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
+  const [loadingAgenda, setLoadingAgenda] = useState(false);
 
   const loadingMessages = [
     'Sincronizando señal en vivo...',
@@ -52,16 +64,12 @@ function App() {
 
   useEffect(() => {
     fetchChannels();
+    fetchAgenda();
   }, []);
 
   const fetchChannels = async () => {
     try {
       setLoading(true);
-      if (!API_URL) {
-        setChannels([]);
-        setError('Error: API_URL no definida.');
-        return;
-      }
       const response = await axios.get(`${API_URL}/channels`);
       setChannels(response.data);
       setError(null);
@@ -70,6 +78,18 @@ function App() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAgenda = async () => {
+    try {
+      setLoadingAgenda(true);
+      const response = await axios.get(`${API_URL}/agenda`);
+      setAgenda(response.data);
+    } catch (err) {
+      console.error('Error fetching agenda:', err);
+    } finally {
+      setLoadingAgenda(false);
     }
   };
 
@@ -91,6 +111,7 @@ function App() {
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
+      setActiveTab('channels'); // Auto-switch to channels if we play from agenda
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
@@ -101,6 +122,25 @@ function App() {
       alert('No se pudo cargar el stream de este canal.');
     } finally {
       setLoadingStream(false);
+    }
+  };
+
+  const handleSelectAgendaEvent = (event: AgendaEvent) => {
+    if (event.channelId) {
+      // Find the channel in our list that matches the ID or part of it
+      const targetChannel = channels.find(c => 
+        c.id.toLowerCase().includes(event.channelId!.toLowerCase()) || 
+        event.channelId!.toLowerCase().includes(c.id.toLowerCase())
+      );
+      
+      if (targetChannel) {
+        handleSelectChannel(targetChannel);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert(`El canal "${event.channelId}" no está disponible actualmente en la lista principal.`);
+      }
+    } else {
+      alert('Este evento no tiene un canal asignado todavía.');
     }
   };
 
@@ -130,12 +170,14 @@ function App() {
             />
           </div>
 
-          <button 
-            onClick={fetchChannels}
-            className="shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium"
-          >
-            Actualizar
-          </button>
+          <div className="flex gap-2">
+             <button 
+              onClick={() => { fetchChannels(); fetchAgenda(); }}
+              className="shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium"
+            >
+              Actualizar
+            </button>
+          </div>
         </div>
       </header>
 
@@ -219,59 +261,132 @@ function App() {
           )}
         </div>
 
-        <div className="lg:col-span-1 flex flex-col gap-4 max-h-[calc(100vh-200px)]">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-500" />
-              {activeCategory}
-            </h2>
-            <span className="text-xs bg-slate-800 px-2 py-1 rounded-md text-slate-400 font-mono">
-              {filteredChannels.length}
-            </span>
+        <div className="lg:col-span-1 flex flex-col gap-4 max-h-[calc(100vh-150px)]">
+          {/* Tabs */}
+          <div className="flex bg-slate-800 p-1 rounded-xl">
+            <button 
+              onClick={() => setActiveTab('channels')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'channels' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Tv className="w-4 h-4" />
+              CANALES
+            </button>
+            <button 
+              onClick={() => setActiveTab('agenda')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'agenda' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              AGENDA
+            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                <p className="text-slate-500 text-sm">Cargando grilla...</p>
-              </div>
-            ) : error ? (
-              <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-red-200 text-sm font-medium">{error}</p>
-              </div>
-            ) : filteredChannels.length === 0 ? (
-              <div className="text-center py-20">
-                <Search className="w-12 h-12 text-slate-800 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">No se encontraron canales</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {filteredChannels.map(channel => (
-                  <div 
-                    key={channel.id}
-                    onClick={() => handleSelectChannel(channel)}
-                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
-                      selectedChannel?.id === channel.id 
-                      ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
-                      : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-                      <Tv className={`w-5 h-5 ${selectedChannel?.id === channel.id ? 'text-blue-500' : 'text-slate-600'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-semibold text-sm truncate ${selectedChannel?.id === channel.id ? 'text-blue-400' : 'text-slate-200'}`}>
-                        {channel.name}
-                      </p>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                        {channel.category}
-                      </p>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${selectedChannel?.id === channel.id ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
+            {activeTab === 'channels' ? (
+              <>
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <p className="text-slate-500 text-sm">Cargando grilla...</p>
                   </div>
-                ))}
+                ) : error ? (
+                  <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-red-200 text-sm font-medium">{error}</p>
+                  </div>
+                ) : filteredChannels.length === 0 ? (
+                  <div className="text-center py-20">
+                    <Search className="w-12 h-12 text-slate-800 mx-auto mb-3" />
+                    <p className="text-slate-500 text-sm">No se encontraron canales</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {filteredChannels.map(channel => (
+                      <div 
+                        key={channel.id}
+                        onClick={() => handleSelectChannel(channel)}
+                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
+                          selectedChannel?.id === channel.id 
+                          ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
+                          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
+                          <Tv className={`w-5 h-5 ${selectedChannel?.id === channel.id ? 'text-blue-500' : 'text-slate-600'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold text-sm truncate ${selectedChannel?.id === channel.id ? 'text-blue-400' : 'text-slate-200'}`}>
+                            {channel.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                            {channel.category}
+                          </p>
+                        </div>
+                        <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${selectedChannel?.id === channel.id ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                {loadingAgenda ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <p className="text-slate-500 text-sm">Sincronizando agenda...</p>
+                  </div>
+                ) : agenda.length === 0 ? (
+                  <div className="text-center py-20">
+                    <Calendar className="w-12 h-12 text-slate-800 mx-auto mb-3" />
+                    <p className="text-slate-500 text-sm">No hay eventos para hoy</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="px-1">
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Partidos de Hoy</h3>
+                    </div>
+                    {agenda.map((event, idx) => (
+                      <div 
+                        key={idx}
+                        className="bg-slate-800 border border-slate-700 rounded-xl p-3 hover:border-blue-500/50 transition-all group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="flex items-center gap-1.5 text-blue-400 text-xs font-bold">
+                            <Clock className="w-3 h-3" />
+                            {event.time}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            event.status.toLowerCase().includes('vivo') 
+                            ? 'bg-red-500/10 text-red-500 animate-pulse' 
+                            : 'bg-slate-700 text-slate-400'
+                          }`}>
+                            {event.status}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-200 leading-tight mb-3">
+                          {event.title}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {event.category} • {event.language}
+                          </span>
+                          {event.channelId && (
+                            <button 
+                              onClick={() => handleSelectAgendaEvent(event)}
+                              className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1"
+                            >
+                              <PlayCircle className="w-3 h-3" />
+                              VER AHORA
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

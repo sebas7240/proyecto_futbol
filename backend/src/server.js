@@ -197,6 +197,39 @@ app.get('/api/stream-url', async (req, res) => {
   }
 });
 
+// --- Agenda Logic ---
+let agendaCache = null;
+let lastAgendaFetch = 0;
+
+app.get('/api/agenda', async (req, res) => {
+  try {
+    // Cache for 10 minutes
+    if (!agendaCache || Date.now() - lastAgendaFetch > 600000) {
+      const response = await fetch('https://la14hd.com/eventos/json/agenda123.json', {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      const data = await response.json();
+      
+      // Clean and normalize links
+      agendaCache = data.map(event => {
+        // Extract channel ID from link like ...canales.php?stream=tycsports
+        const urlMatch = event.link.match(/stream=([^&]+)/);
+        const channelId = urlMatch ? urlMatch[1] : null;
+        
+        return {
+          ...event,
+          channelId: channelId
+        };
+      });
+      lastAgendaFetch = Date.now();
+    }
+    res.json(agendaCache);
+  } catch (error) {
+    console.error('[Agenda Error]:', error.message);
+    res.status(500).json({ error: 'Failed to fetch agenda' });
+  }
+});
+
 app.get('/health', (req, res) => res.send('golea-api ok'));
 app.get('/', (req, res) => res.send('Golea API server online'));
 
