@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, Trophy } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 
@@ -59,7 +59,7 @@ function App() {
       setLoading(true);
       if (!API_URL) {
         setChannels([]);
-        setError('Configura REACT_APP_API_URL en Cloudflare Pages para conectar el backend.');
+        setError('Error: API_URL no definida.');
         return;
       }
       const response = await axios.get(`${API_URL}/channels`);
@@ -88,16 +88,11 @@ function App() {
 
   const handleSelectChannel = async (channel: Channel) => {
     try {
-      if (!API_URL) {
-        alert('Configura REACT_APP_API_URL en Cloudflare Pages para conectar el backend.');
-        return;
-      }
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       const rawUrl = response.data.url;
-      // Obfuscate the URL with base64 for the proxy parameter 'p'
       const protectedUrl = btoa(rawUrl);
       const proxiedUrl = `${API_URL}/proxy?p=${protectedUrl}`;
       setStreamUrl(proxiedUrl);
@@ -164,11 +159,9 @@ function App() {
       </div>
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Content: Player */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 shadow-2xl relative">
             {loadingStream && <AdBanner format="overlay" />}
-            
             {streamUrl ? (
               <div className="w-full h-full">
                 <VideoPlayer src={streamUrl} />
@@ -226,7 +219,6 @@ function App() {
           )}
         </div>
 
-        {/* Sidebar: Channel List */}
         <div className="lg:col-span-1 flex flex-col gap-4 max-h-[calc(100vh-200px)]">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -285,6 +277,20 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Botón Flotante de Telegram */}
+      <a 
+        href="https://t.me/goleafutbol" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center group animate-bounce hover:animate-none"
+        title="Únete a nuestro Telegram"
+      >
+        <MessageCircle className="w-6 h-6" />
+        <span className="max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-2 transition-all duration-300 font-bold text-sm whitespace-nowrap">
+          CANAL TELEGRAM
+        </span>
+      </a>
 
       {/* Footer Legal */}
       <footer className="bg-slate-800 border-t border-slate-700 p-6 mt-8">
