@@ -14,70 +14,111 @@ app.use(express.json());
 const streamCache = new Map(); // id -> { url, headers, timestamp }
 const pendingScrapes = new Map(); // id -> Promise
 
+// Helper to get spoofed headers based on target URL
+function getHeadersForUrl(targetUrl) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Connection': 'keep-alive',
+  };
+
+  // Known sources that require specific referers
+  if (targetUrl.includes('la14hd.com') || targetUrl.includes('fubohd.com') || targetUrl.includes('cvattv.com') || targetUrl.includes('vproov.com')) {
+    headers['Referer'] = 'https://la14hd.com/';
+    headers['Origin'] = 'https://la14hd.com';
+  } else if (targetUrl.includes('televisionlibre') || targetUrl.includes('futbollibre')) {
+    headers['Referer'] = 'https://televisionlibre.net/';
+    headers['Origin'] = 'https://televisionlibre.net';
+  }
+
+  return headers;
+}
+
 // Proxy for video streams
 app.get('/api/proxy', async (req, res) => {
   const { p } = req.query; 
   if (!p) return res.status(400).send('Source required');
 
   try {
-    const url = Buffer.from(p, 'base64').toString('utf-8');
+    // Decode base64 URL. Replace spaces with + to handle browser auto-decoding of query params
+    const normalizedP = p.replace(/ /g, '+');
+    const url = Buffer.from(normalizedP, 'base64').toString('utf-8');
     
-    // IMPORTANT: Cache-Control headers for Cloudflare/Browsers
-    if (url.includes('.ts') || url.includes('.m4s') || url.includes('.mp4')) {
-        // Video segments are immutable and can be cached for a long time
-        res.set('Cache-Control', 'public, max-age=3600'); 
-    } else if (url.includes('.m3u8')) {
-        // Playlists change frequently, cache for only a few seconds
-        res.set('Cache-Control', 'public, max-age=2');
+    // Validate URL
+    if (!url.startsWith('http')) {
+        return res.status(400).send('Invalid URL');
     }
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Referer': 'https://la14hd.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Connection': 'keep-alive',
-        'Origin': 'https://la14hd.com'
-      }
-    });
+    // Cache-Control for efficiency
+    if (url.includes('.ts') || url.includes('.m4s') || url.includes('.mp4')) {
+        res.set('Cache-Control', 'public, max-age=3600'); 
+    } else if (url.includes('.m3u8')) {
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
 
-    const contentType = response.headers.get('content-type') || '';
+    const fetchOptions = {
+      method: 'GET',
+      headers: getHeadersForUrl(url)
+    };
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+        console.error(`[Proxy] Fetch failed for ${url.substring(0, 50)}: ${response.status} ${response.statusText}`);
+        return res.status(response.status).send(`Origin error: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
     res.set('Access-Control-Allow-Origin', '*'); 
     res.set('Content-Type', contentType);
-    res.status(response.status);
 
     if (url.includes('.m3u8')) {
-      const arrayBuffer = await response.arrayBuffer();
-      const body = Buffer.from(arrayBuffer);
-      let content = body.toString('utf8');
+      const text = await response.text();
       const urlObj = new URL(url);
       const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
       const origin = urlObj.origin;
 
-      const rewrittenBody = content.replace(/^(?!#)(.+)$/gm, (match) => {
+      // Rewrite segment URLs and sub-playlists
+      let rewrittenBody = text.replace(/^(?!#)(.+)$/gm, (match) => {
         const line = match.trim();
         if (!line) return line;
-        let fullUrl;
+        
         try {
-          if (line.startsWith('http')) fullUrl = line;
-          else if (line.startsWith('/')) fullUrl = origin + line;
-          else fullUrl = baseUrl + line;
-          return `${PROXY_BASE_URL}/proxy?p=${Buffer.from(fullUrl).toString('base64')}`;
+          let absoluteUrl;
+          if (line.startsWith('http')) {
+            absoluteUrl = line;
+          } else if (line.startsWith('/')) {
+            absoluteUrl = origin + line;
+          } else {
+            absoluteUrl = baseUrl + line;
+          }
+          const base64Url = Buffer.from(absoluteUrl).toString('base64');
+          return `${PROXY_BASE_URL}/proxy?p=${encodeURIComponent(base64Url)}`;
         } catch (e) { return line; }
-      }).replace(/URI="([^"]+)"/g, (match, p1) => {
-        let fullUrl;
+      });
+
+      // Rewrite URIs in attributes (like keys or alternative streams)
+      rewrittenBody = rewrittenBody.replace(/URI="([^"]+)"/g, (match, p1) => {
         try {
-          if (p1.startsWith('http')) fullUrl = p1;
-          else if (p1.startsWith('/')) fullUrl = origin + p1;
-          else fullUrl = baseUrl + p1;
-          return `URI="${PROXY_BASE_URL}/proxy?p=${Buffer.from(fullUrl).toString('base64')}"`;
+          let absoluteUrl;
+          if (p1.startsWith('http')) {
+            absoluteUrl = p1;
+          } else if (p1.startsWith('/')) {
+            absoluteUrl = origin + p1;
+          } else {
+            absoluteUrl = baseUrl + p1;
+          }
+          const base64Url = Buffer.from(absoluteUrl).toString('base64');
+          return `URI="${PROXY_BASE_URL}/proxy?p=${encodeURIComponent(base64Url)}"`;
         } catch (e) { return match; }
       });
+
       res.send(rewrittenBody);
     } else {
-      // Stream segments directly for efficiency
+      // Pipe video segments directly
       if (response.body) {
+        // Node 18+ fetch returns a Web Stream
         const reader = response.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
@@ -91,7 +132,8 @@ app.get('/api/proxy', async (req, res) => {
       }
     }
   } catch (error) {
-    if (!res.headersSent) res.status(500).send('Stream error');
+    console.error('[Proxy Error]:', error.message);
+    if (!res.headersSent) res.status(500).send('Stream proxy error');
   }
 });
 

@@ -94,7 +94,7 @@ function App() {
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
-      const proxiedUrl = `${API_URL}/proxy?p=${protectedUrl}`;
+      const proxiedUrl = `${API_URL}/proxy?p=${encodeURIComponent(protectedUrl)}`;
       setStreamUrl(proxiedUrl);
     } catch (err) {
       console.error(err);
