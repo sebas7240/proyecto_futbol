@@ -9,7 +9,8 @@ interface AdBannerProps {
 
 const AdBanner: React.FC<AdBannerProps> = ({ format, className = "" }) => {
   const [isVisible, setIsVisible] = useState(true);
-  const SMART_LINK = "https://www.effectivecpmnetwork.com/dhut61az?key=d1d0673cc13bbff6e2fdb6f6885ca515";
+  // Nuevo Smartlink con Anti-Adblock
+  const SMART_LINK = "https://formssternlystately.com/ds7rafqk8?key=147d22bbab5806fd51aabf69daa4a76f";
 
   useEffect(() => {
     // Solo cargamos el script de Adsterra para el formato horizontal (Native Banner)
@@ -17,6 +18,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ format, className = "" }) => {
       const script = document.createElement('script');
       script.async = true;
       script.setAttribute('data-cfasync', 'false');
+      // Mantenemos el Native Banner anterior o lo actualizamos si el usuario provee el nuevo
       script.src = "https://pl29623793.effectivecpmnetwork.com/309760bc253aa931b97b78c5f29642b7/invoke.js";
       
       const container = document.getElementById('ad-container-native');

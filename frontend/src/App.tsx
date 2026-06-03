@@ -285,6 +285,18 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Footer Legal */}
+      <footer className="bg-slate-800 border-t border-slate-700 p-6 mt-8">
+        <div className="max-w-7xl mx-auto text-center space-y-3">
+          <p className="text-slate-400 text-xs leading-relaxed max-w-3xl mx-auto">
+            <span className="font-bold text-slate-300">Aviso Legal (DMCA):</span> Golea no aloja ningún video en sus servidores. Solo proporcionamos una interfaz para acceder a enlaces de contenido que ya está disponible públicamente en internet. No tenemos control sobre el contenido de terceros y no asumimos responsabilidad por el mismo. Si usted es el propietario de algún contenido y desea que se retire el enlace, por favor contáctenos y lo eliminaremos en menos de 24 horas.
+          </p>
+          <div className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+            © 2026 GOLEA PREMIUM STREAMS - TODOS LOS DERECHOS RESERVADOS
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
