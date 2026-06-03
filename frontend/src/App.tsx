@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, Trophy } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
+import AdBanner from './components/AdBanner';
 
 interface Channel {
   id: string;
@@ -13,7 +14,7 @@ interface Channel {
 const DEFAULT_API_URL =
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3001/api'
-    : '';
+    : 'https://api.goleafutbol.com/api';
 const API_URL = (process.env.REACT_APP_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
 function App() {
@@ -24,7 +25,30 @@ function App() {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingStream, setLoadingStream] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
   const [error, setError] = useState<string | null>(null);
+
+  const loadingMessages = [
+    'Sincronizando señal en vivo...',
+    'Lanzando instancia de servidor...',
+    'Capturando fragmentos de video...',
+    'Sincronizando audio y video...',
+    'Preparando buffer de alta calidad...',
+    'La carga puede tardar hasta 30 segundos, espera un poco...'
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (loadingStream) {
+      let i = 0;
+      setLoadingMessage(loadingMessages[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % loadingMessages.length;
+        setLoadingMessage(loadingMessages[i]);
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [loadingStream]);
 
   useEffect(() => {
     fetchChannels();
@@ -141,8 +165,10 @@ function App() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content: Player */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-6">
           <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 shadow-2xl relative">
+            {loadingStream && <AdBanner format="overlay" />}
+            
             {streamUrl ? (
               <div className="w-full h-full">
                 <VideoPlayer src={streamUrl} />
@@ -152,7 +178,10 @@ function App() {
                 {loadingStream ? (
                   <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-                    <p className="text-slate-400 font-medium animate-pulse">Sincronizando señal en vivo...</p>
+                    <div className="space-y-1">
+                      <p className="text-slate-200 font-bold animate-pulse text-lg">{loadingMessage}</p>
+                      <p className="text-slate-500 text-xs italic">Cargando señal desde servidores satelitales...</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-4">
@@ -165,6 +194,8 @@ function App() {
               </div>
             )}
           </div>
+          
+          <AdBanner format="horizontal" />
           
           {selectedChannel && (
             <div className="bg-slate-800/80 backdrop-blur p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4 shadow-xl">
