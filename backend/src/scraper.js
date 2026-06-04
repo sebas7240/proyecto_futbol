@@ -73,20 +73,52 @@ async function getChannelsFromFutbolLibre() {
   }
 }
 
+async function getChannelsFromRojaDirecta() {
+  try {
+    const url = "https://rojadirectatv.net/";
+    const response = await needle("get", url, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        }
+    });
+    const html = response.body.toString();
+    const links = html.match(/href=["'](en-vivo\/.*?)["']/g);
+    if (!links) return [];
+
+    return links
+        .map(l => {
+            const path = l.replace(/href=["']|["']/g, "");
+            const name = path.replace("en-vivo/", "").replace(/-/g, " ").toUpperCase();
+            return {
+                id: url + path,
+                name: name,
+                category: "Deportes",
+                source: "rojadirecta"
+            };
+        });
+  } catch (err) {
+    console.error("[Scraper] Error en Fuente C:", err.message);
+    return [];
+  }
+}
+
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
-  const [sourceA, sourceB] = await Promise.all([
+  const [sourceA, sourceB, sourceC] = await Promise.all([
     getChannelsFromLa14(),
-    getChannelsFromFutbolLibre()
+    getChannelsFromFutbolLibre(),
+    getChannelsFromRojaDirecta()
   ]);
 
   const masterMap = new Map();
-  [...sourceA, ...sourceB].forEach(ch => {
+  [...sourceA, ...sourceB, ...sourceC].forEach(ch => {
     const normalizedName = ch.name.toUpperCase().replace(" HD", "").replace(" PREMIUM", "").trim();
     if (!masterMap.has(normalizedName)) {
       masterMap.set(normalizedName, { ...ch, name: normalizedName, backups: [] });
     } else {
-      masterMap.get(normalizedName).backups.push(ch.id);
+      if (!masterMap.get(normalizedName).backups.includes(ch.id) && masterMap.get(normalizedName).id !== ch.id) {
+        masterMap.get(normalizedName).backups.push(ch.id);
+      }
     }
   });
 
@@ -100,7 +132,7 @@ async function getChannels() {
 }
 
 async function getStreamUrl(channelUrl) {
-  console.log("[Scraper] Obteniendo señal para: " + channelUrl);
+  console.log("[Scraper] Obteniendo seï¿½al para: " + channelUrl);
   const browser = await getBrowser();
   const context = await browser.newContext();
   const page = await context.newPage();
