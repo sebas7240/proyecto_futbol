@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Tv, Loader2, AlertCircle, Search, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
+import ChannelCard from './components/ChannelCard';
 import AdBanner from './components/AdBanner';
 
 interface Channel {
@@ -318,9 +319,10 @@ function App() {
             {activeTab === 'channels' ? (
               <>
                 {loading ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                    <p className="text-slate-500 text-sm">Cargando grilla...</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <div key={i} className="bg-slate-800/50 rounded-2xl aspect-video animate-pulse border border-slate-700"></div>
+                    ))}
                   </div>
                 ) : error ? (
                   <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl flex items-start gap-3">
@@ -333,30 +335,14 @@ function App() {
                     <p className="text-slate-500 text-sm">No se encontraron canales</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredChannels.map(channel => (
-                      <div 
+                      <ChannelCard 
                         key={channel.id}
-                        onClick={() => handleSelectChannel(channel)}
-                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
-                          selectedChannel?.id === channel.id 
-                          ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
-                          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-                          <Tv className={`w-5 h-5 ${selectedChannel?.id === channel.id ? 'text-blue-500' : 'text-slate-600'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-semibold text-sm truncate ${selectedChannel?.id === channel.id ? 'text-blue-400' : 'text-slate-200'}`}>
-                            {channel.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                            {channel.category}
-                          </p>
-                        </div>
-                        <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${selectedChannel?.id === channel.id ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
-                      </div>
+                        channel={channel}
+                        onSelect={handleSelectChannel}
+                        isSelected={selectedChannel?.id === channel.id}
+                      />
                     ))}
                   </div>
                 )}
@@ -364,9 +350,10 @@ function App() {
             ) : (
               <div className="space-y-4">
                 {loadingAgenda ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                    <p className="text-slate-500 text-sm">Sincronizando agenda...</p>
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="bg-slate-800/50 rounded-xl h-32 animate-pulse border border-slate-700"></div>
+                    ))}
                   </div>
                 ) : agenda.length === 0 ? (
                   <div className="text-center py-20">
