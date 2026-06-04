@@ -84,7 +84,8 @@ app.get("/api/proxy", async (req, res) => {
 let channelsCache = null, lastChannelsFetch = 0;
 app.get("/api/channels", async (req, res) => {
   try {
-    if (!channelsCache || Date.now() - lastChannelsFetch > 300000) { 
+    // Aumentamos caché a 10 minutos (600000ms) para canales
+    if (!channelsCache || Date.now() - lastChannelsFetch > 600000) { 
       channelsCache = await getChannels(); lastChannelsFetch = Date.now();
     }
     res.json(channelsCache);
@@ -93,12 +94,16 @@ app.get("/api/channels", async (req, res) => {
 
 app.get("/api/stream-url", async (req, res) => {
   const { id } = req.query;
-  if (streamCache.has(id) && Date.now() - streamCache.get(id).timestamp < 180000) return res.json(streamCache.get(id));
+  // Aumentamos caché de stream a 10 minutos para reducir uso de Playwright
+  if (streamCache.has(id) && Date.now() - streamCache.get(id).timestamp < 600000) return res.json(streamCache.get(id));
   if (pendingScrapes.has(id)) return res.json(await pendingScrapes.get(id));
   const p = (async () => {
     try {
       const d = await getStreamUrl(id);
-      if (d) { streamCache.set(id, { ...d, timestamp: Date.now() }); return d; }
+      if (d) { 
+        streamCache.set(id, { ...d, timestamp: Date.now() }); 
+        return d; 
+      }
       throw new Error();
     } finally { pendingScrapes.delete(id); }
   })();
