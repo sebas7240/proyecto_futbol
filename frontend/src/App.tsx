@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
-import ChannelCard from './components/ChannelCard';
 import AdBanner from './components/AdBanner';
 
 interface Channel {
@@ -10,16 +9,6 @@ interface Channel {
   name: string;
   category: string;
   logo: string;
-}
-
-interface AgendaEvent {
-  category: string;
-  title: string;
-  time: string;
-  status: string;
-  language: string;
-  channelId: string | null;
-  date: string;
 }
 
 const API_URL = '/api';
@@ -34,9 +23,6 @@ function App() {
   const [loadingStream, setLoadingStream] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
   const [error, setError] = useState<string | null>(null);
-  const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
-  const [loadingAgenda, setLoadingAgenda] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   const loadingMessages = [
     'Sincronizando señal en vivo...',
@@ -46,11 +32,6 @@ function App() {
     'Preparando buffer de alta calidad...',
     'La carga puede tardar hasta 30 segundos, espera un poco...'
   ];
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     let interval: any;
@@ -67,12 +48,16 @@ function App() {
 
   useEffect(() => {
     fetchChannels();
-    fetchAgenda();
   }, []);
 
   const fetchChannels = async () => {
     try {
       setLoading(true);
+      if (!API_URL) {
+        setChannels([]);
+        setError('Error: API_URL no definida.');
+        return;
+      }
       const response = await axios.get(`${API_URL}/channels`);
       setChannels(response.data);
       setError(null);
@@ -81,18 +66,6 @@ function App() {
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchAgenda = async () => {
-    try {
-      setLoadingAgenda(true);
-      const response = await axios.get(`${API_URL}/agenda`);
-      setAgenda(response.data);
-    } catch (err) {
-      console.error('Error fetching agenda:', err);
-    } finally {
-      setLoadingAgenda(false);
     }
   };
 
@@ -127,48 +100,6 @@ function App() {
     }
   };
 
-  const handleSelectAgendaEvent = (event: AgendaEvent) => {
-    if (event.channelId) {
-      const targetChannel = channels.find(c => 
-        c.id.toLowerCase().includes(event.channelId!.toLowerCase()) || 
-        event.channelId!.toLowerCase().includes(c.id.toLowerCase())
-      );
-      
-      if (targetChannel) {
-        handleSelectChannel(targetChannel);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        alert(`El canal "${event.channelId}" no está disponible actualmente en la lista principal.`);
-      }
-    } else {
-      alert('Este evento no tiene un canal asignado todavía.');
-    }
-  };
-
-  // Helper to calculate dynamic event status
-  const getEventStatus = (event: AgendaEvent) => {
-    try {
-        const [year, month, day] = event.date.split('-').map(Number);
-        const [hour, minute] = event.time.split(':').map(Number);
-        
-        // We assume the source is in GMT-5 (Colombia/Peru)
-        // We create a date object for the event in that timezone
-        // A simple way without libraries:
-        const eventDate = new Date(year, month - 1, day, hour, minute);
-        
-        // Difference in minutes
-        const diffMs = currentTime.getTime() - eventDate.getTime();
-        const diffMin = diffMs / (1000 * 60);
-
-        if (diffMin < -60) return { label: 'PRONTO', color: 'bg-slate-700 text-slate-400', active: true };
-        if (diffMin < 0) return { label: 'EN BREVE', color: 'bg-blue-500/20 text-blue-400', active: true };
-        if (diffMin <= 130) return { label: 'EN VIVO', color: 'bg-red-500/10 text-red-500 animate-pulse', active: true };
-        return { label: 'FINALIZADO', color: 'bg-slate-800 text-slate-600', active: false };
-    } catch (e) {
-        return { label: 'PROGRAMADO', color: 'bg-slate-700 text-slate-400', active: true };
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
       {/* Header */}
@@ -195,14 +126,12 @@ function App() {
             />
           </div>
 
-          <div className="flex gap-2">
-             <button 
-              onClick={() => { fetchChannels(); fetchAgenda(); }}
-              className="shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium"
-            >
-              Actualizar
-            </button>
-          </div>
+          <button 
+            onClick={fetchChannels}
+            className="shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium"
+          >
+            Actualizar
+          </button>
         </div>
       </header>
 
@@ -284,93 +213,64 @@ function App() {
               </div>
             </div>
           )}
+        </div>
 
-          {/* Grilla de Canales en área principal */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Tv className="w-5 h-5 text-blue-500" />
-              Canales Disponibles
+        <div className="lg:col-span-1 flex flex-col gap-4 max-h-[calc(100vh-200px)]">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-500" />
+              {activeCategory}
             </h2>
+            <span className="text-xs bg-slate-800 px-2 py-1 rounded-md text-slate-400 font-mono">
+              {filteredChannels.length}
+            </span>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5, 6].map(i => (
-                  <div key={i} className="bg-slate-800/50 rounded-2xl aspect-video animate-pulse border border-slate-700"></div>
-                ))}
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                <p className="text-slate-500 text-sm">Cargando grilla...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-red-200 text-sm font-medium">{error}</p>
               </div>
             ) : filteredChannels.length === 0 ? (
-              <div className="text-center py-20 bg-slate-800/30 rounded-2xl border border-slate-800">
-                <Search className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+              <div className="text-center py-20">
+                <Search className="w-12 h-12 text-slate-800 mx-auto mb-3" />
                 <p className="text-slate-500 text-sm">No se encontraron canales</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-3">
                 {filteredChannels.map(channel => (
-                  <ChannelCard 
+                  <div 
                     key={channel.id}
-                    channel={channel}
-                    onSelect={handleSelectChannel}
-                    isSelected={selectedChannel?.id === channel.id}
-                  />
+                    onClick={() => handleSelectChannel(channel)}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
+                      selectedChannel?.id === channel.id 
+                      ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
+                      : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
+                      <Tv className={`w-5 h-5 ${selectedChannel?.id === channel.id ? 'text-blue-500' : 'text-slate-600'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-semibold text-sm truncate ${selectedChannel?.id === channel.id ? 'text-blue-400' : 'text-slate-200'}`}>
+                        {channel.name}
+                      </p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                        {channel.category}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${selectedChannel?.id === channel.id ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
+                  </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
-
-        {/* Barra Lateral: Agenda */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-blue-500" />
-              AGENDA DE HOY
-            </h3>
-            
-            <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
-              {loadingAgenda ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="bg-slate-700/50 rounded-xl h-24 animate-pulse"></div>
-                  ))}
-                </div>
-              ) : agenda.length === 0 ? (
-                <p className="text-slate-500 text-xs text-center py-10 italic">No hay eventos programados</p>
-              ) : (
-                agenda.map((event, idx) => {
-                  const status = getEventStatus(event);
-                  return (
-                    <div 
-                      key={idx}
-                      className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 hover:border-blue-500/30 transition-all"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-blue-400 text-[10px] font-bold flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {event.time}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${status.color}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-200 leading-tight mb-2">
-                        {event.title}
-                      </h4>
-                      {event.channelId && status.active && (
-                        <button 
-                          onClick={() => handleSelectAgendaEvent(event)}
-                          className="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-[10px] font-bold py-1.5 rounded transition-all flex items-center justify-center gap-1"
-                        >
-                          <PlayCircle className="w-3 h-3" />
-                          VER PARTIDO
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-          
-          <AdBanner format="vertical" />
         </div>
       </main>
 
