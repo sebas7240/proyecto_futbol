@@ -14,6 +14,7 @@ interface Channel {
 
 interface AgendaEvent {
   category: string;
+  link?: string;
   title: string;
   time: string;
   status: string;
@@ -199,6 +200,14 @@ function App() {
       
       if (targetChannel) {
         handleSelectChannel(targetChannel);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (event.link) {
+        handleSelectChannel({
+          id: event.link,
+          name: event.title,
+          category: event.category,
+          logo: ''
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         alert(`El canal "${event.channelId}" no está disponible actualmente en la lista principal.`);
