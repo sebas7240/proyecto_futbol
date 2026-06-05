@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
+import ChatPanel from './components/ChatPanel';
 
 interface Channel {
   id: string;
@@ -21,13 +22,14 @@ interface AgendaEvent {
   date: string;
 }
 
-const API_URL = '/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
+const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
 
 function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'channels' | 'agenda'>('channels');
+  const [activeTab, setActiveTab] = useState<'channels' | 'agenda' | 'chat'>('channels');
   const [searchTerm, setSearchTerm] = useState('');
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,20 @@ function App() {
   const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [recentChannelIds, setRecentChannelIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('golea_recent') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const loadingMessages = [
     'Sincronizando señal en vivo...',
@@ -69,6 +85,14 @@ function App() {
     fetchChannels();
     fetchAgenda();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('golea_favorites', JSON.stringify(favoriteChannelIds));
+  }, [favoriteChannelIds]);
+
+  useEffect(() => {
+    localStorage.setItem('golea_recent', JSON.stringify(recentChannelIds));
+  }, [recentChannelIds]);
 
   const fetchChannels = async () => {
     try {
@@ -109,11 +133,41 @@ function App() {
     });
   }, [channels, activeCategory, searchTerm]);
 
+  const uniqueAgenda = useMemo(() => {
+    const eventsByMatch = new Map<string, AgendaEvent>();
+
+    agenda.forEach(event => {
+      const key = `${event.date}|${event.time}|${event.title.trim().toLowerCase()}`;
+      const existing = eventsByMatch.get(key);
+
+      if (!existing) {
+        eventsByMatch.set(key, event);
+        return;
+      }
+
+      const languages = new Set(
+        `${existing.language}, ${event.language}`
+          .split(',')
+          .map(language => language.trim())
+          .filter(Boolean)
+      );
+
+      eventsByMatch.set(key, {
+        ...existing,
+        language: Array.from(languages).join(', '),
+        channelId: existing.channelId || event.channelId
+      });
+    });
+
+    return Array.from(eventsByMatch.values());
+  }, [agenda]);
+
   const handleSelectChannel = async (channel: Channel) => {
     try {
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
+      setRecentChannelIds(previous => [channel.id, ...previous.filter(id => id !== channel.id)].slice(0, 8));
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
@@ -125,6 +179,15 @@ function App() {
     } finally {
       setLoadingStream(false);
     }
+  };
+
+  const toggleFavorite = (channelId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setFavoriteChannelIds(previous =>
+      previous.includes(channelId)
+        ? previous.filter(id => id !== channelId)
+        : [channelId, ...previous]
+    );
   };
 
   const handleSelectAgendaEvent = (event: AgendaEvent) => {
@@ -162,43 +225,142 @@ function App() {
     }
   };
 
+  const activeAgenda = uniqueAgenda.filter(event => getEventStatus(event).active);
+  const featuredAgenda = activeAgenda.slice(0, 3);
+
+  const channelMatchesEvent = (channel: Channel, event: AgendaEvent) => {
+    if (!event.channelId) return false;
+    const channelId = channel.id.toLowerCase();
+    const eventChannel = event.channelId.toLowerCase();
+    return channelId.includes(`stream=${eventChannel}`) || channelId.includes(eventChannel);
+  };
+
+  const getChannelStatus = (channel: Channel) => {
+    const event = activeAgenda.find(item => channelMatchesEvent(channel, item));
+    return event ? getEventStatus(event) : null;
+  };
+
+  const favoriteChannels = favoriteChannelIds
+    .map(id => filteredChannels.find(channel => channel.id === id))
+    .filter((channel): channel is Channel => Boolean(channel));
+  const favoriteSet = new Set(favoriteChannels.map(channel => channel.id));
+  const recentChannels = recentChannelIds
+    .map(id => filteredChannels.find(channel => channel.id === id && !favoriteSet.has(channel.id)))
+    .filter((channel): channel is Channel => Boolean(channel));
+  const recentSet = new Set(recentChannels.map(channel => channel.id));
+  const regularChannels = filteredChannels.filter(channel => !favoriteSet.has(channel.id) && !recentSet.has(channel.id));
+  const selectedChannelRoom = selectedChannel
+    ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
+    : null;
+
+  const renderChannelCard = (channel: Channel) => {
+    const channelStatus = getChannelStatus(channel);
+    const isFavorite = favoriteChannelIds.includes(channel.id);
+    const isSelected = selectedChannel?.id === channel.id;
+
+    return (
+      <div 
+        key={channel.id}
+        onClick={() => handleSelectChannel(channel)}
+        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
+          isSelected 
+          ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
+          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
+        }`}
+      >
+        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
+          <Tv className={`w-5 h-5 ${isSelected ? 'text-blue-500' : 'text-slate-600'}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`font-semibold text-sm truncate ${isSelected ? 'text-blue-400' : 'text-slate-200'}`}>
+              {channel.name}
+            </p>
+            {channelStatus && (
+              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${channelStatus.color}`}>
+                {channelStatus.label}
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+            {channel.category}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={(event) => toggleFavorite(channel.id, event)}
+          className={`shrink-0 rounded-lg p-1.5 transition-colors ${isFavorite ? 'text-yellow-400 bg-yellow-400/10' : 'text-slate-600 hover:text-yellow-400 hover:bg-slate-900'}`}
+          aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+        >
+          <Star className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
+        </button>
+        <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
+      </div>
+    );
+  };
+
+  const renderChannelSection = (title: string, items: Channel[], icon: React.ReactNode) => {
+    if (items.length === 0) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+            {icon}
+            {title}
+          </h3>
+          <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-500 font-bold">
+            {items.length}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          {items.map(renderChannelCard)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="h-16 w-16 bg-blue-600 rounded-xl overflow-hidden flex items-center justify-center border-2 border-blue-500 shadow-xl shadow-blue-500/30">
+      <header className="bg-slate-800 border-b border-slate-700 p-3 md:p-4 md:sticky md:top-0 z-20">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-3 md:gap-4 shrink-0">
+            <div className="h-12 w-12 md:h-16 md:w-16 bg-blue-600 rounded-xl overflow-hidden flex items-center justify-center border-2 border-blue-500 shadow-xl shadow-blue-500/30">
               <img src="/assets/logo.png" alt="Golea Logo" className="h-full w-full object-contain" />
             </div>
             <div>
-              <h1 className="text-4xl font-black leading-none tracking-tighter text-white italic">GOLEA</h1>
-              <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.3em] mt-1">Premium Streams</p>
+              <h1 className="text-3xl md:text-4xl font-black leading-none tracking-tighter text-white italic">GOLEA</h1>
+              <p className="text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.22em] md:tracking-[0.3em] mt-1">Premium Streams</p>
             </div>
           </div>
           
-          <div className="relative flex-1 w-full max-w-md md:ml-8">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input 
-              type="text" 
-              placeholder="Buscar canal..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
-            />
-          </div>
+          <div className="flex items-center gap-2 flex-1 w-full md:ml-8">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input 
+                type="text" 
+                placeholder="Buscar canal..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
+              />
+            </div>
 
-          <button 
-            onClick={() => { fetchChannels(); fetchAgenda(); }}
-            className="shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium"
-          >
-            Actualizar
-          </button>
+            <button 
+              onClick={() => { fetchChannels(); fetchAgenda(); }}
+              className="shrink-0 px-3 md:px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+              title="Actualizar"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Actualizar</span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Categories Bar */}
-      <div className="bg-slate-800/50 border-b border-slate-700 p-2 overflow-x-auto custom-scrollbar sticky top-[73px] z-10 backdrop-blur-md">
+      <div className="bg-slate-800/50 border-b border-slate-700 p-2 overflow-x-auto custom-scrollbar sticky top-0 md:top-[97px] z-10 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex gap-2">
           {categories.map(cat => (
             <button
@@ -218,16 +380,18 @@ function App() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
-          <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 shadow-2xl relative">
+          <div className={`bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-2xl relative ${
+            streamUrl || loadingStream ? 'aspect-video' : 'min-h-[260px] md:aspect-video'
+          }`}>
             {loadingStream && <AdBanner format="overlay" />}
             {streamUrl ? (
               <div className="w-full h-full">
                 <VideoPlayer src={streamUrl} />
               </div>
             ) : (
-              <div className="text-center p-8">
+              <div className="w-full h-full">
                 {loadingStream ? (
-                  <div className="flex flex-col items-center gap-4">
+                  <div className="h-full flex flex-col items-center justify-center gap-4 text-center p-8">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
                     <div className="space-y-1">
                       <p className="text-slate-200 font-bold animate-pulse text-lg">{loadingMessage}</p>
@@ -235,16 +399,100 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="p-6 bg-slate-800/50 rounded-full">
-                      <Tv className="w-12 h-12 text-slate-600" />
+                  <div className="min-h-[260px] md:h-full flex flex-col justify-center p-4 md:p-8 bg-gradient-to-br from-slate-950 via-black to-slate-900">
+                    <div className="flex items-center gap-2 text-blue-400 text-[11px] font-black uppercase tracking-widest mb-3">
+                      <Radio className="w-4 h-4" />
+                      {featuredAgenda.length > 0 ? 'En vivo y proximos' : 'Centro de transmision'}
                     </div>
-                    <p className="text-slate-400 max-w-xs text-center">Selecciona un canal de la lista para comenzar la transmisión</p>
+                    <h2 className="text-xl md:text-3xl font-black text-white leading-tight max-w-2xl">
+                      Elige un canal o entra desde la agenda del dia.
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-2 max-w-xl">
+                      Los eventos activos aparecen destacados para que llegues mas rapido a la transmision.
+                    </p>
+                    {featuredAgenda.length > 0 && (
+                      <div className="hidden md:grid md:grid-cols-3 gap-3 mt-5">
+                        {featuredAgenda.map(event => {
+                          const status = getEventStatus(event);
+                          return (
+                            <button
+                              key={`${event.date}-${event.time}-${event.title}`}
+                              onClick={() => handleSelectAgendaEvent(event)}
+                              className="text-left bg-slate-900/80 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
+                            >
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <span className="text-blue-400 text-xs font-bold flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {event.time}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${status.color}`}>
+                                  {status.label}
+                                </span>
+                              </div>
+                              <p className="text-slate-100 text-sm font-bold leading-snug line-clamp-2">
+                                {event.title}
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-2 truncate">
+                                {event.category} - {event.language}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {uniqueAgenda.length > 0 && (
+            <section className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+              <div className="flex items-start sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-200 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-400" />
+                    Agenda de hoy
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">Partidos activos y proximos sin repetir senales.</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('agenda')}
+                  className="shrink-0 whitespace-nowrap text-xs font-bold text-blue-400 hover:text-blue-300"
+                >
+                  Ver todo
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {uniqueAgenda.slice(0, 3).map(event => {
+                  const status = getEventStatus(event);
+                  return (
+                    <button
+                      key={`main-${event.date}-${event.time}-${event.title}`}
+                      onClick={() => handleSelectAgendaEvent(event)}
+                      className="text-left bg-slate-900 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-blue-400 text-xs font-bold flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {event.time}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-slate-100 leading-tight line-clamp-2">
+                        {event.title}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-2 truncate">
+                        {event.category} - {event.language}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
           
           <AdBanner format="horizontal" />
           
@@ -277,7 +525,7 @@ function App() {
           )}
         </div>
 
-        <div className="lg:col-span-1 flex flex-col gap-4 max-h-[calc(100vh-150px)]">
+        <div className="lg:col-span-1 flex flex-col gap-4 lg:max-h-[calc(100vh-150px)]">
           {/* Tabs */}
           <div className="flex bg-slate-800 p-1 rounded-xl">
             <button 
@@ -297,6 +545,15 @@ function App() {
             >
               <Calendar className="w-4 h-4" />
               AGENDA
+            </button>
+            <button 
+              onClick={() => setActiveTab('chat')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'chat' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              CHAT
             </button>
           </div>
           
@@ -328,42 +585,21 @@ function App() {
                     <p className="text-slate-500 text-sm">No se encontraron canales</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3">
-                    {filteredChannels.map(channel => (
-                      <div 
-                        key={channel.id}
-                        onClick={() => handleSelectChannel(channel)}
-                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
-                          selectedChannel?.id === channel.id 
-                          ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
-                          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-                          <Tv className={`w-5 h-5 ${selectedChannel?.id === channel.id ? 'text-blue-500' : 'text-slate-600'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-semibold text-sm truncate ${selectedChannel?.id === channel.id ? 'text-blue-400' : 'text-slate-200'}`}>
-                            {channel.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                            {channel.category}
-                          </p>
-                        </div>
-                        <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${selectedChannel?.id === channel.id ? 'text-blue-500 rotate-90' : 'text-slate-700'}`} />
-                      </div>
-                    ))}
+                  <div className="space-y-5">
+                    {renderChannelSection('Favoritos', favoriteChannels, <Star className="w-3.5 h-3.5 text-yellow-400" />)}
+                    {renderChannelSection('Recientes', recentChannels, <History className="w-3.5 h-3.5 text-blue-400" />)}
+                    {renderChannelSection(activeCategory, regularChannels, <Globe className="w-3.5 h-3.5 text-slate-500" />)}
                   </div>
                 )}
               </>
-            ) : (
+            ) : activeTab === 'agenda' ? (
               <div className="space-y-4">
                 {loadingAgenda ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
                     <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
                     <p className="text-slate-500 text-sm">Sincronizando agenda...</p>
                   </div>
-                ) : agenda.length === 0 ? (
+                ) : uniqueAgenda.length === 0 ? (
                   <div className="text-center py-20">
                     <Calendar className="w-12 h-12 text-slate-800 mx-auto mb-3" />
                     <p className="text-slate-500 text-sm">No hay eventos para hoy</p>
@@ -373,11 +609,11 @@ function App() {
                     <div className="px-1">
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Partidos de Hoy</h3>
                     </div>
-                    {agenda.map((event, idx) => {
+                    {uniqueAgenda.map((event) => {
                       const status = getEventStatus(event);
                       return (
                         <div 
-                          key={idx}
+                          key={`${event.date}-${event.time}-${event.title}`}
                           className="bg-slate-800 border border-slate-700 rounded-xl p-3 hover:border-blue-500/50 transition-all group"
                         >
                           <div className="flex items-center justify-between mb-2">
@@ -412,6 +648,12 @@ function App() {
                   </div>
                 )}
               </div>
+            ) : (
+              <ChatPanel
+                baseUrl={CHAT_URL}
+                channelRoom={selectedChannelRoom}
+                channelName={selectedChannel?.name || null}
+              />
             )}
           </div>
         </div>
@@ -422,7 +664,7 @@ function App() {
         href="https://t.me/goleafutbol" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center group animate-bounce hover:animate-none"
+        className="hidden md:flex fixed bottom-6 right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 items-center justify-center group animate-bounce hover:animate-none"
         title="Únete a nuestro Telegram"
       >
         <MessageCircle className="w-6 h-6" />
