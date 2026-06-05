@@ -28,7 +28,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ format, className = "" }) => {
         const script = document.createElement('script');
         script.async = true;
         script.setAttribute('data-cfasync', 'false');
-        script.src = "https://pl29623793.effectivecpmnetwork.com/309760bc253aa931b97b78c5f29642b7/invoke.js";
+        script.src = "https://formssternlystately.com/309760bc253aa931b97b78c5f29642b7/invoke.js";
         containerRef.current.appendChild(script);
       }, isMobile ? 8000 : 1500);
 
