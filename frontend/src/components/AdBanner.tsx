@@ -15,6 +15,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ format, className = "" }) => {
   useEffect(() => {
     if (format === 'horizontal' && isVisible && containerRef.current) {
       // Usamos un pequeño delay para asegurar que el móvil haya renderizado el div
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
       const timer = setTimeout(() => {
         if (!containerRef.current) return;
         
@@ -29,7 +30,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ format, className = "" }) => {
         script.setAttribute('data-cfasync', 'false');
         script.src = "https://pl29623793.effectivecpmnetwork.com/309760bc253aa931b97b78c5f29642b7/invoke.js";
         containerRef.current.appendChild(script);
-      }, 500);
+      }, isMobile ? 8000 : 1500);
 
       return () => clearTimeout(timer);
     }
