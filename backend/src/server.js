@@ -58,16 +58,19 @@ app.get("/api/proxy", async (req, res) => {
 
     if (isVideo && !needsFullProxy) return res.redirect(url);
 
-    if (isVideo) res.set("Cache-Control", "public, max-age=3600");
-    else if (url.includes(".m3u8")) res.set("Cache-Control", "no-cache, no-store, must-revalidate");
-
     const response = await fetch(url, { method: "GET", headers: getHeadersForUrl(url) });
     if (!response.ok) return res.status(response.status).send("Origin error");
 
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Content-Type", response.headers.get("content-type") || "application/octet-stream");
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    const isPlaylist = url.includes(".m3u8") || /mpegurl|vnd\.apple\.mpegurl/i.test(contentType);
 
-    if (url.includes(".m3u8")) {
+    if (isVideo) res.set("Cache-Control", "public, max-age=3600");
+    else if (isPlaylist) res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Content-Type", contentType);
+
+    if (isPlaylist) {
       let text = await response.text();
       const baseUrl = url.substring(0, url.lastIndexOf("/") + 1);
       const origin = new URL(url).origin;
