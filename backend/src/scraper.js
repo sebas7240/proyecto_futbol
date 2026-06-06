@@ -37,7 +37,11 @@ async function getChannelsFromPelotaLibre() {
 
 async function getAgendaEventsFromPelotaLibre() {
   const browser = await getBrowser();
-  const page = await browser.newPage();
+  const context = await browser.newContext({
+    locale: "es-CO",
+    timezoneId: "America/Bogota"
+  });
+  const page = await context.newPage();
 
   try {
     await page.goto(`${PELOTA_DOMAIN}/agenda2`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -105,6 +109,7 @@ async function getAgendaEventsFromPelotaLibre() {
     }, PELOTA_DOMAIN);
   } finally {
     await page.close();
+    await context.close();
   }
 }
 
