@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio, Users } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
@@ -24,9 +24,48 @@ interface AgendaEvent {
   date: string;
 }
 
+interface PresenceCounts {
+  total: number;
+  channels: Record<string, number>;
+  ttlSeconds?: number;
+  updatedAt?: number;
+}
+
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'agenda2-sync-2026-06-06';
+const APP_BUILD_MARKER = 'presence-counters-2026-06-06';
+const PRESENCE_HEARTBEAT_MS = 25000;
+const PRESENCE_COUNTS_MS = 20000;
+
+function getOrCreatePresenceSessionId(): string {
+  const key = 'golea_presence_session';
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+
+  const sessionId = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  localStorage.setItem(key, sessionId);
+  return sessionId;
+}
+
+function hashString(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function getPresenceChannelKey(channelId: string): string {
+  return `ch-${hashString(channelId)}`;
+}
+
+function formatViewerCount(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 10000) return `${Math.round(value / 1000)}k`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return String(value);
+}
 
 function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -42,6 +81,8 @@ function App() {
   const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [presenceSessionId] = useState(getOrCreatePresenceSessionId);
+  const [presenceCounts, setPresenceCounts] = useState<PresenceCounts>({ total: 0, channels: {} });
   const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
@@ -96,6 +137,69 @@ function App() {
     return () => clearInterval(refresh);
   }, []);
 
+  const selectedPresenceChannelKey = useMemo(() => {
+    return selectedChannel ? getPresenceChannelKey(selectedChannel.id) : null;
+  }, [selectedChannel]);
+
+  const presenceChannelKeys = useMemo(() => {
+    return Array.from(new Set(channels.map(channel => getPresenceChannelKey(channel.id)))).slice(0, 80);
+  }, [channels]);
+
+  useEffect(() => {
+    const sendPresence = async () => {
+      if (document.hidden) return;
+
+      try {
+        await axios.post(`${CHAT_URL}/presence`, {
+          sessionId: presenceSessionId,
+          channelId: selectedPresenceChannelKey
+        }, {
+          timeout: 8000
+        });
+      } catch (err) {
+        console.debug('Presence heartbeat failed:', err);
+      }
+    };
+
+    sendPresence();
+    const heartbeat = setInterval(sendPresence, PRESENCE_HEARTBEAT_MS);
+    const handleVisibility = () => {
+      if (!document.hidden) sendPresence();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [presenceSessionId, selectedPresenceChannelKey]);
+
+  useEffect(() => {
+    const fetchPresenceCounts = async () => {
+      try {
+        const response = await axios.get(`${CHAT_URL}/presence/counts`, {
+          params: { channels: presenceChannelKeys.join(',') },
+          timeout: 8000
+        });
+        setPresenceCounts(response.data);
+      } catch (err) {
+        console.debug('Presence counts failed:', err);
+      }
+    };
+
+    fetchPresenceCounts();
+    const refresh = setInterval(fetchPresenceCounts, PRESENCE_COUNTS_MS);
+    const handleVisibility = () => {
+      if (!document.hidden) fetchPresenceCounts();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(refresh);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [presenceChannelKeys]);
+
   useEffect(() => {
     localStorage.setItem('golea_favorites', JSON.stringify(favoriteChannelIds));
   }, [favoriteChannelIds]);
@@ -131,7 +235,7 @@ function App() {
   };
 
   const categories = useMemo(() => {
-    const cats = ['Todos', ...Array.from(new Set(channels.map(c => c.category)))];
+    const cats = ['Todos', 'Premium', ...Array.from(new Set(channels.filter(c => c.category !== 'Premium').map(c => c.category)))];
     return cats;
   }, [channels]);
 
@@ -277,11 +381,17 @@ function App() {
   const selectedChannelRoom = selectedChannel
     ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
     : null;
+  const getChannelViewerCount = (channel: Channel) => {
+    return presenceCounts.channels[getPresenceChannelKey(channel.id)] || 0;
+  };
+  const selectedChannelViewers = selectedChannel ? getChannelViewerCount(selectedChannel) : 0;
 
   const renderChannelCard = (channel: Channel) => {
     const channelStatus = getChannelStatus(channel);
     const isFavorite = favoriteChannelIds.includes(channel.id);
     const isSelected = selectedChannel?.id === channel.id;
+    const isPremium = channel.category === 'Premium';
+    const channelViewers = getChannelViewerCount(channel);
 
     return (
       <div 
@@ -290,26 +400,39 @@ function App() {
         className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
           isSelected 
           ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
-          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
+          : isPremium 
+            ? 'bg-slate-800 border-transparent hover:bg-blue-900/20 hover:border-blue-700/50'
+            : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
         }`}
       >
-        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-          <Tv className={`w-5 h-5 ${isSelected ? 'text-blue-500' : 'text-slate-600'}`} />
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-blue-600/20' : 'bg-slate-900'}`}>
+          <Tv className={`w-5 h-5 ${isSelected ? 'text-blue-500' : isPremium ? 'text-blue-400' : 'text-slate-600'}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className={`font-semibold text-sm truncate ${isSelected ? 'text-blue-400' : 'text-slate-200'}`}>
               {channel.name}
             </p>
+            {isPremium && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] bg-blue-600 text-white font-black uppercase">
+                PREMIUM
+              </span>
+            )}
             {channelStatus && (
               <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${channelStatus.color}`}>
                 {channelStatus.label}
               </span>
             )}
           </div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-            {channel.category}
-          </p>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold truncate">
+              {channel.category}
+            </p>
+            <span className="shrink-0 inline-flex items-center gap-1 text-[10px] text-green-400 font-bold">
+              <Users className="w-3 h-3" />
+              {channelViewers > 0 ? formatViewerCount(channelViewers) : 'En vivo'}
+            </span>
+          </div>
         </div>
         <button
           type="button"
@@ -370,6 +493,11 @@ function App() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
               />
+            </div>
+
+            <div className="shrink-0 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-bold text-slate-300 flex items-center gap-2">
+              <Users className="w-4 h-4 text-green-400" />
+              <span>{presenceCounts.total > 0 ? `${formatViewerCount(presenceCounts.total)} online` : 'Online'}</span>
             </div>
 
             <button 
@@ -544,6 +672,11 @@ function App() {
                   </span>
                   <span className="text-slate-600">•</span>
                   <span>{streamUrl ? 'Streaming HD' : 'Estableciendo conexión...'}</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="inline-flex items-center gap-1 text-green-400">
+                    <Users className="w-3.5 h-3.5" />
+                    {selectedChannelViewers > 0 ? `${formatViewerCount(selectedChannelViewers)} viendo ahora` : 'Contador activo'}
+                  </span>
                 </div>
               </div>
             </div>

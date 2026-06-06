@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 interface Env {
   CHAT_ROOM: DurableObjectNamespace<ChatRoom>;
+  PRESENCE_SHARD: DurableObjectNamespace<PresenceShard>;
 }
 
 interface ChatMessage {
@@ -16,12 +17,20 @@ interface SocketAttachment {
   ip: string;
 }
 
+interface PresenceCounts {
+  total: number;
+  channels: Record<string, number>;
+}
+
 const ALLOWED_ORIGINS = new Set([
   "https://goleafutbol.com",
   "https://www.goleafutbol.com",
   "https://golea.pages.dev",
 ]);
 
+const PRESENCE_SHARDS = 16;
+const PRESENCE_TTL_MS = 70_000;
+const MAX_PRESENCE_CHANNELS = 80;
 const MAX_MESSAGE_LENGTH = 160;
 const MAX_MESSAGES = 200;
 const RATE_LIMIT_MS = 7000;
@@ -59,6 +68,28 @@ function cleanRoom(value: string | null): string {
   return room || "global";
 }
 
+function cleanPresenceId(value: unknown): string {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9:_-]/g, "-").slice(0, 96);
+}
+
+function cleanPresenceChannel(value: unknown): string | null {
+  const channel = String(value || "").toLowerCase().replace(/[^a-z0-9:_-]/g, "-").slice(0, 96);
+  return channel || null;
+}
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function presenceShardName(sessionId: string): string {
+  return `presence-${hashString(sessionId) % PRESENCE_SHARDS}`;
+}
+
 function cleanName(value: string | null): string {
   const name = (value || "").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().slice(0, 18);
   return name || `Invitado${Math.floor(100 + Math.random() * 900)}`;
@@ -82,6 +113,73 @@ function errorResponse(request: Request, message: string, status = 400): Respons
     status,
     headers: { ...jsonHeaders, ...corsHeaders(request) },
   });
+}
+
+export class PresenceShard extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.ctx.blockConcurrencyWhile(async () => {
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS presence_sessions (
+          session_id TEXT PRIMARY KEY,
+          channel_id TEXT,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_presence_updated_at ON presence_sessions(updated_at);
+        CREATE INDEX IF NOT EXISTS idx_presence_channel_id ON presence_sessions(channel_id);
+      `);
+    });
+  }
+
+  heartbeat(sessionId: string, channelId: string | null): { ok: true; expiresInMs: number } {
+    const now = Date.now();
+    this.cleanup(now);
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO presence_sessions (session_id, channel_id, updated_at) VALUES (?, ?, ?)",
+      sessionId,
+      channelId,
+      now
+    );
+    return { ok: true, expiresInMs: PRESENCE_TTL_MS };
+  }
+
+  getCounts(channelIds: string[]): PresenceCounts {
+    const now = Date.now();
+    this.cleanup(now);
+
+    const totalRow = this.ctx.storage.sql.exec<{ count: number } & Record<string, SqlStorageValue>>(
+      "SELECT COUNT(*) AS count FROM presence_sessions WHERE updated_at >= ?",
+      now - PRESENCE_TTL_MS
+    ).toArray()[0];
+
+    const counts: Record<string, number> = {};
+    const uniqueChannelIds = Array.from(new Set(channelIds)).slice(0, MAX_PRESENCE_CHANNELS);
+
+    if (uniqueChannelIds.length > 0) {
+      const placeholders = uniqueChannelIds.map(() => "?").join(",");
+      const rows = this.ctx.storage.sql.exec<{ channel_id: string; count: number } & Record<string, SqlStorageValue>>(
+        `SELECT channel_id, COUNT(*) AS count
+         FROM presence_sessions
+         WHERE updated_at >= ? AND channel_id IN (${placeholders})
+         GROUP BY channel_id`,
+        now - PRESENCE_TTL_MS,
+        ...uniqueChannelIds
+      ).toArray();
+
+      rows.forEach((row) => {
+        if (row.channel_id) counts[row.channel_id] = Number(row.count) || 0;
+      });
+    }
+
+    return { total: Number(totalRow?.count) || 0, channels: counts };
+  }
+
+  private cleanup(now: number): void {
+    this.ctx.storage.sql.exec(
+      "DELETE FROM presence_sessions WHERE updated_at < ?",
+      now - PRESENCE_TTL_MS
+    );
+  }
 }
 
 export class ChatRoom extends DurableObject<Env> {
@@ -309,6 +407,53 @@ export default {
 
     if (url.pathname === "/health") {
       return Response.json({ ok: true, service: "golea-chat" }, { headers: corsHeaders(request) });
+    }
+
+    if (url.pathname === "/presence" && request.method === "POST") {
+      const body = await request.json().catch(() => null) as { sessionId?: string; channelId?: string | null } | null;
+      const sessionId = cleanPresenceId(body?.sessionId);
+      if (!sessionId) return errorResponse(request, "Sesion invalida");
+
+      const channelId = cleanPresenceChannel(body?.channelId || null);
+      const stub = env.PRESENCE_SHARD.getByName(presenceShardName(sessionId));
+      const result = await stub.heartbeat(sessionId, channelId);
+      return Response.json(result, {
+        headers: { ...corsHeaders(request), "Cache-Control": "no-store" },
+      });
+    }
+
+    if (url.pathname === "/presence/counts" && request.method === "GET") {
+      const channelIds = (url.searchParams.get("channels") || "")
+        .split(",")
+        .map(cleanPresenceChannel)
+        .filter((channelId): channelId is string => Boolean(channelId))
+        .slice(0, MAX_PRESENCE_CHANNELS);
+
+      const results = await Promise.all(
+        Array.from({ length: PRESENCE_SHARDS }, (_, index) =>
+          env.PRESENCE_SHARD.getByName(`presence-${index}`).getCounts(channelIds)
+        )
+      );
+
+      const merged: PresenceCounts = {
+        total: 0,
+        channels: Object.fromEntries(channelIds.map((channelId) => [channelId, 0])),
+      };
+
+      results.forEach((result) => {
+        merged.total += result.total;
+        Object.entries(result.channels).forEach(([channelId, count]) => {
+          merged.channels[channelId] = (merged.channels[channelId] || 0) + count;
+        });
+      });
+
+      return Response.json({
+        ...merged,
+        ttlSeconds: Math.round(PRESENCE_TTL_MS / 1000),
+        updatedAt: Date.now(),
+      }, {
+        headers: { ...corsHeaders(request), "Cache-Control": "no-store" },
+      });
     }
 
     if (!["/ws", "/messages", "/report"].includes(url.pathname)) {
