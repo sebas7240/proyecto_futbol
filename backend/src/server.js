@@ -16,7 +16,7 @@ const pendingScrapes = new Map();
 const FULL_PROXY_DOMAINS = [
     "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com", 
     "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
-    "pelotalibrestv.org", "skylivefu.com", "skylivehd.com"
+    "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org"
 ];
 
 function getHeadersForUrl(targetUrl) {
@@ -32,7 +32,7 @@ function getHeadersForUrl(targetUrl) {
   } else if (targetUrl.includes("televisionlibre") || targetUrl.includes("futbollibre")) {
     headers["Referer"] = "https://televisionlibre.net/";
     headers["Origin"] = "https://televisionlibre.net";
-  } else if (targetUrl.includes("pelotalibrestv.org") || targetUrl.includes("skylivefu.com") || targetUrl.includes("skylivehd.com")) {
+  } else if (targetUrl.includes("pelotalibrestv.org") || targetUrl.includes("skylivefu.com") || targetUrl.includes("skylivehd.com") || targetUrl.includes("envivoslatam.org")) {
     headers["Referer"] = "https://skylivefu.com/";
     headers["Origin"] = "https://skylivefu.com";
   }
@@ -88,7 +88,6 @@ app.get("/api/proxy", async (req, res) => {
 let channelsCache = null, lastChannelsFetch = 0;
 app.get("/api/channels", async (req, res) => {
   try {
-    // Aumentamos caché a 10 minutos (600000ms) para canales
     if (!channelsCache || Date.now() - lastChannelsFetch > 600000) { 
       channelsCache = await getChannels(); lastChannelsFetch = Date.now();
     }
@@ -98,7 +97,6 @@ app.get("/api/channels", async (req, res) => {
 
 app.get("/api/stream-url", async (req, res) => {
   const { id } = req.query;
-  // Aumentamos caché de stream a 10 minutos para reducir uso de Playwright
   if (streamCache.has(id) && Date.now() - streamCache.get(id).timestamp < 600000) return res.json(streamCache.get(id));
   if (pendingScrapes.has(id)) return res.json(await pendingScrapes.get(id));
   const p = (async () => {
@@ -119,12 +117,40 @@ let agendaCache = null, lastAgendaFetch = 0;
 app.get("/api/agenda", async (req, res) => {
   try {
     if (!agendaCache || Date.now() - lastAgendaFetch > 600000) {
-      const r = await fetch("https://la14hd.com/eventos/json/agenda123.json", {
+      const r = await fetch("https://pelotalibrestv.org/agenda.json", {
         headers: { "User-Agent": "Mozilla/5.0" },
         signal: AbortSignal.timeout(5000)
       });
       if (!r.ok) throw new Error("Agenda source down");
-      agendaCache = (await r.json()).map(e => ({ ...e, channelId: (e.link.match(/stream=([^&]+)/) || [])[1] }));
+      const data = await r.json();
+
+      const events = [];
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+      if (data.dias && data.dias.length > 0) {
+          data.dias[0].eventos.forEach(ev => {
+              ev.canales.forEach(ch => {
+                  try {
+                      const b64 = ch.url.split("r=")[1];
+                      if (b64) {
+                          const decodedUrl = Buffer.from(b64, "base64").toString("utf-8");
+                          events.push({
+                              title: ev.titulo,
+                              time: ev.hora,
+                              category: ev.clase || "Deportes",
+                              language: "Español",
+                              status: "PROXIMO",
+                              date: today,
+                              channelName: ch.nombre,
+                              link: decodedUrl,
+                              channelId: decodedUrl.split("stream=")[1] || decodedUrl
+                          });
+                      }
+                  } catch (e) { }
+              });
+          });
+      }
+      agendaCache = events;
       lastAgendaFetch = Date.now();
     }
     res.json(agendaCache || []);
@@ -133,7 +159,6 @@ app.get("/api/agenda", async (req, res) => {
     res.json([]);
   }
 });
-
 app.get("/health", (req, res) => res.send("golea-api ok"));
 app.get("/", (req, res) => res.send("Golea API online"));
 app.listen(PORT, () => console.log("Running on " + PORT));
