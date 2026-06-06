@@ -1,4 +1,4 @@
-const { chromium } = require("playwright-extra");
+﻿const { chromium } = require("playwright-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const needle = require("needle");
 
@@ -10,7 +10,7 @@ const PELOTA_DOMAIN = "https://pelotalibrestv.org";
 async function getBrowser() {
   if (!browser || !browser.isConnected()) {
     console.log("[Scraper] Lanzando navegador...");
-    browser = await chromium.launch({ 
+    browser = await chromium.launch({
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
@@ -176,7 +176,7 @@ async function getChannelsFromNoveo() {
     const response = await needle("get", `${url}/api/channels`, {
       headers: { "User-Agent": "Mozilla/5.0" }
     });
-    
+
     if (!Array.isArray(response.body)) return [];
 
     return response.body.map(ch => ({
@@ -224,7 +224,7 @@ async function getNoveoToken() {
 async function getNoveoStreamUrl(id) {
   const channelId = id.replace("noveo-", "");
   const baseUrl = "https://noveopartidos.xyz";
-  
+
   try {
     const token = await getNoveoToken();
     if (!token) throw new Error("Could not get Noveo token");
@@ -237,10 +237,73 @@ async function getNoveoStreamUrl(id) {
   }
 }
 
+async function getChannelsFromTvTvHd() {
+  try {
+    const url = "https://tvtvhd.com";
+    const response = await needle("get", `${url}/status.json`, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+
+    if (!response.body) return [];
+
+    const channels = [];
+    for (const category in response.body) {
+      response.body[category].forEach(ch => {
+        if (ch.Estado === "Activo") {
+          channels.push({
+            id: `tvtvhd-${ch.Link.split("stream=")[1]}`,
+            name: ch.Canal,
+            category: "Premium 2",
+            source: "tvtvhd"
+          });
+        }
+      });
+    }
+    return channels;
+  } catch (err) {
+    console.error("[Scraper] Error en TVTVHD Channels:", err.message);
+    return [];
+  }
+}
+
+async function getTvTvHdStreamUrl(id) {
+  const streamId = id.replace("tvtvhd-", "");
+  const baseUrl = "https://tvtvhd.com";
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+
+  try {
+    // 1. Get iframe source
+    const r1 = await needle("get", `${baseUrl}/vivo/canales.php?stream=${streamId}`, {
+      headers: { "User-Agent": userAgent }
+    });
+    const body1 = r1.body.toString();
+    const iframeMatch = body1.match(/src="(https:\/\/la18hd\.com\/vivo\/canales\.php\?stream=.*?)"/);
+    if (!iframeMatch) return null;
+
+    const iframeUrl = iframeMatch[1];
+
+    // 2. Get playbackURL from iframe
+    const r2 = await needle("get", iframeUrl, {
+      headers: { "User-Agent": userAgent, "Referer": baseUrl }
+    });
+    const body2 = r2.body.toString();
+    const playbackMatch = body2.match(/playbackURL = "(.*?)"/);
+
+    if (playbackMatch) {
+      return { url: playbackMatch[1], headers: { "Referer": "https://la18hd.com/" } };
+    }
+    return null;
+  } catch (err) {
+    console.error("[Scraper] Error en TVTVHD Stream:", err.message);
+    return null;
+  }
+}
+
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
   const sourceA = await getChannelsFromPelotaLibre();
   const sourceNoveo = await getChannelsFromNoveo();
+  const sourceTvTvHd = await getChannelsFromTvTvHd();
 
   const masterMap = new Map();
   sourceA.forEach(ch => {
@@ -262,14 +325,17 @@ async function getChannels() {
     backups: ch.backups
   }));
 
-  return [...channels, ...sourceNoveo];
+  return [...channels, ...sourceNoveo, ...sourceTvTvHd];
 }
 
 async function getStreamUrl(channelUrl) {
   if (channelUrl.startsWith("noveo-")) {
     return await getNoveoStreamUrl(channelUrl);
   }
-  console.log("[Scraper] Obteniendo señal para: " + channelUrl);
+  if (channelUrl.startsWith("tvtvhd-")) {
+    return await getTvTvHdStreamUrl(channelUrl);
+  }
+  console.log("[Scraper] Obteniendo seÃ±al para: " + channelUrl);
   const browser = await getBrowser();
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -284,8 +350,8 @@ async function getStreamUrl(channelUrl) {
       }
     });
 
-    // IMPORTANTE: Si la URL es de skylivefu, no cargará fuera de pelotalibre.
-    // Intentamos cargarla, pero si falla, el usuario tiene razón: hay que navegar vía pelotalibrestv.org
+    // IMPORTANTE: Si la URL es de skylivefu, no cargarÃ¡ fuera de pelotalibre.
+    // Intentamos cargarla, pero si falla, el usuario tiene razÃ³n: hay que navegar vÃ­a pelotalibrestv.org
     await page.goto(channelUrl, { waitUntil: "networkidle", timeout: 30000 });
     await page.waitForTimeout(10000);
 
