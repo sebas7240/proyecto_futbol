@@ -15,7 +15,8 @@ const pendingScrapes = new Map();
 
 const FULL_PROXY_DOMAINS = [
     "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com", 
-    "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar"
+    "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
+    "pelotalibrestv.org", "skylivefu.com", "skylivehd.com"
 ];
 
 function getHeadersForUrl(targetUrl) {
@@ -31,6 +32,9 @@ function getHeadersForUrl(targetUrl) {
   } else if (targetUrl.includes("televisionlibre") || targetUrl.includes("futbollibre")) {
     headers["Referer"] = "https://televisionlibre.net/";
     headers["Origin"] = "https://televisionlibre.net";
+  } else if (targetUrl.includes("pelotalibrestv.org") || targetUrl.includes("skylivefu.com") || targetUrl.includes("skylivehd.com")) {
+    headers["Referer"] = "https://skylivefu.com/";
+    headers["Origin"] = "https://skylivefu.com";
   }
   return headers;
 }
@@ -115,12 +119,19 @@ let agendaCache = null, lastAgendaFetch = 0;
 app.get("/api/agenda", async (req, res) => {
   try {
     if (!agendaCache || Date.now() - lastAgendaFetch > 600000) {
-      const r = await fetch("https://la14hd.com/eventos/json/agenda123.json", { headers: { "User-Agent": "Mozilla/5.0" } });
+      const r = await fetch("https://la14hd.com/eventos/json/agenda123.json", {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!r.ok) throw new Error("Agenda source down");
       agendaCache = (await r.json()).map(e => ({ ...e, channelId: (e.link.match(/stream=([^&]+)/) || [])[1] }));
       lastAgendaFetch = Date.now();
     }
-    res.json(agendaCache);
-  } catch (e) { res.status(500).send("Agenda error"); }
+    res.json(agendaCache || []);
+  } catch (e) {
+    console.error("[Agenda] Error:", e.message);
+    res.json([]);
+  }
 });
 
 app.get("/health", (req, res) => res.send("golea-api ok"));
