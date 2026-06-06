@@ -36,6 +36,9 @@ function getHeadersForUrl(targetUrl) {
   } else if (targetUrl.includes("pelotalibrestv.org") || targetUrl.includes("skylivefu.com") || targetUrl.includes("skylivehd.com") || targetUrl.includes("envivoslatam.org")) {
     headers["Referer"] = "https://skylivefu.com/";
     headers["Origin"] = "https://skylivefu.com";
+  } else if (targetUrl.includes("noveopartidos.xyz")) {
+    headers["Referer"] = "https://noveopartidos.xyz/";
+    headers["Origin"] = "https://noveopartidos.xyz";
   }
 
   return headers;

@@ -170,9 +170,77 @@ async function getChannelsFromRojaDirecta() {
   }
 }
 
+async function getChannelsFromNoveo() {
+  try {
+    const url = "https://noveopartidos.xyz";
+    const response = await needle("get", `${url}/api/channels`, {
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+    
+    if (!Array.isArray(response.body)) return [];
+
+    return response.body.map(ch => ({
+      id: `noveo-${ch.id}`,
+      name: ch.name,
+      category: "Premium",
+      source: "noveopartidos",
+      original_id: ch.id
+    }));
+  } catch (err) {
+    console.error("[Scraper] Error en Noveo Channels:", err.message);
+    return [];
+  }
+}
+
+let noveoTokenCache = {
+  token: null,
+  timestamp: 0
+};
+
+async function getNoveoToken() {
+  const baseUrl = "https://noveopartidos.xyz";
+  // Cache for 10 minutes
+  if (noveoTokenCache.token && Date.now() - noveoTokenCache.timestamp < 600000) {
+    return noveoTokenCache.token;
+  }
+
+  try {
+    const tokenResp = await needle("get", `${baseUrl}/api/token`, {
+      headers: { "User-Agent": "Mozilla/5.0", "Referer": baseUrl }
+    });
+    if (tokenResp.body && tokenResp.body.token) {
+      noveoTokenCache = {
+        token: tokenResp.body.token,
+        timestamp: Date.now()
+      };
+      return noveoTokenCache.token;
+    }
+  } catch (e) {
+    console.error("[Noveo] Token error:", e.message);
+  }
+  return null;
+}
+
+async function getNoveoStreamUrl(id) {
+  const channelId = id.replace("noveo-", "");
+  const baseUrl = "https://noveopartidos.xyz";
+  
+  try {
+    const token = await getNoveoToken();
+    if (!token) throw new Error("Could not get Noveo token");
+
+    const streamUrl = `${baseUrl}/api/stream/${channelId}?target=1&_t=${token}`;
+    return { url: streamUrl, headers: { "Referer": baseUrl } };
+  } catch (err) {
+    console.error("[Scraper] Error en Noveo Stream:", err.message);
+    return null;
+  }
+}
+
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
   const sourceA = await getChannelsFromPelotaLibre();
+  const sourceNoveo = await getChannelsFromNoveo();
 
   const masterMap = new Map();
   sourceA.forEach(ch => {
@@ -186,16 +254,21 @@ async function getChannels() {
     }
   });
 
-  return Array.from(masterMap.values()).map(ch => ({
+  const channels = Array.from(masterMap.values()).map(ch => ({
     id: ch.id,
     name: ch.name,
     category: ch.category,
     logo: "",
     backups: ch.backups
   }));
+
+  return [...channels, ...sourceNoveo];
 }
 
 async function getStreamUrl(channelUrl) {
+  if (channelUrl.startsWith("noveo-")) {
+    return await getNoveoStreamUrl(channelUrl);
+  }
   console.log("[Scraper] Obteniendo señal para: " + channelUrl);
   const browser = await getBrowser();
   const context = await browser.newContext({
