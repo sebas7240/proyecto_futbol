@@ -11,6 +11,7 @@ app.use(express.json());
 
 const streamCache = new Map();
 const pendingScrapes = new Map();
+const LIST_CACHE_TTL_MS = 300000;
 
 const FULL_PROXY_DOMAINS = [
   "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com",
@@ -92,7 +93,7 @@ let channelsCache = null;
 let lastChannelsFetch = 0;
 app.get("/api/channels", async (req, res) => {
   try {
-    if (!channelsCache || Date.now() - lastChannelsFetch > 600000) {
+    if (!channelsCache || Date.now() - lastChannelsFetch > LIST_CACHE_TTL_MS) {
       channelsCache = await getChannels();
       lastChannelsFetch = Date.now();
     }
@@ -137,7 +138,7 @@ let agendaCache = null;
 let lastAgendaFetch = 0;
 app.get("/api/agenda", async (req, res) => {
   try {
-    if (!agendaCache || Date.now() - lastAgendaFetch > 600000) {
+    if (!agendaCache || Date.now() - lastAgendaFetch > LIST_CACHE_TTL_MS) {
       agendaCache = await getAgendaEventsFromPelotaLibre();
       lastAgendaFetch = Date.now();
     }
