@@ -277,7 +277,7 @@ async function getTvTvHdStreamUrl(id) {
       headers: { "User-Agent": userAgent }
     });
     const body1 = r1.body.toString();
-    const iframeMatch = body1.match(/src="(https:\/\/la18hd\.com\/vivo\/canales\.php\?stream=.*?)"/);
+    const iframeMatch = body1.match(/src=["'](https:\/\/la18hd\.com\/vivo\/canales\.php\?stream=.*?)["']/);
     if (!iframeMatch) return null;
 
     const iframeUrl = iframeMatch[1];
@@ -287,10 +287,25 @@ async function getTvTvHdStreamUrl(id) {
       headers: { "User-Agent": userAgent, "Referer": baseUrl }
     });
     const body2 = r2.body.toString();
-    const playbackMatch = body2.match(/playbackURL = "(.*?)"/);
+    const playbackMatch = body2.match(/playbackURL\s*=\s*["']([^"']+)["']/);
 
     if (playbackMatch) {
-      return { url: playbackMatch[1], headers: { "Referer": "https://la18hd.com/" } };
+      const playlistUrl = playbackMatch[1];
+      const playlistCheck = await needle("get", playlistUrl, {
+        headers: {
+          "User-Agent": userAgent,
+          "Referer": "https://la18hd.com/",
+          "Origin": "https://la18hd.com"
+        },
+        open_timeout: 10000,
+        response_timeout: 10000
+      });
+
+      if (playlistCheck.statusCode >= 200 && playlistCheck.statusCode < 300) {
+        return { url: playlistUrl, headers: { "Referer": "https://la18hd.com/" } };
+      }
+
+      console.error(`[Scraper] TVTVHD playlist no disponible (${playlistCheck.statusCode}) para ${streamId}`);
     }
     return null;
   } catch (err) {
