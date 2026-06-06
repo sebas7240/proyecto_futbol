@@ -39,11 +39,16 @@ const PRESENCE_COUNTS_MS = 20000;
 
 function getOrCreatePresenceSessionId(): string {
   const key = 'golea_presence_session';
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
-
   const sessionId = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  localStorage.setItem(key, sessionId);
+
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    localStorage.setItem(key, sessionId);
+  } catch {
+    return sessionId;
+  }
+
   return sessionId;
 }
 
