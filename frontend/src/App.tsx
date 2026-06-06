@@ -15,6 +15,7 @@ interface Channel {
 interface AgendaEvent {
   category: string;
   link?: string;
+  dateLabel?: string;
   title: string;
   time: string;
   status: string;
@@ -227,7 +228,13 @@ function App() {
   const getEventStatus = (event: AgendaEvent) => {
     try {
         const [year, month, day] = event.date.split('-').map(Number);
-        const [hour, minute] = event.time.split(':').map(Number);
+        const timeMatch = event.time.trim().toLowerCase().match(/^(\d{1,2}):(\d{2})(am|pm)?$/);
+        if (!timeMatch) throw new Error('Invalid time');
+        let hour = Number(timeMatch[1]);
+        const minute = Number(timeMatch[2]);
+        const meridiem = timeMatch[3];
+        if (meridiem === 'pm' && hour < 12) hour += 12;
+        if (meridiem === 'am' && hour === 12) hour = 0;
         const eventDate = new Date(year, month - 1, day, hour, minute);
         const diffMs = currentTime.getTime() - eventDate.getTime();
         const diffMin = diffMs / (1000 * 60);
@@ -243,6 +250,7 @@ function App() {
 
   const activeAgenda = uniqueAgenda.filter(event => getEventStatus(event).active);
   const featuredAgenda = activeAgenda.slice(0, 3);
+  const agendaTitle = uniqueAgenda[0]?.dateLabel || 'Agenda de hoy';
 
   const channelMatchesEvent = (channel: Channel, event: AgendaEvent) => {
     if (!event.channelId) return false;
@@ -468,9 +476,9 @@ function App() {
                 <div>
                   <h2 className="text-sm font-black uppercase tracking-widest text-slate-200 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-blue-400" />
-                    Agenda de hoy
+                    {agendaTitle}
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">Partidos activos y proximos sin repetir senales.</p>
+                  <p className="text-xs text-slate-500 mt-1">Sincronizada con Pelota Libre TV.</p>
                 </div>
                 <button
                   onClick={() => setActiveTab('agenda')}
@@ -623,7 +631,7 @@ function App() {
                 ) : (
                   <div className="space-y-3">
                     <div className="px-1">
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Partidos de Hoy</h3>
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{agendaTitle}</h3>
                     </div>
                     {uniqueAgenda.map((event) => {
                       const status = getEventStatus(event);

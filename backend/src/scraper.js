@@ -20,39 +20,15 @@ async function getBrowser() {
 
 async function getChannelsFromPelotaLibre() {
   try {
-    let channels = [];
-
-    try {
-        const browser = await getBrowser();
-        const page = await browser.newPage();
-        await page.goto(`${PELOTA_DOMAIN}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
-        const staticChannels = await page.evaluate(() => {
-            const links = Array.from(document.querySelectorAll("a"));
-            return links
-                .filter(l => l.href.includes("/en-vivo/"))
-                .map(l => ({
-                    id: l.href,
-                    name: l.innerText.trim() || l.href.split("/").pop().replace(/-/g, " ").toUpperCase(),
-                    category: "Deportes",
-                    source: "pelotalibre"
-                }))
-                .filter(ch => ch.name.length > 2 && !ch.name.includes("Ver Canal"));
-        });
-        channels = [...staticChannels];
-        await page.close();
-    } catch (e) { console.error("[Scraper] Error en PelotaLibre Home:", e.message); }
-
-    try {
-        const agendaEvents = await getAgendaEventsFromPelotaLibre();
-        channels.push(...agendaEvents.map(event => ({
-            id: event.link,
-            name: `${event.channelName} - ${event.title}`.toUpperCase(),
-            category: "Agenda",
-            source: "pelotalibre_agenda"
-        })));
-    } catch (e) { console.error("[Scraper] Error en PelotaLibre Agenda:", e.message); }
-
-    return channels;
+    const agendaEvents = await getAgendaEventsFromPelotaLibre();
+    return agendaEvents.flatMap(event =>
+      (event.channels || []).map(channel => ({
+        id: channel.url,
+        name: channel.name,
+        category: "Canales",
+        source: "pelotalibre_agenda"
+      }))
+    );
   } catch (err) {
     console.error("[Scraper] Error general PelotaLibre:", err.message);
     return [];
@@ -60,47 +36,76 @@ async function getChannelsFromPelotaLibre() {
 }
 
 async function getAgendaEventsFromPelotaLibre() {
-  const response = await needle("get", `${PELOTA_DOMAIN}/agenda.json`, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    open_timeout: 5000,
-    response_timeout: 5000
-  });
+  const browser = await getBrowser();
+  const page = await browser.newPage();
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new Error(`Agenda source status ${response.statusCode}`);
-  }
+  try {
+    await page.goto(`${PELOTA_DOMAIN}/agenda2`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    return await page.evaluate((domain) => {
+      const getTextWithoutChildren = (element) => {
+        if (!element) return "";
+        return Array.from(element.childNodes)
+          .filter(node => node.nodeType === Node.TEXT_NODE)
+          .map(node => node.textContent || "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+      };
 
-  const data = response.body;
-  const events = [];
-  const today = new Date().toISOString().split("T")[0];
-
-  if (data.dias && data.dias.length > 0) {
-    data.dias[0].eventos.forEach(ev => {
-      ev.canales.forEach(ch => {
+      const getChannelId = (href) => {
         try {
-          const b64 = ch.url.split("r=")[1];
-          if (b64) {
-            const decodedUrl = Buffer.from(b64, "base64").toString("utf-8");
-            events.push({
-              title: ev.titulo,
-              time: ev.hora,
-              category: ev.clase || "Deportes",
-              language: "Espa\u00f1ol",
-              status: "PROXIMO",
-              date: today,
-              channelName: ch.nombre,
-              link: PELOTA_DOMAIN + ch.url,
-              channelId: decodedUrl.split("stream=")[1] || decodedUrl
-            });
-          }
-        } catch (e) {
-          console.error("[Agenda] Evento ignorado:", e.message);
+          const absolute = new URL(href, domain);
+          const encoded = absolute.searchParams.get("r");
+          if (!encoded) return absolute.href;
+          const decoded = atob(encoded);
+          return new URL(decoded).searchParams.get("stream") || decoded;
+        } catch {
+          return href;
         }
-      });
-    });
-  }
+      };
 
-  return events;
+      const dayTitle = document.querySelector(".day-title b")?.textContent?.trim() || "Agenda Deportiva";
+      const date = document.querySelector(".day-title")?.getAttribute("data-date") || new Date().toISOString().slice(0, 10);
+
+      return Array.from(document.querySelectorAll(".menu > li"))
+        .map((item) => {
+          const eventLink = item.querySelector(":scope > a");
+          const time = eventLink?.querySelector("span.t")?.textContent?.trim() || "";
+          const title = getTextWithoutChildren(eventLink);
+          const channels = Array.from(item.querySelectorAll(":scope > ul li a"))
+            .map((channelLink) => {
+              const quality = channelLink.querySelector("span")?.textContent?.trim() || "";
+              const name = getTextWithoutChildren(channelLink);
+              const href = channelLink.getAttribute("href") || "";
+              const url = new URL(href, domain).href;
+              return {
+                name,
+                quality,
+                url,
+                channelId: getChannelId(url)
+              };
+            })
+            .filter(channel => channel.name && channel.url);
+
+          return {
+            title,
+            time,
+            category: Array.from(item.classList)[0] || "Deportes",
+            language: "Espa\u00f1ol",
+            status: "PROXIMO",
+            date,
+            dateLabel: dayTitle,
+            channelName: channels.map(channel => channel.name).join(", "),
+            link: channels[0]?.url || null,
+            channelId: channels[0]?.channelId || null,
+            channels
+          };
+        })
+        .filter(event => event.title && event.time && event.channels.length > 0);
+    }, PELOTA_DOMAIN);
+  } finally {
+    await page.close();
+  }
 }
 
 async function getChannelsFromFutbolLibre() {
