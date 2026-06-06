@@ -16,7 +16,8 @@ const LIST_CACHE_TTL_MS = 300000;
 const FULL_PROXY_DOMAINS = [
   "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com",
   "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
-  "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org"
+  "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org",
+  "noveopartidos.xyz"
 ];
 
 function getHeadersForUrl(targetUrl) {
