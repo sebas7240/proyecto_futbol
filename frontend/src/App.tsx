@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio, Users } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
@@ -36,6 +36,8 @@ const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240
 const APP_BUILD_MARKER = 'presence-counters-2026-06-06';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
+const SOLANA_DONATION_ADDRESS = 'ar65x4bnv19SqAkr6p3Ts6Wx9G3jGp4Pxrj5q4dYndK';
+const SOLANA_EXPLORER_URL = `https://solscan.io/account/${SOLANA_DONATION_ADDRESS}`;
 
 function getOrCreatePresenceSessionId(): string {
   const key = 'golea_presence_session';
@@ -88,6 +90,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [presenceSessionId] = useState(getOrCreatePresenceSessionId);
   const [presenceCounts, setPresenceCounts] = useState<PresenceCounts>({ total: 0, channels: {} });
+  const [donationCopied, setDonationCopied] = useState(false);
   const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
@@ -240,7 +243,7 @@ function App() {
   };
 
   const categories = useMemo(() => {
-    const cats = ['Todos', 'Premium', ...Array.from(new Set(channels.filter(c => c.category !== 'Premium').map(c => c.category)))];
+    const cats = ['Todos', 'Premium', 'Premium 2', ...Array.from(new Set(channels.filter(c => !['Premium', 'Premium 2'].includes(c.category)).map(c => c.category)))];
     return cats;
   }, [channels]);
 
@@ -301,6 +304,25 @@ function App() {
       alert('No se pudo cargar el stream de este canal.');
     } finally {
       setLoadingStream(false);
+    }
+  };
+
+  const handleCopyDonationAddress = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(SOLANA_DONATION_ADDRESS);
+      } else {
+        const input = document.createElement('input');
+        input.value = SOLANA_DONATION_ADDRESS;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+      setDonationCopied(true);
+      window.setTimeout(() => setDonationCopied(false), 2000);
+    } catch {
+      setDonationCopied(false);
     }
   };
 
@@ -400,6 +422,7 @@ function App() {
     const isFavorite = favoriteChannelIds.includes(channel.id);
     const isSelected = selectedChannel?.id === channel.id;
     const isPremium = channel.category === 'Premium';
+    const isPremium2 = channel.category === 'Premium 2';
     const channelViewers = getChannelViewerCount(channel);
 
     return (
@@ -411,11 +434,13 @@ function App() {
           ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
           : isPremium 
             ? 'bg-slate-800 border-transparent hover:bg-blue-900/20 hover:border-blue-700/50'
-            : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
+            : isPremium2
+              ? 'bg-slate-800 border-transparent hover:bg-emerald-900/20 hover:border-emerald-700/50'
+              : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600'
         }`}
       >
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-blue-600/20' : 'bg-slate-900'}`}>
-          <Tv className={`w-5 h-5 ${isSelected ? 'text-blue-500' : isPremium ? 'text-blue-400' : 'text-slate-600'}`} />
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-blue-600/20' : isPremium2 ? 'bg-emerald-600/20' : 'bg-slate-900'}`}>
+          <Tv className={`w-5 h-5 ${isSelected ? 'text-blue-500' : isPremium ? 'text-blue-400' : isPremium2 ? 'text-emerald-400' : 'text-slate-600'}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -425,6 +450,11 @@ function App() {
             {isPremium && (
               <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] bg-blue-600 text-white font-black uppercase">
                 PREMIUM
+              </span>
+            )}
+            {isPremium2 && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] bg-emerald-600 text-white font-black uppercase">
+                PREMIUM 2
               </span>
             )}
             {channelStatus && (
@@ -823,6 +853,59 @@ function App() {
               />
             )}
           </div>
+
+          <section className="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 text-purple-300" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-black text-white uppercase tracking-widest">Apoya Golea</h2>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Si la web te sirve, puedes enviar una donacion voluntaria en Solana.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[96px_1fr] gap-3 items-center">
+              <div className="bg-white rounded-xl p-2">
+                <img
+                  src="/assets/donacion-solana.png"
+                  alt="QR Solana para donaciones"
+                  className="w-full aspect-square object-contain"
+                  loading="lazy"
+                />
+              </div>
+              <div className="min-w-0 space-y-3">
+                <div className="bg-slate-900 border border-slate-700 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Direccion Solana</p>
+                  <p className="text-[11px] text-slate-200 font-mono break-all leading-relaxed">
+                    {SOLANA_DONATION_ADDRESS}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button
+                type="button"
+                onClick={handleCopyDonationAddress}
+                className="bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
+              >
+                {donationCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {donationCopied ? 'Copiada' : 'Copiar'}
+              </button>
+              <a
+                href={SOLANA_EXPLORER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Solscan
+              </a>
+            </div>
+          </section>
         </div>
       </main>
 
