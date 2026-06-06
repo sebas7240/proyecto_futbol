@@ -17,31 +17,29 @@ async function getBrowser() {
   return browser;
 }
 
-async function getChannelsFromLa14() {
+async function getChannelsFromPelotaLibre() {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const response = await needle("get", "https://la14hd.com/status.json", {
-        headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        }
+    await page.goto("https://pelotalibrestv.org/", { waitUntil: "domcontentloaded", timeout: 30000 });
+    const channels = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a"));
+      return links
+        .filter(l => l.href.includes("/en-vivo/"))
+        .map(l => ({
+            id: l.href,
+            name: l.innerText.trim() || l.href.split("/").pop().replace(/-/g, " ").toUpperCase(),
+            category: "Deportes",
+            source: "pelotalibre"
+        }))
+        .filter(ch => ch.name.length > 2);
     });
-    const data = response.body;
-    let channels = [];
-    for (const category in data) {
-        data[category].forEach(item => {
-            if (item.Estado === "Activo") {
-                channels.push({
-                    id: item.Link,
-                    name: item.Canal,
-                    category: category,
-                    source: "la14"
-                });
-            }
-        });
-    }
     return channels;
   } catch (err) {
-    console.error("[Scraper] Error en Fuente A:", err.message);
+    console.error("[Scraper] Error en PelotaLibre:", err.message);
     return [];
+  } finally {
+    await page.close();
   }
 }
 
@@ -49,7 +47,7 @@ async function getChannelsFromFutbolLibre() {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.goto("https://futbol-libre.su/", { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto("https://futbol-libre.su/", { waitUntil: "domcontentloaded", timeout: 30000 });
     const channels = await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a"));
       return links
@@ -105,7 +103,7 @@ async function getChannelsFromRojaDirecta() {
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
   const [sourceA, sourceB, sourceC] = await Promise.all([
-    getChannelsFromLa14(),
+    getChannelsFromPelotaLibre(),
     getChannelsFromFutbolLibre(),
     getChannelsFromRojaDirecta()
   ]);
