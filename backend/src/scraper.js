@@ -18,28 +18,53 @@ async function getBrowser() {
 }
 
 async function getChannelsFromPelotaLibre() {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
   try {
-    await page.goto("https://pelotalibrestv.org/", { waitUntil: "domcontentloaded", timeout: 30000 });
-    const channels = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a"));
-      return links
-        .filter(l => l.href.includes("/en-vivo/"))
-        .map(l => ({
-            id: l.href,
-            name: l.innerText.trim() || l.href.split("/").pop().replace(/-/g, " ").toUpperCase(),
-            category: "Deportes",
-            source: "pelotalibre"
-        }))
-        .filter(ch => ch.name.length > 2);
-    });
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    let channels = [];
+    const domain = "https://pelotalibrestv.org";
+
+    try {
+        await page.goto(`${domain}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
+        const staticChannels = await page.evaluate(() => {
+            const links = Array.from(document.querySelectorAll("a"));
+            return links
+                .filter(l => l.href.includes("/en-vivo/"))
+                .map(l => ({
+                    id: l.href,
+                    name: l.innerText.trim() || l.href.split("/").pop().replace(/-/g, " ").toUpperCase(),
+                    category: "Deportes",
+                    source: "pelotalibre"
+                }))
+                .filter(ch => ch.name.length > 2 && !ch.name.includes("Ver Canal"));
+        });
+        channels = [...staticChannels];
+    } catch (e) { console.error("[Scraper] Error en PelotaLibre Home:", e.message); }
+    finally { await page.close(); }
+
+    try {
+        const response = await needle("get", `${domain}/agenda.json`);
+        const data = response.body;
+        if (data.dias && data.dias.length > 0) {
+            data.dias[0].eventos.forEach(ev => {
+                ev.canales.forEach(ch => {
+                    if (ch.url && ch.url.includes("r=")) {
+                        channels.push({
+                            id: domain + ch.url,
+                            name: `${ev.titulo} (${ch.nombre})`.toUpperCase(),
+                            category: "Agenda",
+                            source: "pelotalibre_agenda"
+                        });
+                    }
+                });
+            });
+        }
+    } catch (e) { console.error("[Scraper] Error en PelotaLibre Agenda:", e.message); }
+
     return channels;
   } catch (err) {
-    console.error("[Scraper] Error en PelotaLibre:", err.message);
+    console.error("[Scraper] Error general PelotaLibre:", err.message);
     return [];
-  } finally {
-    await page.close();
   }
 }
 
@@ -130,9 +155,11 @@ async function getChannels() {
 }
 
 async function getStreamUrl(channelUrl) {
-  console.log("[Scraper] Obteniendo se�al para: " + channelUrl);
+  console.log("[Scraper] Obteniendo señal para: " + channelUrl);
   const browser = await getBrowser();
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  });
   const page = await context.newPage();
   let m3u8s = [];
 
@@ -143,18 +170,19 @@ async function getStreamUrl(channelUrl) {
       }
     });
 
+    // IMPORTANTE: Si la URL es de skylivefu, no cargará fuera de pelotalibre.
+    // Intentamos cargarla, pero si falla, el usuario tiene razón: hay que navegar vía pelotalibrestv.org
     await page.goto(channelUrl, { waitUntil: "networkidle", timeout: 30000 });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(10000);
 
     if (m3u8s.length > 0) {
-        const master = m3u8s.find(m => m.url.includes("master"));
-        const index = m3u8s.find(m => m.url.includes("index"));
-        return master || index || m3u8s[m3u8s.length - 1];
+        const master = m3u8s.find(m => m.url.includes("master") || m.url.includes("index.m3u8"));
+        return master || m3u8s[m3u8s.length - 1];
     }
     return null;
   } catch (err) {
     console.error("[Scraper Error] getStreamUrl:", err.message);
-    throw err;
+    return null;
   } finally {
     await page.close();
     await context.close();

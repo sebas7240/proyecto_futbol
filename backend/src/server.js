@@ -117,7 +117,8 @@ let agendaCache = null, lastAgendaFetch = 0;
 app.get("/api/agenda", async (req, res) => {
   try {
     if (!agendaCache || Date.now() - lastAgendaFetch > 600000) {
-      const r = await fetch("https://pelotalibrestv.org/agenda.json", {
+      const domain = "https://pelotalibrestv.org";
+      const r = await fetch(`${domain}/agenda.json`, {
         headers: { "User-Agent": "Mozilla/5.0" },
         signal: AbortSignal.timeout(5000)
       });
@@ -125,7 +126,7 @@ app.get("/api/agenda", async (req, res) => {
       const data = await r.json();
 
       const events = [];
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0];
 
       if (data.dias && data.dias.length > 0) {
           data.dias[0].eventos.forEach(ev => {
@@ -142,7 +143,9 @@ app.get("/api/agenda", async (req, res) => {
                               status: "PROXIMO",
                               date: today,
                               channelName: ch.nombre,
-                              link: decodedUrl,
+                              // Usamos la URL del portal para que el scraper pueda extraer la señal
+                              link: domain + ch.url,
+                              // Usamos el ID del stream decodificado para facilitar el matching en el frontend
                               channelId: decodedUrl.split("stream=")[1] || decodedUrl
                           });
                       }
@@ -159,6 +162,7 @@ app.get("/api/agenda", async (req, res) => {
     res.json([]);
   }
 });
+
 app.get("/health", (req, res) => res.send("golea-api ok"));
 app.get("/", (req, res) => res.send("Golea API online"));
 app.listen(PORT, () => console.log("Running on " + PORT));
