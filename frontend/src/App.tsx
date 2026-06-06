@@ -288,6 +288,10 @@ function App() {
       setStreamUrl(null);
       setRecentChannelIds(previous => [channel.id, ...previous.filter(id => id !== channel.id)].slice(0, 8));
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
+      if (response.data.proxyUrl) {
+        setStreamUrl(response.data.proxyUrl);
+        return;
+      }
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
       const proxiedUrl = `${API_URL}/proxy?p=${encodeURIComponent(protectedUrl)}`;

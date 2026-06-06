@@ -53,10 +53,25 @@ const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
 };
 
+function isAllowedRequestOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin") || "";
+  if (!origin) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === "https:" && (
+      ALLOWED_ORIGINS.has(origin) ||
+      hostname === "golea.pages.dev" ||
+      hostname.endsWith(".golea.pages.dev")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("origin") || "";
   return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "https://goleafutbol.com",
+    "Access-Control-Allow-Origin": isAllowedRequestOrigin(request) && origin ? origin : "https://goleafutbol.com",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
@@ -209,8 +224,10 @@ export class ChatRoom extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     if (request.method === "OPTIONS") {
+      if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
+    if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
 
     const url = new URL(request.url);
 
@@ -250,6 +267,10 @@ export class ChatRoom extends DurableObject<Env> {
   }
 
   private handleWebSocket(request: Request): Response {
+    if (!isAllowedRequestOrigin(request)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
       return errorResponse(request, "Se esperaba WebSocket", 426);
     }
@@ -402,8 +423,10 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
+      if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
+    if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
 
     if (url.pathname === "/health") {
       return Response.json({ ok: true, service: "golea-chat" }, { headers: corsHeaders(request) });
