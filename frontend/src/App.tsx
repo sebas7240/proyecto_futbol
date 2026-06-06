@@ -85,6 +85,13 @@ function App() {
   useEffect(() => {
     fetchChannels();
     fetchAgenda();
+
+    const refresh = setInterval(() => {
+      fetchChannels(true);
+      fetchAgenda(true);
+    }, 300000);
+
+    return () => clearInterval(refresh);
   }, []);
 
   useEffect(() => {
@@ -95,9 +102,9 @@ function App() {
     localStorage.setItem('golea_recent', JSON.stringify(recentChannelIds));
   }, [recentChannelIds]);
 
-  const fetchChannels = async () => {
+  const fetchChannels = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await axios.get(`${API_URL}/channels`);
       setChannels(response.data);
       setError(null);
@@ -105,19 +112,19 @@ function App() {
       setError('Error al cargar los canales. Asegúrate de que el backend esté ejecutándose.');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const fetchAgenda = async () => {
+  const fetchAgenda = async (silent = false) => {
     try {
-      setLoadingAgenda(true);
+      if (!silent) setLoadingAgenda(true);
       const response = await axios.get(`${API_URL}/agenda`);
       setAgenda(response.data);
     } catch (err) {
       console.error('Error fetching agenda:', err);
     } finally {
-      setLoadingAgenda(false);
+      if (!silent) setLoadingAgenda(false);
     }
   };
 

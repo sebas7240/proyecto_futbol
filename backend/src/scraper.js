@@ -5,6 +5,7 @@ const needle = require("needle");
 chromium.use(StealthPlugin());
 
 let browser;
+const PELOTA_DOMAIN = "https://pelotalibrestv.org";
 
 async function getBrowser() {
   if (!browser || !browser.isConnected()) {
@@ -19,13 +20,12 @@ async function getBrowser() {
 
 async function getChannelsFromPelotaLibre() {
   try {
-    const browser = await getBrowser();
-    const page = await browser.newPage();
     let channels = [];
-    const domain = "https://pelotalibrestv.org";
 
     try {
-        await page.goto(`${domain}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
+        const browser = await getBrowser();
+        const page = await browser.newPage();
+        await page.goto(`${PELOTA_DOMAIN}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
         const staticChannels = await page.evaluate(() => {
             const links = Array.from(document.querySelectorAll("a"));
             return links
@@ -39,26 +39,17 @@ async function getChannelsFromPelotaLibre() {
                 .filter(ch => ch.name.length > 2 && !ch.name.includes("Ver Canal"));
         });
         channels = [...staticChannels];
+        await page.close();
     } catch (e) { console.error("[Scraper] Error en PelotaLibre Home:", e.message); }
-    finally { await page.close(); }
 
     try {
-        const response = await needle("get", `${domain}/agenda.json`);
-        const data = response.body;
-        if (data.dias && data.dias.length > 0) {
-            data.dias[0].eventos.forEach(ev => {
-                ev.canales.forEach(ch => {
-                    if (ch.url && ch.url.includes("r=")) {
-                        channels.push({
-                            id: domain + ch.url,
-                            name: `${ev.titulo} (${ch.nombre})`.toUpperCase(),
-                            category: "Agenda",
-                            source: "pelotalibre_agenda"
-                        });
-                    }
-                });
-            });
-        }
+        const agendaEvents = await getAgendaEventsFromPelotaLibre();
+        channels.push(...agendaEvents.map(event => ({
+            id: event.link,
+            name: `${event.channelName} - ${event.title}`.toUpperCase(),
+            category: "Agenda",
+            source: "pelotalibre_agenda"
+        })));
     } catch (e) { console.error("[Scraper] Error en PelotaLibre Agenda:", e.message); }
 
     return channels;
@@ -66,6 +57,50 @@ async function getChannelsFromPelotaLibre() {
     console.error("[Scraper] Error general PelotaLibre:", err.message);
     return [];
   }
+}
+
+async function getAgendaEventsFromPelotaLibre() {
+  const response = await needle("get", `${PELOTA_DOMAIN}/agenda.json`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    open_timeout: 5000,
+    response_timeout: 5000
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`Agenda source status ${response.statusCode}`);
+  }
+
+  const data = response.body;
+  const events = [];
+  const today = new Date().toISOString().split("T")[0];
+
+  if (data.dias && data.dias.length > 0) {
+    data.dias[0].eventos.forEach(ev => {
+      ev.canales.forEach(ch => {
+        try {
+          const b64 = ch.url.split("r=")[1];
+          if (b64) {
+            const decodedUrl = Buffer.from(b64, "base64").toString("utf-8");
+            events.push({
+              title: ev.titulo,
+              time: ev.hora,
+              category: ev.clase || "Deportes",
+              language: "Espa\u00f1ol",
+              status: "PROXIMO",
+              date: today,
+              channelName: ch.nombre,
+              link: PELOTA_DOMAIN + ch.url,
+              channelId: decodedUrl.split("stream=")[1] || decodedUrl
+            });
+          }
+        } catch (e) {
+          console.error("[Agenda] Evento ignorado:", e.message);
+        }
+      });
+    });
+  }
+
+  return events;
 }
 
 async function getChannelsFromFutbolLibre() {
@@ -127,14 +162,10 @@ async function getChannelsFromRojaDirecta() {
 
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
-  const [sourceA, sourceB, sourceC] = await Promise.all([
-    getChannelsFromPelotaLibre(),
-    getChannelsFromFutbolLibre(),
-    getChannelsFromRojaDirecta()
-  ]);
+  const sourceA = await getChannelsFromPelotaLibre();
 
   const masterMap = new Map();
-  [...sourceA, ...sourceB, ...sourceC].forEach(ch => {
+  sourceA.forEach(ch => {
     const normalizedName = ch.name.toUpperCase().replace(" HD", "").replace(" PREMIUM", "").trim();
     if (!masterMap.has(normalizedName)) {
       masterMap.set(normalizedName, { ...ch, name: normalizedName, backups: [] });
@@ -189,4 +220,4 @@ async function getStreamUrl(channelUrl) {
   }
 }
 
-module.exports = { getChannels, getStreamUrl };
+module.exports = { getChannels, getStreamUrl, getAgendaEventsFromPelotaLibre };
