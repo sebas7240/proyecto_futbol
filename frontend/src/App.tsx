@@ -722,7 +722,8 @@ function App() {
           )}
         </div>
 
-        <div className="lg:col-span-1 flex flex-col gap-4 lg:max-h-[calc(100vh-150px)]">
+        <div className="lg:col-span-1 flex flex-col gap-5">
+          <div className="flex flex-col gap-4 lg:h-[calc(100vh-150px)] lg:min-h-[640px]">
           {/* Tabs */}
           <div className="flex bg-slate-800 p-1 rounded-xl">
             <button 
@@ -853,8 +854,9 @@ function App() {
               />
             )}
           </div>
+          </div>
 
-          <section className="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl">
+          <section className="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-xl lg:mt-6">
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                 <Wallet className="w-5 h-5 text-purple-300" />
