@@ -103,14 +103,14 @@ function App() {
     }
   });
 
-  const loadingMessages = [
+  const loadingMessages = useMemo(() => [
     'Sincronizando señal en vivo...',
     'Lanzando instancia de servidor...',
     'Capturando fragmentos de video...',
     'Sincronizando audio y video...',
     'Preparando buffer de alta calidad...',
     'La carga puede tardar hasta 30 segundos, espera un poco...'
-  ];
+  ], []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000);
@@ -128,7 +128,7 @@ function App() {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [loadingStream]);
+  }, [loadingStream, loadingMessages]);
 
   useEffect(() => {
     fetchChannels();
