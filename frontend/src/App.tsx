@@ -4,6 +4,7 @@ import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, C
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
+import AdsterraGlobalAds from './components/AdsterraGlobalAds';
 
 interface Channel {
   id: string;
@@ -33,14 +34,17 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'tv-remote-focus-2026-06-07';
+const APP_BUILD_MARKER = 'first-channel-ad-grace-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
 const AGENDA_CACHE_KEY = 'golea_agenda_cache_v1';
 const ACTIVE_CATEGORY_KEY = 'golea_active_category';
+const FIRST_CHANNEL_UNLOCK_KEY = 'golea_first_channel_unlocked';
 const CHANNELS_CACHE_TTL_MS = 10 * 60 * 1000;
 const AGENDA_CACHE_TTL_MS = 5 * 60 * 1000;
+const FIRST_CHANNEL_AD_GRACE_MS = 90000;
+const GLOBAL_AD_DELAY_MS = 12000;
 const SOLANA_DONATION_ADDRESS = 'ar65x4bnv19SqAkr6p3Ts6Wx9G3jGp4Pxrj5q4dYndK';
 const SOLANA_EXPLORER_URL = `https://solscan.io/account/${SOLANA_DONATION_ADDRESS}`;
 
@@ -83,6 +87,15 @@ function readStoredString(key: string, fallback: string): string {
   try {
     if (typeof localStorage === 'undefined') return fallback;
     return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readSessionString(key: string, fallback: string): string {
+  try {
+    if (typeof sessionStorage === 'undefined') return fallback;
+    return sessionStorage.getItem(key) || fallback;
   } catch {
     return fallback;
   }
@@ -209,6 +222,7 @@ function App() {
   const [presenceSessionId] = useState(getOrCreatePresenceSessionId);
   const [presenceCounts, setPresenceCounts] = useState<PresenceCounts>({ total: 0, channels: {} });
   const [donationCopied, setDonationCopied] = useState(false);
+  const [adsUnlocked, setAdsUnlocked] = useState(() => readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true');
   const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
@@ -373,6 +387,24 @@ function App() {
     }
   }, [activeCategory]);
 
+  const unlockAdsAfterFirstChannel = () => {
+    if (adsUnlocked) return;
+
+    try {
+      sessionStorage.setItem(FIRST_CHANNEL_UNLOCK_KEY, 'true');
+    } catch {
+      // Ad timing is a retention preference; storage failures should not block playback.
+    }
+
+    window.setTimeout(() => {
+      setAdsUnlocked(true);
+    }, FIRST_CHANNEL_AD_GRACE_MS);
+  };
+
+  const hasFirstChannelUnlockedAds = () => {
+    return readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true';
+  };
+
   const fetchChannels = async (silent = false, force = false) => {
     const cached = readLocalCache<Channel[]>(CHANNELS_CACHE_KEY);
 
@@ -483,6 +515,11 @@ function App() {
 
   const handleSelectChannel = async (channel: Channel) => {
     try {
+      const canShowAdsForThisSelection = adsUnlocked || hasFirstChannelUnlockedAds();
+      if (canShowAdsForThisSelection && !adsUnlocked) {
+        setAdsUnlocked(true);
+      }
+
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
@@ -490,12 +527,14 @@ function App() {
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       if (response.data.proxyUrl) {
         setStreamUrl(response.data.proxyUrl);
+        if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
         return;
       }
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
       const proxiedUrl = `${API_URL}/proxy?p=${encodeURIComponent(protectedUrl)}`;
       setStreamUrl(proxiedUrl);
+      if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
     } catch (err) {
       console.error(err);
       alert('No se pudo cargar el stream de este canal.');
@@ -711,6 +750,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col" data-build={APP_BUILD_MARKER}>
+      <AdsterraGlobalAds enabled={adsUnlocked} delayMs={GLOBAL_AD_DELAY_MS} />
+
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 p-3 md:p-4 md:sticky md:top-0 z-20">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
@@ -779,7 +820,7 @@ function App() {
           <div className={`bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-slate-800 shadow-2xl relative ${
             streamUrl || loadingStream ? 'aspect-video' : 'min-h-[260px] md:aspect-video'
           }`}>
-            {loadingStream && <AdBanner format="overlay" />}
+            {loadingStream && adsUnlocked && <AdBanner format="overlay" />}
             {streamUrl ? (
               <div className="w-full h-full">
                 <VideoPlayer src={streamUrl} />
