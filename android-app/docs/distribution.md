@@ -8,6 +8,12 @@ La APK release actual esta lista para distribucion manual:
 dist/Golea-release.apk
 ```
 
+Tambien se publica como descarga directa desde el dominio:
+
+```text
+https://goleafutbol.com/downloads/Golea-release.apk
+```
+
 Version:
 
 ```text
@@ -58,6 +64,48 @@ Si la app conserva un estado roto de una version anterior:
 ```powershell
 & "$env:ANDROID_HOME\platform-tools\adb.exe" shell pm clear com.goleafutbol.app
 ```
+
+## Instalar en ONN TV / Android TV con Downloader by AFTVnews
+
+1. Instala `Downloader by AFTVnews` desde Google Play en el ONN TV.
+2. En Android TV, permite instalar apps desconocidas para Downloader:
+
+```text
+Settings > Apps > Security & restrictions > Unknown sources > Downloader > Allow
+```
+
+3. Abre Downloader.
+4. Escribe esta URL directa:
+
+```text
+https://goleafutbol.com/downloads/Golea-release.apk
+```
+
+5. Descarga el APK.
+6. Pulsa `Install`.
+7. Abre `Golea`.
+
+## Crear codigo corto para Downloader
+
+Downloader acepta codigos numericos generados por AFTVnews. Para crear uno:
+
+1. Entra a:
+
+```text
+https://go.aftvnews.com/
+```
+
+2. Pega la URL:
+
+```text
+https://goleafutbol.com/downloads/Golea-release.apk
+```
+
+3. Resuelve el captcha.
+4. Copia el codigo numerico.
+5. En Downloader, escribe solo ese codigo.
+
+Nota: los codigos y URLs enviados a AFTVnews son publicos, asi que solo uses enlaces que quieras distribuir.
 
 ## Verificar firma
 
