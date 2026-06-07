@@ -8,6 +8,7 @@ const { getChannels, getStreamUrl, getAgendaEventsFromPelotaLibre } = require(".
 const app = express();
 const PORT = process.env.PORT || 3001;
 const PROXY_BASE_URL = process.env.PROXY_BASE_URL || "https://api.goleafutbol.com/api";
+const EDGE_PROXY_BASE_URL = (process.env.EDGE_PROXY_BASE_URL || "").replace(/\/+$/, "");
 
 const ALLOWED_ORIGINS = [
   "https://goleafutbol.com",
@@ -185,6 +186,18 @@ function getProxyTtlForUrl(url) {
   return isVideoUrl(url) ? VIDEO_TOKEN_TTL_MS : TOKEN_TTL_MS;
 }
 
+function createSignedProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
+  const bucket = Math.floor(Date.now() / ttlMs);
+  const expiresAt = (bucket + 1) * ttlMs + 60_000;
+  const payload = Buffer.from(JSON.stringify({ u: targetUrl, e: expiresAt })).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", PROXY_TOKEN_SECRET)
+    .update(payload)
+    .digest("base64url");
+
+  return `${payload}.${signature}`;
+}
+
 function createProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   const bucket = Math.floor(Date.now() / ttlMs);
   const token = crypto
@@ -200,7 +213,19 @@ function createProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   return token;
 }
 
+function getProxyPathForUrl(targetUrl) {
+  return isVideoUrl(targetUrl)
+    ? "/segment"
+    : isPlaylistUrl(targetUrl)
+      ? "/manifest"
+      : "/asset";
+}
+
 function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
+  if (EDGE_PROXY_BASE_URL) {
+    return `${EDGE_PROXY_BASE_URL}${getProxyPathForUrl(targetUrl)}?token=${createSignedProxyToken(targetUrl, ttlMs)}`;
+  }
+
   const path = isVideoUrl(targetUrl)
     ? "/proxy/segment"
     : isPlaylistUrl(targetUrl)

@@ -12,6 +12,7 @@ services:
       - PORT=3001
       - PROXY_TOKEN_SECRET=${PROXY_TOKEN_SECRET:-}
       - VIDEO_TOKEN_TTL_MS=${VIDEO_TOKEN_TTL_MS:-21600000}
+      - EDGE_PROXY_BASE_URL=${EDGE_PROXY_BASE_URL:-}
     restart: always
 
   microcache:
