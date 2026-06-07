@@ -71,11 +71,11 @@ public class MainActivity extends BridgeActivity {
 
         webView.evaluateJavascript(
             "(function(key){" +
-                "var selector='[data-tv-focus=\"true\"],button:not([disabled]),a[href],input:not([disabled])';" +
+                "var selector='[data-tv-focus=\"true\"],button:not([disabled]),a[href]';" +
                 "function visible(el){var r=el.getBoundingClientRect();var s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';}" +
                 "function textInput(el){if(!el)return false;var t=(el.tagName||'').toLowerCase();return t==='input'||t==='textarea'||el.isContentEditable;}" +
                 "function els(){return Array.prototype.slice.call(document.querySelectorAll(selector)).filter(visible);}" +
-                "function fallback(list){return list.find(function(el){return el.dataset&&el.dataset.tvPrimary==='true';})||list[0]||null;}" +
+                "function fallback(list){return list.find(function(el){return el.dataset&&el.dataset.tvPrimary==='true';})||list.find(function(el){return el.dataset&&el.dataset.tvCard==='true';})||list[0]||null;}" +
                 "function center(rect){return {x:rect.left+rect.width/2,y:rect.top+rect.height/2};}" +
                 "function score(item,vertical){return (vertical?Math.abs(item.dy):Math.abs(item.dx))*3+(vertical?Math.abs(item.dx):Math.abs(item.dy));}" +
                 "var list=els();if(!list.length)return false;" +

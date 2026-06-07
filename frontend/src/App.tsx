@@ -34,7 +34,7 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'first-channel-ad-grace-2026-06-07';
+const APP_BUILD_MARKER = 'tv-skip-search-focus-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
@@ -139,8 +139,7 @@ function formatViewerCount(value: number): string {
 const TV_FOCUS_SELECTOR = [
   '[data-tv-focus="true"]',
   'button:not([disabled])',
-  'a[href]',
-  'input:not([disabled])'
+  'a[href]'
 ].join(',');
 
 function isTextInputElement(element: Element | null): boolean {
@@ -158,7 +157,10 @@ function getFocusableElements(): HTMLElement[] {
 }
 
 function getFallbackElement(elements: HTMLElement[]): HTMLElement | null {
-  return elements.find(element => element.dataset.tvPrimary === 'true') || elements[0] || null;
+  return elements.find(element => element.dataset.tvPrimary === 'true')
+    || elements.find(element => element.dataset.tvCard === 'true')
+    || elements[0]
+    || null;
 }
 
 function getNextFocusableElement(
@@ -667,6 +669,7 @@ function App() {
         role="button"
         tabIndex={0}
         data-tv-focus="true"
+        data-tv-card="true"
         data-tv-primary={isSelected ? 'true' : undefined}
         onClick={() => handleSelectChannel(channel)}
         className={`tv-focusable flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
