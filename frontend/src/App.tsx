@@ -33,7 +33,7 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'local-cache-2026-06-07';
+const APP_BUILD_MARKER = 'tv-remote-focus-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
@@ -123,6 +123,75 @@ function formatViewerCount(value: number): string {
   return String(value);
 }
 
+const TV_FOCUS_SELECTOR = [
+  '[data-tv-focus="true"]',
+  'button:not([disabled])',
+  'a[href]',
+  'input:not([disabled])'
+].join(',');
+
+function isTextInputElement(element: Element | null): boolean {
+  if (!element) return false;
+  const tagName = element.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || (element as HTMLElement).isContentEditable;
+}
+
+function getFocusableElements(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(TV_FOCUS_SELECTOR)).filter(element => {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+  });
+}
+
+function getFallbackElement(elements: HTMLElement[]): HTMLElement | null {
+  return elements.find(element => element.dataset.tvPrimary === 'true') || elements[0] || null;
+}
+
+function getNextFocusableElement(
+  current: HTMLElement | null,
+  key: string,
+  elements: HTMLElement[]
+): HTMLElement | null {
+  if (elements.length === 0) return null;
+  if (!current || !elements.includes(current)) return getFallbackElement(elements);
+
+  const currentRect = current.getBoundingClientRect();
+  const currentCenterX = currentRect.left + currentRect.width / 2;
+  const currentCenterY = currentRect.top + currentRect.height / 2;
+  const candidates = elements
+    .filter(element => element !== current)
+    .map(element => {
+      const rect = element.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const deltaX = centerX - currentCenterX;
+      const deltaY = centerY - currentCenterY;
+
+      return { element, deltaX, deltaY };
+    })
+    .filter(({ deltaX, deltaY }) => {
+      if (key === 'ArrowDown') return deltaY > 8;
+      if (key === 'ArrowUp') return deltaY < -8;
+      if (key === 'ArrowRight') return deltaX > 8;
+      if (key === 'ArrowLeft') return deltaX < -8;
+      return false;
+    })
+    .sort((a, b) => {
+      const aPrimary = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(a.deltaY) : Math.abs(a.deltaX);
+      const bPrimary = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(b.deltaY) : Math.abs(b.deltaX);
+      const aCross = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(a.deltaX) : Math.abs(a.deltaY);
+      const bCross = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(b.deltaX) : Math.abs(b.deltaY);
+      return aPrimary * 3 + aCross - (bPrimary * 3 + bCross);
+    });
+
+  if (candidates[0]) return candidates[0].element;
+
+  const currentIndex = elements.indexOf(current);
+  if (key === 'ArrowDown' || key === 'ArrowRight') return elements[(currentIndex + 1) % elements.length];
+  return elements[(currentIndex - 1 + elements.length) % elements.length];
+}
+
 function App() {
   const [channels, setChannels] = useState<Channel[]>(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY));
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -167,6 +236,37 @@ function App() {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleRemoteNavigation = (event: KeyboardEvent) => {
+      const isSelectKey = event.key === 'Enter' || event.key === 'NumpadEnter' || event.key === ' ';
+      const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
+
+      if (!isArrowKey && !isSelectKey) return;
+      if (isTextInputElement(document.activeElement)) return;
+
+      const elements = getFocusableElements();
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+      if (isSelectKey) {
+        if (activeElement && elements.includes(activeElement)) {
+          event.preventDefault();
+          activeElement.click();
+        }
+        return;
+      }
+
+      const nextElement = getNextFocusableElement(activeElement, event.key, elements);
+      if (!nextElement) return;
+
+      event.preventDefault();
+      nextElement.focus({ preventScroll: true });
+      nextElement.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    };
+
+    document.addEventListener('keydown', handleRemoteNavigation, true);
+    return () => document.removeEventListener('keydown', handleRemoteNavigation, true);
   }, []);
 
   useEffect(() => {
@@ -525,8 +625,12 @@ function App() {
     return (
       <div 
         key={channel.id}
+        role="button"
+        tabIndex={0}
+        data-tv-focus="true"
+        data-tv-primary={isSelected ? 'true' : undefined}
         onClick={() => handleSelectChannel(channel)}
-        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
+        className={`tv-focusable flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border-2 ${
           isSelected 
           ? 'bg-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/10' 
           : isPremium 
@@ -572,6 +676,7 @@ function App() {
         </div>
         <button
           type="button"
+          data-tv-focus="true"
           onClick={(event) => toggleFavorite(channel.id, event)}
           className={`shrink-0 rounded-lg p-1.5 transition-colors ${isFavorite ? 'text-yellow-400 bg-yellow-400/10' : 'text-slate-600 hover:text-yellow-400 hover:bg-slate-900'}`}
           aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
@@ -638,6 +743,7 @@ function App() {
 
             <button 
               onClick={() => { fetchChannels(false, true); fetchAgenda(false, true); }}
+              data-tv-focus="true"
               className="shrink-0 px-3 md:px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
               title="Actualizar"
             >
@@ -654,6 +760,7 @@ function App() {
           {categories.map(cat => (
             <button
               key={cat}
+              data-tv-focus="true"
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
                 activeCategory === cat 
@@ -706,6 +813,7 @@ function App() {
                           return (
                             <button
                               key={`${event.date}-${event.time}-${event.title}`}
+                              data-tv-focus="true"
                               onClick={() => handleSelectAgendaEvent(event)}
                               className="text-left bg-slate-900/80 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
                             >
@@ -746,6 +854,7 @@ function App() {
                   <p className="text-xs text-slate-500 mt-1">Sincronizada con Pelota Libre TV.</p>
                 </div>
                 <button
+                  data-tv-focus="true"
                   onClick={() => setActiveTab('agenda')}
                   className="shrink-0 whitespace-nowrap text-xs font-bold text-blue-400 hover:text-blue-300"
                 >
@@ -758,6 +867,7 @@ function App() {
                   return (
                     <button
                       key={`main-${event.date}-${event.time}-${event.title}`}
+                      data-tv-focus="true"
                       onClick={() => handleSelectAgendaEvent(event)}
                       className="text-left bg-slate-900 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
                     >
@@ -824,6 +934,7 @@ function App() {
           {/* Tabs */}
           <div className="flex bg-slate-800 p-1 rounded-xl">
             <button 
+              data-tv-focus="true"
               onClick={() => setActiveTab('channels')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'channels' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -833,6 +944,7 @@ function App() {
               CANALES
             </button>
             <button 
+              data-tv-focus="true"
               onClick={() => setActiveTab('agenda')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'agenda' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -842,6 +954,7 @@ function App() {
               AGENDA
             </button>
             <button 
+              data-tv-focus="true"
               onClick={() => setActiveTab('chat')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'chat' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -929,6 +1042,7 @@ function App() {
                             </span>
                             {event.channelId && status.active && (
                               <button 
+                                data-tv-focus="true"
                                 onClick={() => handleSelectAgendaEvent(event)}
                                 className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1"
                               >
@@ -988,6 +1102,7 @@ function App() {
             <div className="grid grid-cols-2 gap-2 mt-3">
               <button
                 type="button"
+                data-tv-focus="true"
                 onClick={handleCopyDonationAddress}
                 className="bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
               >
@@ -998,6 +1113,7 @@ function App() {
                 href={SOLANA_EXPLORER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-tv-focus="true"
                 className="bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
               >
                 <ExternalLink className="w-4 h-4" />

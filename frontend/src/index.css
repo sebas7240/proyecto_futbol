@@ -12,3 +12,33 @@ body {
   background-color: #0f172a;
   color: white;
 }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[data-tv-focus="true"]:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.22);
+}
+
+[data-tv-focus="true"]:focus {
+  scroll-margin: 88px;
+}
+
+.tv-focusable:focus {
+  border-color: #38bdf8;
+  background-color: rgba(30, 64, 175, 0.24);
+}
+
+@media (min-width: 900px) and (hover: none) {
+  button,
+  a,
+  [data-tv-focus="true"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tv-focusable {
+    min-height: 76px;
+  }
+}
