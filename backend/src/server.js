@@ -189,7 +189,11 @@ function getProxyTtlForUrl(url) {
 function createSignedProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   const bucket = Math.floor(Date.now() / ttlMs);
   const expiresAt = (bucket + 1) * ttlMs + 60_000;
-  const payload = Buffer.from(JSON.stringify({ u: targetUrl, e: expiresAt })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    u: targetUrl,
+    e: expiresAt,
+    v: createLegacyProxyUrl(targetUrl, ttlMs)
+  })).toString("base64url");
   const signature = crypto
     .createHmac("sha256", PROXY_TOKEN_SECRET)
     .update(payload)
@@ -221,11 +225,7 @@ function getProxyPathForUrl(targetUrl) {
       : "/asset";
 }
 
-function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
-  if (EDGE_PROXY_BASE_URL) {
-    return `${EDGE_PROXY_BASE_URL}${getProxyPathForUrl(targetUrl)}?token=${createSignedProxyToken(targetUrl, ttlMs)}`;
-  }
-
+function createLegacyProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   const path = isVideoUrl(targetUrl)
     ? "/proxy/segment"
     : isPlaylistUrl(targetUrl)
@@ -233,6 +233,14 @@ function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
       : "/proxy";
 
   return `${PROXY_BASE_URL}${path}?s=${createProxyToken(targetUrl, ttlMs)}`;
+}
+
+function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
+  if (EDGE_PROXY_BASE_URL) {
+    return `${EDGE_PROXY_BASE_URL}${getProxyPathForUrl(targetUrl)}?token=${createSignedProxyToken(targetUrl, ttlMs)}`;
+  }
+
+  return createLegacyProxyUrl(targetUrl, ttlMs);
 }
 
 async function resolveProxyTarget(req) {

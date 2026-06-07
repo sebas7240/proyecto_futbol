@@ -104,7 +104,10 @@ async function verifyToken(token, secret) {
 
   const payload = JSON.parse(base64UrlDecodeToString(parts[0]));
   if (!payload.u || !payload.e || Date.now() > Number(payload.e)) throw new Error("Expired token");
-  return assertSafeProxyUrl(payload.u);
+  return {
+    targetUrl: assertSafeProxyUrl(payload.u),
+    originProxyUrl: payload.v ? assertSafeOriginProxyUrl(payload.v) : ""
+  };
 }
 
 function hostnameMatches(hostname, domain) {
@@ -126,6 +129,21 @@ function assertSafeProxyUrl(rawUrl) {
 
   if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Invalid protocol");
   if (!isAllowedProxyHost(parsed.hostname)) throw new Error("Domain not allowed");
+  return parsed.href;
+}
+
+function assertSafeOriginProxyUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("Invalid origin proxy URL");
+  }
+
+  if (parsed.protocol !== "https:" || parsed.hostname !== "api.goleafutbol.com") {
+    throw new Error("Invalid origin proxy URL");
+  }
+  if (!parsed.pathname.startsWith("/api/proxy")) throw new Error("Invalid origin proxy URL");
   return parsed.href;
 }
 
@@ -171,6 +189,25 @@ function getHeadersForUrl(targetUrl, request) {
   return headers;
 }
 
+function getProxyOriginHeaders(request) {
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "*/*"
+  };
+
+  const range = request.headers.get("Range");
+  if (range) headers.Range = range;
+  return headers;
+}
+
+function getOriginFetchUrl(tokenData) {
+  return tokenData.originProxyUrl || tokenData.targetUrl;
+}
+
+function getOriginFetchHeaders(tokenData, request) {
+  return tokenData.originProxyUrl ? getProxyOriginHeaders(request) : getHeadersForUrl(tokenData.targetUrl, request);
+}
+
 function responseWithCors(request, originResponse, extraHeaders = {}) {
   const headers = new Headers(originResponse.headers);
   headers.delete("set-cookie");
@@ -189,9 +226,10 @@ function responseWithCors(request, originResponse, extraHeaders = {}) {
   });
 }
 
-async function fetchManifest(request, targetUrl, env) {
-  const response = await fetch(targetUrl, {
-    headers: getHeadersForUrl(targetUrl, request),
+async function fetchManifest(request, tokenData, env) {
+  const fetchUrl = getOriginFetchUrl(tokenData);
+  const response = await fetch(fetchUrl, {
+    headers: getOriginFetchHeaders(tokenData, request),
     cache: "no-store"
   });
 
@@ -201,8 +239,19 @@ async function fetchManifest(request, targetUrl, env) {
 
   const contentType = response.headers.get("content-type") || "application/vnd.apple.mpegurl";
   const text = await response.text();
-  const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf("/") + 1);
-  const origin = new URL(targetUrl).origin;
+
+  if (tokenData.originProxyUrl) {
+    return textResponse(request, text, 200, {
+      "Content-Type": contentType,
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "CDN-Cache-Control": "no-store",
+      "X-Golea-Edge": "manifest",
+      "X-Golea-Origin-Mode": "vps"
+    });
+  }
+
+  const baseUrl = tokenData.targetUrl.substring(0, tokenData.targetUrl.lastIndexOf("/") + 1);
+  const origin = new URL(tokenData.targetUrl).origin;
   const videoTtl = Number(env.EDGE_VIDEO_TOKEN_TTL_MS || 21600000);
   const manifestTtl = Number(env.EDGE_MANIFEST_TOKEN_TTL_MS || 900000);
 
@@ -237,10 +286,10 @@ async function fetchManifest(request, targetUrl, env) {
   });
 }
 
-async function fetchSegment(request, targetUrl, env) {
+async function fetchSegment(request, tokenData, env) {
   const ttlSeconds = Math.floor(Number(env.EDGE_VIDEO_TOKEN_TTL_MS || 21600000) / 1000);
-  const originResponse = await fetch(targetUrl, {
-    headers: getHeadersForUrl(targetUrl, request),
+  const originResponse = await fetch(getOriginFetchUrl(tokenData), {
+    headers: getOriginFetchHeaders(tokenData, request),
     cf: {
       cacheEverything: true,
       cacheTtlByStatus: {
@@ -255,19 +304,21 @@ async function fetchSegment(request, targetUrl, env) {
     "Cache-Control": `public, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}`,
     "CDN-Cache-Control": `public, max-age=${ttlSeconds}`,
     "X-Golea-Edge": "segment",
+    "X-Golea-Origin-Mode": tokenData.originProxyUrl ? "vps" : "direct",
     "X-Golea-Origin-Cache": originResponse.headers.get("CF-Cache-Status") || "unknown"
   });
 }
 
-async function fetchAsset(request, targetUrl) {
-  const originResponse = await fetch(targetUrl, {
-    headers: getHeadersForUrl(targetUrl, request),
+async function fetchAsset(request, tokenData) {
+  const originResponse = await fetch(getOriginFetchUrl(tokenData), {
+    headers: getOriginFetchHeaders(tokenData, request),
     cache: "no-store"
   });
 
   return responseWithCors(request, originResponse, {
     "Cache-Control": "no-store",
-    "X-Golea-Edge": "asset"
+    "X-Golea-Edge": "asset",
+    "X-Golea-Origin-Mode": tokenData.originProxyUrl ? "vps" : "direct"
   });
 }
 
@@ -282,15 +333,21 @@ export default {
     if (!env.PROXY_TOKEN_SECRET) return textResponse(request, "Worker not configured", 500);
 
     try {
-      const targetUrl = await verifyToken(url.searchParams.get("token"), env.PROXY_TOKEN_SECRET);
+      const tokenData = await verifyToken(url.searchParams.get("token"), env.PROXY_TOKEN_SECRET);
 
-      if (url.pathname === "/manifest") return fetchManifest(request, targetUrl, env);
-      if (url.pathname === "/segment") return fetchSegment(request, targetUrl, env);
-      if (url.pathname === "/asset") return fetchAsset(request, targetUrl);
+      if (url.pathname === "/manifest") return fetchManifest(request, tokenData, env);
+      if (url.pathname === "/segment") return fetchSegment(request, tokenData, env);
+      if (url.pathname === "/asset") return fetchAsset(request, tokenData);
 
       return textResponse(request, "Not found", 404);
     } catch (error) {
-      const forbidden = error.message === "Domain not allowed" || error.message === "Invalid protocol";
+      const forbidden = [
+        "Domain not allowed",
+        "Invalid protocol",
+        "Invalid origin proxy URL",
+        "Invalid token",
+        "Expired token"
+      ].includes(error.message);
       return textResponse(request, forbidden ? "Forbidden" : "Proxy error", forbidden ? 403 : 500);
     }
   }
