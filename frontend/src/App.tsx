@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
@@ -34,7 +34,7 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'tv-skip-search-focus-2026-06-07';
+const APP_BUILD_MARKER = 'tv-focus-map-player-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
@@ -137,9 +137,7 @@ function formatViewerCount(value: number): string {
 }
 
 const TV_FOCUS_SELECTOR = [
-  '[data-tv-focus="true"]',
-  'button:not([disabled])',
-  'a[href]'
+  '[data-tv-focus="true"]'
 ].join(',');
 
 function isTextInputElement(element: Element | null): boolean {
@@ -170,6 +168,17 @@ function getNextFocusableElement(
 ): HTMLElement | null {
   if (elements.length === 0) return null;
   if (!current || !elements.includes(current)) return getFallbackElement(elements);
+
+  if (key === 'ArrowLeft' && current.dataset.tvCard === 'true') {
+    const player = elements.find(element => element.dataset.tvPlayer === 'true');
+    if (player) return player;
+  }
+
+  if (key === 'ArrowRight' && current.dataset.tvPlayer === 'true') {
+    return elements.find(element => element.dataset.tvPrimary === 'true')
+      || elements.find(element => element.dataset.tvCard === 'true')
+      || null;
+  }
 
   const currentRect = current.getBoundingClientRect();
   const currentCenterX = currentRect.left + currentRect.width / 2;
@@ -207,7 +216,14 @@ function getNextFocusableElement(
   return elements[(currentIndex - 1 + elements.length) % elements.length];
 }
 
+declare global {
+  interface Window {
+    __goleaTvNavigate?: (key: string) => boolean;
+  }
+}
+
 function App() {
+  const playerFrameRef = useRef<HTMLDivElement>(null);
   const [channels, setChannels] = useState<Channel[]>(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY));
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(() => readStoredString(ACTIVE_CATEGORY_KEY, 'Todos'));
@@ -255,34 +271,47 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const handleRemoteNavigation = (event: KeyboardEvent) => {
-      const isSelectKey = event.key === 'Enter' || event.key === 'NumpadEnter' || event.key === ' ';
-      const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
-
-      if (!isArrowKey && !isSelectKey) return;
-      if (isTextInputElement(document.activeElement)) return;
-
+    const navigateWithRemote = (key: string) => {
+      const isSelectKey = key === 'Enter' || key === 'NumpadEnter' || key === ' ';
+      const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key);
+      if (!isArrowKey && !isSelectKey) return false;
+      if (isTextInputElement(document.activeElement)) {
+        (document.activeElement as HTMLElement).blur();
+      }
       const elements = getFocusableElements();
       const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
       if (isSelectKey) {
         if (activeElement && elements.includes(activeElement)) {
-          event.preventDefault();
           activeElement.click();
+          return true;
         }
-        return;
+        const fallback = getFallbackElement(elements);
+        fallback?.focus({ preventScroll: true });
+        fallback?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        return true;
       }
 
-      const nextElement = getNextFocusableElement(activeElement, event.key, elements);
-      if (!nextElement) return;
+      const nextElement = getNextFocusableElement(activeElement, key, elements);
+      if (!nextElement) return false;
 
-      event.preventDefault();
       nextElement.focus({ preventScroll: true });
       nextElement.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      return true;
+    };
+
+    window.__goleaTvNavigate = navigateWithRemote;
+
+    const handleRemoteNavigation = (event: KeyboardEvent) => {
+      const handled = navigateWithRemote(event.key);
+      if (handled) event.preventDefault();
     };
 
     document.addEventListener('keydown', handleRemoteNavigation, true);
-    return () => document.removeEventListener('keydown', handleRemoteNavigation, true);
+    return () => {
+      document.removeEventListener('keydown', handleRemoteNavigation, true);
+      delete window.__goleaTvNavigate;
+    };
   }, []);
 
   useEffect(() => {
@@ -405,6 +434,22 @@ function App() {
 
   const hasFirstChannelUnlockedAds = () => {
     return readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true';
+  };
+
+  const handlePlayerFullscreen = async () => {
+    const target = playerFrameRef.current;
+    if (!target) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await target.requestFullscreen();
+    } catch (err) {
+      console.debug('Fullscreen request failed:', err);
+    }
   };
 
   const fetchChannels = async (silent = false, force = false) => {
@@ -787,7 +832,6 @@ function App() {
 
             <button 
               onClick={() => { fetchChannels(false, true); fetchAgenda(false, true); }}
-              data-tv-focus="true"
               className="shrink-0 px-3 md:px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
               title="Actualizar"
             >
@@ -804,7 +848,6 @@ function App() {
           {categories.map(cat => (
             <button
               key={cat}
-              data-tv-focus="true"
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
                 activeCategory === cat 
@@ -825,7 +868,17 @@ function App() {
           }`}>
             {loadingStream && adsUnlocked && <AdBanner format="overlay" />}
             {streamUrl ? (
-              <div className="w-full h-full">
+              <div
+                ref={playerFrameRef}
+                role="button"
+                tabIndex={0}
+                data-tv-focus="true"
+                data-tv-player="true"
+                onClick={handlePlayerFullscreen}
+                className="tv-focusable w-full h-full rounded-2xl"
+                aria-label="Pantalla completa"
+                title="Pantalla completa"
+              >
                 <VideoPlayer src={streamUrl} />
               </div>
             ) : (
@@ -1146,7 +1199,6 @@ function App() {
             <div className="grid grid-cols-2 gap-2 mt-3">
               <button
                 type="button"
-                data-tv-focus="true"
                 onClick={handleCopyDonationAddress}
                 className="bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
               >
@@ -1157,7 +1209,6 @@ function App() {
                 href={SOLANA_EXPLORER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                data-tv-focus="true"
                 className="bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs font-black transition-colors flex items-center justify-center gap-2"
               >
                 <ExternalLink className="w-4 h-4" />
