@@ -177,6 +177,10 @@ function isVideoUrl(url) {
   return /\.(ts|m4s|mp4)(\?|$)/i.test(url);
 }
 
+function isPlaylistUrl(url) {
+  return /\.m3u8(\?|$)/i.test(url);
+}
+
 function getProxyTtlForUrl(url) {
   return isVideoUrl(url) ? VIDEO_TOKEN_TTL_MS : TOKEN_TTL_MS;
 }
@@ -197,7 +201,13 @@ function createProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
 }
 
 function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
-  return `${PROXY_BASE_URL}/proxy?s=${createProxyToken(targetUrl, ttlMs)}`;
+  const path = isVideoUrl(targetUrl)
+    ? "/proxy/segment"
+    : isPlaylistUrl(targetUrl)
+      ? "/proxy/manifest"
+      : "/proxy";
+
+  return `${PROXY_BASE_URL}${path}?s=${createProxyToken(targetUrl, ttlMs)}`;
 }
 
 async function resolveProxyTarget(req) {
@@ -251,13 +261,17 @@ function getHeadersForUrl(targetUrl) {
   return headers;
 }
 
-app.get("/api/proxy", rateLimit({ windowMs: 60_000, max: 1200 }), async (req, res) => {
+async function handleProxyRequest(req, res, expectedType = "auto") {
   try {
     const url = await resolveProxyTarget(req);
 
     const domain = new URL(url).hostname;
-    const isVideo = url.includes(".ts") || url.includes(".m4s") || url.includes(".mp4");
+    const isVideo = isVideoUrl(url);
     const needsFullProxy = FULL_PROXY_DOMAINS.some(d => domain.includes(d));
+
+    if (expectedType === "segment" && !isVideo) {
+      return res.status(400).send("Invalid segment URL");
+    }
 
     if (isVideo && !needsFullProxy) return res.redirect(url);
 
@@ -265,13 +279,24 @@ app.get("/api/proxy", rateLimit({ windowMs: 60_000, max: 1200 }), async (req, re
     if (!response.ok) return res.status(response.status).send("Origin error");
 
     const contentType = response.headers.get("content-type") || "application/octet-stream";
-    const isPlaylist = url.includes(".m3u8") || /mpegurl|vnd\.apple\.mpegurl/i.test(contentType);
+    const isPlaylist = isPlaylistUrl(url) || /mpegurl|vnd\.apple\.mpegurl/i.test(contentType);
 
-    if (isVideo) res.set("Cache-Control", "public, max-age=3600");
-    else if (isPlaylist) res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    if (expectedType === "manifest" && !isPlaylist) {
+      return res.status(400).send("Invalid manifest URL");
+    }
+
+    if (isVideo) {
+      const ttlSeconds = Math.floor(VIDEO_TOKEN_TTL_MS / 1000);
+      res.set("Cache-Control", `public, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}`);
+      res.set("CDN-Cache-Control", `public, max-age=${ttlSeconds}`);
+    } else if (isPlaylist) {
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.set("CDN-Cache-Control", "no-store");
+    }
 
     setProxyCors(req, res);
     res.set("Content-Type", contentType);
+    res.set("X-Golea-Proxy-Type", isVideo ? "segment" : isPlaylist ? "manifest" : "asset");
 
     if (isPlaylist) {
       let text = await response.text();
@@ -299,7 +324,12 @@ app.get("/api/proxy", rateLimit({ windowMs: 60_000, max: 1200 }), async (req, re
       res.status(message === "Forbidden" ? 403 : 500).send(message);
     }
   }
-});
+}
+
+const proxyRateLimit = rateLimit({ windowMs: 60_000, max: 1200 });
+app.get("/api/proxy", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "auto"));
+app.get("/api/proxy/manifest", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "manifest"));
+app.get("/api/proxy/segment", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "segment"));
 
 let channelsCache = null;
 let lastChannelsFetch = 0;
