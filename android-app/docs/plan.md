@@ -49,6 +49,6 @@ Estado: completada para APK manual.
 
 - APK debug para pruebas privadas.
 - APK release firmada para distribucion manual.
-- Version actual: `1.0.5` (`versionCode` 6).
+- Version actual: `1.0.6` (`versionCode` 7).
 - APK final local: `dist/Golea-release.apk`.
 - AAB queda como siguiente paso solo si se decide subir a Play Store.

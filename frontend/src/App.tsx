@@ -34,7 +34,7 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'tv-region-navigation-2026-06-07';
+const APP_BUILD_MARKER = 'tv-player-autofocus-expanded-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
@@ -199,6 +199,7 @@ function getNextFocusableElement(
   if (!current || !elements.includes(current)) return getFallbackElement(elements);
 
   const region = current.dataset.tvRegion || '';
+  const expandedPlayer = elements.find(element => element.dataset.tvPlayerExpanded === 'true') || null;
   const categories = getRegionElements('category', elements);
   const activeCategory = categories.find(element => element.dataset.tvActive === 'true') || categories[0] || null;
   const channels = getRegionElements('channel', elements);
@@ -208,6 +209,22 @@ function getNextFocusableElement(
   const tabs = getRegionElements('tab', elements);
   const activeTab = tabs.find(element => element.dataset.tvActive === 'true') || tabs[0] || null;
   const agendaEvents = getRegionElements('agenda-event', elements);
+
+  if (expandedPlayer) {
+    if (region === 'player') {
+      if (key === 'ArrowDown' || key === 'ArrowLeft') return playerControls[0] || current;
+      if (key === 'ArrowUp' || key === 'ArrowRight') return playerControls[playerControls.length - 1] || current;
+    }
+
+    if (region === 'player-control') {
+      if (key === 'ArrowLeft') return moveInRegion(playerControls, current, -1, true);
+      if (key === 'ArrowRight') return moveInRegion(playerControls, current, 1, true);
+      if (key === 'ArrowUp') return expandedPlayer;
+      if (key === 'ArrowDown') return expandedPlayer;
+    }
+
+    return expandedPlayer;
+  }
 
   if (region === 'category') {
     if (key === 'ArrowLeft') return moveInRegion(categories, current, -1, true);
@@ -280,6 +297,7 @@ function App() {
   const [donationCopied, setDonationCopied] = useState(false);
   const [adsUnlocked, setAdsUnlocked] = useState(() => readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true');
   const [playerPaused, setPlayerPaused] = useState(false);
+  const [playerExpanded, setPlayerExpanded] = useState(false);
   const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
@@ -308,6 +326,16 @@ function App() {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!playerExpanded) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [playerExpanded]);
 
   useEffect(() => {
     const navigateWithRemote = (key: string) => {
@@ -361,6 +389,16 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [loadingStream, loadingMessages]);
+
+  useEffect(() => {
+    if (!streamUrl) return;
+
+    const timer = window.setTimeout(() => {
+      focusElement(playerFrameRef.current);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [streamUrl]);
 
   useEffect(() => {
     fetchChannels();
@@ -493,20 +531,8 @@ function App() {
     }
   };
 
-  const handlePlayerFullscreen = async () => {
-    const target = playerFrameRef.current;
-    if (!target) return;
-
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        return;
-      }
-
-      await target.requestFullscreen();
-    } catch (err) {
-      console.debug('Fullscreen request failed:', err);
-    }
+  const handlePlayerFullscreen = () => {
+    setPlayerExpanded(previous => !previous);
   };
 
   const fetchChannels = async (silent = false, force = false) => {
@@ -625,6 +651,7 @@ function App() {
       }
 
       setPlayerPaused(false);
+      setPlayerExpanded(false);
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
@@ -935,14 +962,21 @@ function App() {
                 tabIndex={0}
                 data-tv-focus="true"
                 data-tv-player="true"
+                data-tv-player-expanded={playerExpanded ? 'true' : undefined}
                 data-tv-region="player"
                 onClick={togglePlayerPlayback}
-                className="tv-focusable w-full h-full rounded-2xl relative"
+                className={`tv-focusable bg-black ${
+                  playerExpanded
+                    ? 'fixed inset-0 z-[100] h-screen w-screen rounded-none'
+                    : 'relative h-full w-full rounded-2xl'
+                }`}
                 aria-label={playerPaused ? 'Reproducir' : 'Pausar'}
                 title={playerPaused ? 'Reproducir' : 'Pausar'}
               >
                 <VideoPlayer src={streamUrl} />
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur">
+                <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur ${
+                  playerExpanded ? 'bottom-6' : 'bottom-3'
+                }`}>
                   <button
                     type="button"
                     data-tv-focus="true"
@@ -967,7 +1001,7 @@ function App() {
                     className="tv-focusable flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-600"
                   >
                     <Maximize2 className="h-4 w-4" />
-                    Pantalla
+                    {playerExpanded ? 'Salir' : 'Pantalla'}
                   </button>
                 </div>
               </div>
