@@ -33,11 +33,60 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'presence-counters-2026-06-06';
+const APP_BUILD_MARKER = 'local-cache-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
+const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
+const AGENDA_CACHE_KEY = 'golea_agenda_cache_v1';
+const ACTIVE_CATEGORY_KEY = 'golea_active_category';
+const CHANNELS_CACHE_TTL_MS = 10 * 60 * 1000;
+const AGENDA_CACHE_TTL_MS = 5 * 60 * 1000;
 const SOLANA_DONATION_ADDRESS = 'ar65x4bnv19SqAkr6p3Ts6Wx9G3jGp4Pxrj5q4dYndK';
 const SOLANA_EXPLORER_URL = `https://solscan.io/account/${SOLANA_DONATION_ADDRESS}`;
+
+interface LocalCachePayload<T> {
+  data: T;
+  savedAt: number;
+}
+
+function readLocalCache<T>(key: string): LocalCachePayload<T> | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.data) || typeof parsed.savedAt !== 'number') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function readCachedArray<T>(key: string): T[] {
+  return readLocalCache<T[]>(key)?.data || [];
+}
+
+function isCacheFresh<T>(cache: LocalCachePayload<T> | null, ttlMs: number): cache is LocalCachePayload<T> {
+  return !!cache && Date.now() - cache.savedAt < ttlMs;
+}
+
+function writeLocalCache<T>(key: string, data: T): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(key, JSON.stringify({ data, savedAt: Date.now() }));
+  } catch {
+    // Cache is an optimization; storage quota/privacy failures should not block playback.
+  }
+}
+
+function readStoredString(key: string, fallback: string): string {
+  try {
+    if (typeof localStorage === 'undefined') return fallback;
+    return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function getOrCreatePresenceSessionId(): string {
   const key = 'golea_presence_session';
@@ -75,17 +124,17 @@ function formatViewerCount(value: number): string {
 }
 
 function App() {
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channels, setChannels] = useState<Channel[]>(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY));
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>('Todos');
+  const [activeCategory, setActiveCategory] = useState<string>(() => readStoredString(ACTIVE_CATEGORY_KEY, 'Todos'));
   const [activeTab, setActiveTab] = useState<'channels' | 'agenda' | 'chat'>('channels');
   const [searchTerm, setSearchTerm] = useState('');
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY).length === 0);
   const [loadingStream, setLoadingStream] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
   const [error, setError] = useState<string | null>(null);
-  const [agenda, setAgenda] = useState<AgendaEvent[]>([]);
+  const [agenda, setAgenda] = useState<AgendaEvent[]>(() => readCachedArray<AgendaEvent>(AGENDA_CACHE_KEY));
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [presenceSessionId] = useState(getOrCreatePresenceSessionId);
@@ -216,25 +265,67 @@ function App() {
     localStorage.setItem('golea_recent', JSON.stringify(recentChannelIds));
   }, [recentChannelIds]);
 
-  const fetchChannels = async (silent = false) => {
+  useEffect(() => {
     try {
-      if (!silent) setLoading(true);
+      localStorage.setItem(ACTIVE_CATEGORY_KEY, activeCategory);
+    } catch {
+      // Local preferences should never interrupt the main experience.
+    }
+  }, [activeCategory]);
+
+  const fetchChannels = async (silent = false, force = false) => {
+    const cached = readLocalCache<Channel[]>(CHANNELS_CACHE_KEY);
+
+    if (!force && isCacheFresh(cached, CHANNELS_CACHE_TTL_MS)) {
+      setChannels(cached.data);
+      setError(null);
+      if (!silent) setLoading(false);
+      return;
+    }
+
+    if (cached?.data.length) {
+      setChannels(cached.data);
+      setError(null);
+      if (!silent) setLoading(false);
+    }
+
+    try {
+      if (!silent && !cached?.data.length) setLoading(true);
       const response = await axios.get(`${API_URL}/channels`);
-      setChannels(response.data);
+      const nextChannels = Array.isArray(response.data) ? response.data : [];
+      setChannels(nextChannels);
+      writeLocalCache(CHANNELS_CACHE_KEY, nextChannels);
       setError(null);
     } catch (err) {
-      setError('Error al cargar los canales. Asegúrate de que el backend esté ejecutándose.');
+      if (!cached?.data.length) {
+        setError('Error al cargar los canales. Asegúrate de que el backend esté ejecutándose.');
+      }
       console.error(err);
     } finally {
       if (!silent) setLoading(false);
     }
   };
 
-  const fetchAgenda = async (silent = false) => {
+  const fetchAgenda = async (silent = false, force = false) => {
+    const cached = readLocalCache<AgendaEvent[]>(AGENDA_CACHE_KEY);
+
+    if (!force && isCacheFresh(cached, AGENDA_CACHE_TTL_MS)) {
+      setAgenda(cached.data);
+      if (!silent) setLoadingAgenda(false);
+      return;
+    }
+
+    if (cached?.data.length) {
+      setAgenda(cached.data);
+      if (!silent) setLoadingAgenda(false);
+    }
+
     try {
-      if (!silent) setLoadingAgenda(true);
+      if (!silent && !cached?.data.length) setLoadingAgenda(true);
       const response = await axios.get(`${API_URL}/agenda`);
-      setAgenda(response.data);
+      const nextAgenda = Array.isArray(response.data) ? response.data : [];
+      setAgenda(nextAgenda);
+      writeLocalCache(AGENDA_CACHE_KEY, nextAgenda);
     } catch (err) {
       console.error('Error fetching agenda:', err);
     } finally {
@@ -246,6 +337,12 @@ function App() {
     const cats = ['Todos', 'Premium', 'Premium 2', ...Array.from(new Set(channels.filter(c => !['Premium', 'Premium 2'].includes(c.category)).map(c => c.category)))];
     return cats;
   }, [channels]);
+
+  useEffect(() => {
+    if (channels.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory('Todos');
+    }
+  }, [activeCategory, categories, channels.length]);
 
   const filteredChannels = useMemo(() => {
     return channels.filter(c => {
@@ -540,7 +637,7 @@ function App() {
             </div>
 
             <button 
-              onClick={() => { fetchChannels(); fetchAgenda(); }}
+              onClick={() => { fetchChannels(false, true); fetchAgenda(false, true); }}
               className="shrink-0 px-3 md:px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
               title="Actualizar"
             >
