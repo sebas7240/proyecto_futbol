@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
-import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
+import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, PauseCircle, Maximize2, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
@@ -34,7 +34,7 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const APP_BUILD_MARKER = 'tv-focus-map-player-2026-06-07';
+const APP_BUILD_MARKER = 'tv-region-navigation-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
 const CHANNELS_CACHE_KEY = 'golea_channels_cache_v1';
@@ -154,11 +154,40 @@ function getFocusableElements(): HTMLElement[] {
   });
 }
 
+function getRegionElements(region: string, elements = getFocusableElements()): HTMLElement[] {
+  return elements.filter(element => element.dataset.tvRegion === region);
+}
+
 function getFallbackElement(elements: HTMLElement[]): HTMLElement | null {
   return elements.find(element => element.dataset.tvPrimary === 'true')
     || elements.find(element => element.dataset.tvCard === 'true')
+    || elements.find(element => element.dataset.tvRegion === 'category' && element.dataset.tvActive === 'true')
+    || elements.find(element => element.dataset.tvRegion === 'category')
     || elements[0]
     || null;
+}
+
+function focusElement(element: HTMLElement | null): boolean {
+  if (!element) return false;
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  return true;
+}
+
+function moveInRegion(
+  elements: HTMLElement[],
+  current: HTMLElement,
+  direction: 1 | -1,
+  wrap = false
+): HTMLElement | null {
+  if (elements.length === 0) return null;
+  const currentIndex = elements.indexOf(current);
+  if (currentIndex < 0) return elements[0];
+  const nextIndex = currentIndex + direction;
+
+  if (nextIndex < 0) return wrap ? elements[elements.length - 1] : null;
+  if (nextIndex >= elements.length) return wrap ? elements[0] : null;
+  return elements[nextIndex];
 }
 
 function getNextFocusableElement(
@@ -169,51 +198,60 @@ function getNextFocusableElement(
   if (elements.length === 0) return null;
   if (!current || !elements.includes(current)) return getFallbackElement(elements);
 
-  if (key === 'ArrowLeft' && current.dataset.tvCard === 'true') {
-    const player = elements.find(element => element.dataset.tvPlayer === 'true');
-    if (player) return player;
+  const region = current.dataset.tvRegion || '';
+  const categories = getRegionElements('category', elements);
+  const activeCategory = categories.find(element => element.dataset.tvActive === 'true') || categories[0] || null;
+  const channels = getRegionElements('channel', elements);
+  const primaryChannel = channels.find(element => element.dataset.tvPrimary === 'true') || channels[0] || null;
+  const player = getRegionElements('player', elements)[0] || null;
+  const playerControls = getRegionElements('player-control', elements);
+  const tabs = getRegionElements('tab', elements);
+  const activeTab = tabs.find(element => element.dataset.tvActive === 'true') || tabs[0] || null;
+  const agendaEvents = getRegionElements('agenda-event', elements);
+
+  if (region === 'category') {
+    if (key === 'ArrowLeft') return moveInRegion(categories, current, -1, true);
+    if (key === 'ArrowRight') return moveInRegion(categories, current, 1, true);
+    if (key === 'ArrowDown') return primaryChannel || activeTab || null;
+    if (key === 'ArrowUp') return player || null;
   }
 
-  if (key === 'ArrowRight' && current.dataset.tvPlayer === 'true') {
-    return elements.find(element => element.dataset.tvPrimary === 'true')
-      || elements.find(element => element.dataset.tvCard === 'true')
-      || null;
+  if (region === 'channel') {
+    if (key === 'ArrowUp') return moveInRegion(channels, current, -1) || activeCategory;
+    if (key === 'ArrowDown') return moveInRegion(channels, current, 1);
+    if (key === 'ArrowLeft') return player || activeCategory;
+    if (key === 'ArrowRight') return activeTab;
   }
 
-  const currentRect = current.getBoundingClientRect();
-  const currentCenterX = currentRect.left + currentRect.width / 2;
-  const currentCenterY = currentRect.top + currentRect.height / 2;
-  const candidates = elements
-    .filter(element => element !== current)
-    .map(element => {
-      const rect = element.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const deltaX = centerX - currentCenterX;
-      const deltaY = centerY - currentCenterY;
+  if (region === 'player') {
+    if (key === 'ArrowRight') return primaryChannel || activeCategory;
+    if (key === 'ArrowDown') return playerControls[0] || primaryChannel;
+    if (key === 'ArrowUp') return activeCategory || primaryChannel;
+    if (key === 'ArrowLeft') return playerControls[playerControls.length - 1] || null;
+  }
 
-      return { element, deltaX, deltaY };
-    })
-    .filter(({ deltaX, deltaY }) => {
-      if (key === 'ArrowDown') return deltaY > 8;
-      if (key === 'ArrowUp') return deltaY < -8;
-      if (key === 'ArrowRight') return deltaX > 8;
-      if (key === 'ArrowLeft') return deltaX < -8;
-      return false;
-    })
-    .sort((a, b) => {
-      const aPrimary = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(a.deltaY) : Math.abs(a.deltaX);
-      const bPrimary = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(b.deltaY) : Math.abs(b.deltaX);
-      const aCross = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(a.deltaX) : Math.abs(a.deltaY);
-      const bCross = key === 'ArrowDown' || key === 'ArrowUp' ? Math.abs(b.deltaX) : Math.abs(b.deltaY);
-      return aPrimary * 3 + aCross - (bPrimary * 3 + bCross);
-    });
+  if (region === 'player-control') {
+    if (key === 'ArrowLeft') return moveInRegion(playerControls, current, -1, true);
+    if (key === 'ArrowRight') return moveInRegion(playerControls, current, 1, true);
+    if (key === 'ArrowUp') return player || activeCategory;
+    if (key === 'ArrowDown') return primaryChannel || activeTab;
+  }
 
-  if (candidates[0]) return candidates[0].element;
+  if (region === 'tab') {
+    if (key === 'ArrowLeft') return moveInRegion(tabs, current, -1, true);
+    if (key === 'ArrowRight') return moveInRegion(tabs, current, 1, true);
+    if (key === 'ArrowUp') return player || activeCategory;
+    if (key === 'ArrowDown') return primaryChannel || agendaEvents[0] || current;
+  }
 
-  const currentIndex = elements.indexOf(current);
-  if (key === 'ArrowDown' || key === 'ArrowRight') return elements[(currentIndex + 1) % elements.length];
-  return elements[(currentIndex - 1 + elements.length) % elements.length];
+  if (region === 'agenda-event') {
+    if (key === 'ArrowUp') return moveInRegion(agendaEvents, current, -1) || activeTab;
+    if (key === 'ArrowDown') return moveInRegion(agendaEvents, current, 1);
+    if (key === 'ArrowLeft') return player || activeCategory;
+    if (key === 'ArrowRight') return activeTab;
+  }
+
+  return getFallbackElement(elements);
 }
 
 declare global {
@@ -241,6 +279,7 @@ function App() {
   const [presenceCounts, setPresenceCounts] = useState<PresenceCounts>({ total: 0, channels: {} });
   const [donationCopied, setDonationCopied] = useState(false);
   const [adsUnlocked, setAdsUnlocked] = useState(() => readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true');
+  const [playerPaused, setPlayerPaused] = useState(false);
   const [favoriteChannelIds, setFavoriteChannelIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('golea_favorites') || '[]');
@@ -272,7 +311,7 @@ function App() {
 
   useEffect(() => {
     const navigateWithRemote = (key: string) => {
-      const isSelectKey = key === 'Enter' || key === 'NumpadEnter' || key === ' ';
+      const isSelectKey = key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'MediaPlayPause';
       const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key);
       if (!isArrowKey && !isSelectKey) return false;
       if (isTextInputElement(document.activeElement)) {
@@ -287,17 +326,13 @@ function App() {
           return true;
         }
         const fallback = getFallbackElement(elements);
-        fallback?.focus({ preventScroll: true });
-        fallback?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-        return true;
+        return focusElement(fallback);
       }
 
       const nextElement = getNextFocusableElement(activeElement, key, elements);
       if (!nextElement) return false;
 
-      nextElement.focus({ preventScroll: true });
-      nextElement.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-      return true;
+      return focusElement(nextElement);
     };
 
     window.__goleaTvNavigate = navigateWithRemote;
@@ -436,6 +471,28 @@ function App() {
     return readSessionString(FIRST_CHANNEL_UNLOCK_KEY, 'false') === 'true';
   };
 
+  const getPlayerVideo = () => {
+    return playerFrameRef.current?.querySelector<HTMLVideoElement>('[data-golea-player-video="true"]') || null;
+  };
+
+  const togglePlayerPlayback = async () => {
+    const video = getPlayerVideo();
+    if (!video) return;
+
+    try {
+      if (video.paused) {
+        await video.play();
+        setPlayerPaused(false);
+        return;
+      }
+
+      video.pause();
+      setPlayerPaused(true);
+    } catch (err) {
+      console.debug('Playback toggle failed:', err);
+    }
+  };
+
   const handlePlayerFullscreen = async () => {
     const target = playerFrameRef.current;
     if (!target) return;
@@ -567,6 +624,7 @@ function App() {
         setAdsUnlocked(true);
       }
 
+      setPlayerPaused(false);
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
@@ -714,6 +772,7 @@ function App() {
         role="button"
         tabIndex={0}
         data-tv-focus="true"
+        data-tv-region="channel"
         data-tv-card="true"
         data-tv-primary={isSelected ? 'true' : undefined}
         onClick={() => handleSelectChannel(channel)}
@@ -763,7 +822,6 @@ function App() {
         </div>
         <button
           type="button"
-          data-tv-focus="true"
           onClick={(event) => toggleFavorite(channel.id, event)}
           className={`shrink-0 rounded-lg p-1.5 transition-colors ${isFavorite ? 'text-yellow-400 bg-yellow-400/10' : 'text-slate-600 hover:text-yellow-400 hover:bg-slate-900'}`}
           aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
@@ -848,6 +906,9 @@ function App() {
           {categories.map(cat => (
             <button
               key={cat}
+              data-tv-focus="true"
+              data-tv-region="category"
+              data-tv-active={activeCategory === cat ? 'true' : undefined}
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
                 activeCategory === cat 
@@ -874,12 +935,41 @@ function App() {
                 tabIndex={0}
                 data-tv-focus="true"
                 data-tv-player="true"
-                onClick={handlePlayerFullscreen}
-                className="tv-focusable w-full h-full rounded-2xl"
-                aria-label="Pantalla completa"
-                title="Pantalla completa"
+                data-tv-region="player"
+                onClick={togglePlayerPlayback}
+                className="tv-focusable w-full h-full rounded-2xl relative"
+                aria-label={playerPaused ? 'Reproducir' : 'Pausar'}
+                title={playerPaused ? 'Reproducir' : 'Pausar'}
               >
                 <VideoPlayer src={streamUrl} />
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur">
+                  <button
+                    type="button"
+                    data-tv-focus="true"
+                    data-tv-region="player-control"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      togglePlayerPlayback();
+                    }}
+                    className="tv-focusable flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-600"
+                  >
+                    {playerPaused ? <PlayCircle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
+                    {playerPaused ? 'Reproducir' : 'Pausar'}
+                  </button>
+                  <button
+                    type="button"
+                    data-tv-focus="true"
+                    data-tv-region="player-control"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handlePlayerFullscreen();
+                    }}
+                    className="tv-focusable flex items-center gap-2 rounded-lg bg-slate-900/90 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-600"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    Pantalla
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="w-full h-full">
@@ -911,6 +1001,7 @@ function App() {
                             <button
                               key={`${event.date}-${event.time}-${event.title}`}
                               data-tv-focus="true"
+                              data-tv-region="agenda-event"
                               onClick={() => handleSelectAgendaEvent(event)}
                               className="text-left bg-slate-900/80 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
                             >
@@ -952,6 +1043,7 @@ function App() {
                 </div>
                 <button
                   data-tv-focus="true"
+                  data-tv-region="agenda-event"
                   onClick={() => setActiveTab('agenda')}
                   className="shrink-0 whitespace-nowrap text-xs font-bold text-blue-400 hover:text-blue-300"
                 >
@@ -965,6 +1057,7 @@ function App() {
                     <button
                       key={`main-${event.date}-${event.time}-${event.title}`}
                       data-tv-focus="true"
+                      data-tv-region="agenda-event"
                       onClick={() => handleSelectAgendaEvent(event)}
                       className="text-left bg-slate-900 border border-slate-700 hover:border-blue-500 rounded-xl p-3 transition-all"
                     >
@@ -1032,6 +1125,8 @@ function App() {
           <div className="flex bg-slate-800 p-1 rounded-xl">
             <button 
               data-tv-focus="true"
+              data-tv-region="tab"
+              data-tv-active={activeTab === 'channels' ? 'true' : undefined}
               onClick={() => setActiveTab('channels')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'channels' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -1042,6 +1137,8 @@ function App() {
             </button>
             <button 
               data-tv-focus="true"
+              data-tv-region="tab"
+              data-tv-active={activeTab === 'agenda' ? 'true' : undefined}
               onClick={() => setActiveTab('agenda')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'agenda' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -1052,6 +1149,8 @@ function App() {
             </button>
             <button 
               data-tv-focus="true"
+              data-tv-region="tab"
+              data-tv-active={activeTab === 'chat' ? 'true' : undefined}
               onClick={() => setActiveTab('chat')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'chat' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
@@ -1140,6 +1239,7 @@ function App() {
                             {event.channelId && status.active && (
                               <button 
                                 data-tv-focus="true"
+                                data-tv-region="agenda-event"
                                 onClick={() => handleSelectAgendaEvent(event)}
                                 className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1"
                               >

@@ -60,6 +60,11 @@ public class MainActivity extends BridgeActivity {
             case KeyEvent.KEYCODE_BUTTON_A:
                 runTvRemoteScript("Enter");
                 return true;
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                runTvRemoteScript("MediaPlayPause");
+                return true;
             default:
                 return super.dispatchKeyEvent(event);
         }

@@ -66,6 +66,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
     <div className="w-full h-full flex flex-col items-center justify-center bg-black relative">
       <video 
         ref={videoRef} 
+        data-golea-player-video="true"
         className="w-full h-full object-contain"
         controls
         autoPlay

@@ -17,8 +17,8 @@ https://goleafutbol.com/downloads/Golea-release.apk
 Version:
 
 ```text
-versionName: 1.0.4
-versionCode: 5
+versionName: 1.0.5
+versionCode: 6
 package: com.goleafutbol.app
 ```
 
