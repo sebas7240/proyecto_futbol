@@ -8,6 +8,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - PROXY_TOKEN_SECRET=${PROXY_TOKEN_SECRET:-}
+      - VIDEO_TOKEN_TTL_MS=${VIDEO_TOKEN_TTL_MS:-21600000}
     restart: always
 
   # Note: Frontend is usually deployed to Cloudflare Pages as discussed,

@@ -15,7 +15,9 @@ const ALLOWED_ORIGINS = [
   "https://golea.pages.dev"
 ];
 const TOKEN_TTL_MS = 15 * 60 * 1000;
+const VIDEO_TOKEN_TTL_MS = Number(process.env.VIDEO_TOKEN_TTL_MS || 6 * 60 * 60 * 1000);
 const DNS_CACHE_TTL_MS = 60 * 1000;
+const PROXY_TOKEN_SECRET = process.env.PROXY_TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
@@ -171,16 +173,30 @@ async function assertSafeProxyUrl(rawUrl) {
   return parsed.href;
 }
 
-function createProxyToken(targetUrl, ttlMs = TOKEN_TTL_MS) {
-  const token = crypto.randomBytes(24).toString("base64url");
+function isVideoUrl(url) {
+  return /\.(ts|m4s|mp4)(\?|$)/i.test(url);
+}
+
+function getProxyTtlForUrl(url) {
+  return isVideoUrl(url) ? VIDEO_TOKEN_TTL_MS : TOKEN_TTL_MS;
+}
+
+function createProxyToken(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
+  const bucket = Math.floor(Date.now() / ttlMs);
+  const token = crypto
+    .createHmac("sha256", PROXY_TOKEN_SECRET)
+    .update(`${bucket}:${targetUrl}`)
+    .digest("base64url")
+    .slice(0, 32);
+
   proxyTokens.set(token, {
     url: targetUrl,
-    expiresAt: Date.now() + ttlMs
+    expiresAt: (bucket + 1) * ttlMs + 60_000
   });
   return token;
 }
 
-function createProxyUrl(targetUrl, ttlMs = TOKEN_TTL_MS) {
+function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   return `${PROXY_BASE_URL}/proxy?s=${createProxyToken(targetUrl, ttlMs)}`;
 }
 
