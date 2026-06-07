@@ -364,7 +364,8 @@ async function handleProxyRequest(req, res, expectedType = "auto") {
   }
 }
 
-const proxyRateLimit = rateLimit({ windowMs: 60_000, max: 1200 });
+const PROXY_RATE_LIMIT_MAX = Number(process.env.PROXY_RATE_LIMIT_MAX || 60000);
+const proxyRateLimit = rateLimit({ windowMs: 60_000, max: PROXY_RATE_LIMIT_MAX });
 app.get("/api/proxy", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "auto"));
 app.get("/api/proxy/manifest", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "manifest"));
 app.get("/api/proxy/segment", proxyRateLimit, (req, res) => handleProxyRequest(req, res, "segment"));
