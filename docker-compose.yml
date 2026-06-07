@@ -1,5 +1,7 @@
 version: '3.8'
 
+# Note: Frontend is usually deployed to Cloudflare Pages as discussed,
+# but this compose file is useful for local production testing.
 services:
   backend:
     build: ./backend
@@ -12,5 +14,16 @@ services:
       - VIDEO_TOKEN_TTL_MS=${VIDEO_TOKEN_TTL_MS:-21600000}
     restart: always
 
-  # Note: Frontend is usually deployed to Cloudflare Pages as discussed,
-  # but this compose file is useful for local production testing.
+  microcache:
+    image: nginx:1.27-alpine
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3002:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx-cache:/var/cache/nginx
+    restart: always
+
+volumes:
+  nginx-cache:
