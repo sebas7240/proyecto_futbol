@@ -1,0 +1,16 @@
+node_modules/
+.gradle/
+local.properties
+build/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/captures/
+android/.idea/
+dist/
+keystore/
+signing.properties
+*.jks
+*.jks.old
+*.iml

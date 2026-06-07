@@ -13,7 +13,11 @@ const EDGE_PROXY_BASE_URL = (process.env.EDGE_PROXY_BASE_URL || "").replace(/\/+
 const ALLOWED_ORIGINS = [
   "https://goleafutbol.com",
   "https://www.goleafutbol.com",
-  "https://golea.pages.dev"
+  "https://golea.pages.dev",
+  "capacitor://localhost",
+  "capacitor://goleafutbol.com",
+  "http://localhost",
+  "https://localhost"
 ];
 const TOKEN_TTL_MS = 15 * 60 * 1000;
 const VIDEO_TOKEN_TTL_MS = Number(process.env.VIDEO_TOKEN_TTL_MS || 6 * 60 * 60 * 1000);
@@ -24,11 +28,12 @@ function isAllowedOrigin(origin) {
   if (!origin) return true;
   try {
     const { hostname, protocol } = new URL(origin);
-    return protocol === "https:" && (
-      ALLOWED_ORIGINS.includes(origin) ||
-      hostname === "golea.pages.dev" ||
-      hostname.endsWith(".golea.pages.dev")
-    );
+    if (ALLOWED_ORIGINS.includes(origin)) return true;
+
+    if (protocol !== "https:") return false;
+
+    return hostname === "golea.pages.dev" ||
+      hostname.endsWith(".golea.pages.dev");
   } catch {
     return false;
   }

@@ -1,0 +1,26 @@
+{
+  "name": "golea-android-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "APK Android paralela para Golea Futbol.",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android",
+    "doctor": "cap doctor android",
+    "build:debug": "cd android && gradlew assembleDebug",
+    "build:release": "cd android && gradlew assembleRelease",
+    "package:release": "cd android && gradlew assembleRelease && powershell -NoProfile -Command \"New-Item -ItemType Directory -Force ..\\dist | Out-Null; Copy-Item app\\build\\outputs\\apk\\release\\app-release.apk ..\\dist\\Golea-release.apk -Force\"",
+    "install:release": "powershell -NoProfile -Command \"$sdk=$env:ANDROID_HOME; if (-not $sdk) { $sdk=Join-Path $env:LOCALAPPDATA 'Android\\Sdk' }; & (Join-Path $sdk 'platform-tools\\adb.exe') install -r dist\\Golea-release.apk\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/browser": "^7.0.2",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/splash-screen": "^7.0.2",
+    "@capacitor/status-bar": "^7.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4"
+  }
+}
