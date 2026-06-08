@@ -72,14 +72,14 @@ const ALLOWED_PROXY_DOMAINS = [
   "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
   "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org",
   "noveopartidos.xyz", "streamhdhx.com", "ksdjugfsddeports.com",
-  "la18hd.com", "fubo18.com"
+  "la18hd.com", "fubo18.com", "vopartidos.tv", "tvtvhd.com"
 ];
 
 const FULL_PROXY_DOMAINS = [
   "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com",
   "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
   "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org",
-  "noveopartidos.xyz", "la18hd.com", "fubo18.com"
+  "noveopartidos.xyz", "la18hd.com", "fubo18.com", "vopartidos.tv", "tvtvhd.com"
 ];
 
 function getClientIp(req) {
@@ -291,9 +291,12 @@ function getHeadersForUrl(targetUrl) {
   } else if (targetUrl.includes("noveopartidos.xyz")) {
     headers["Referer"] = "https://noveopartidos.xyz/";
     headers["Origin"] = "https://noveopartidos.xyz";
-  } else if (targetUrl.includes("la18hd.com") || targetUrl.includes("fubo18.com")) {
+  } else if (targetUrl.includes("la18hd.com") || targetUrl.includes("fubo18.com") || targetUrl.includes("vopartidos.tv")) {
     headers["Referer"] = "https://la18hd.com/";
     headers["Origin"] = "https://la18hd.com";
+  } else if (targetUrl.includes("tvtvhd.com")) {
+    headers["Referer"] = "https://tvtvhd.com/";
+    headers["Origin"] = "https://tvtvhd.com";
   }
 
   return headers;

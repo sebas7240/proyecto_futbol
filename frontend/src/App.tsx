@@ -312,6 +312,33 @@ function App() {
       return [];
     }
   });
+  const [showControls, setShowControls] = useState(true);
+
+  useEffect(() => {
+    if (!streamUrl) return;
+
+    let timeout: NodeJS.Timeout;
+    const resetTimer = () => {
+      setShowControls(true);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setShowControls(false), 3000);
+    };
+
+    const handleActivity = () => resetTimer();
+    
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('touchstart', handleActivity);
+    
+    resetTimer();
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      clearTimeout(timeout);
+    };
+  }, [streamUrl]);
 
   const loadingMessages = useMemo(() => [
     'Sincronizando señal en vivo...',
@@ -366,6 +393,11 @@ function App() {
     window.__goleaTvNavigate = navigateWithRemote;
 
     const handleRemoteNavigation = (event: KeyboardEvent) => {
+      // Si el foco está en un input o textarea, no interferir con la navegación por TV
+      if (isTextInputElement(document.activeElement)) {
+        return;
+      }
+
       const handled = navigateWithRemote(event.key);
       if (handled) event.preventDefault();
     };
@@ -974,7 +1006,9 @@ function App() {
                 title={playerPaused ? 'Reproducir' : 'Pausar'}
               >
                 <VideoPlayer src={streamUrl} />
-                <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur ${
+                <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur transition-opacity duration-500 ${
+                  showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                } ${
                   playerExpanded ? 'bottom-6' : 'bottom-3'
                 }`}>
                   <button

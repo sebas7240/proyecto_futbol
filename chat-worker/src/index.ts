@@ -26,27 +26,19 @@ const ALLOWED_ORIGINS = new Set([
   "https://goleafutbol.com",
   "https://www.goleafutbol.com",
   "https://golea.pages.dev",
+  "http://178.105.224.176",
+  "https://api.goleafutbol.com",
+  "http://localhost:3000",
+  "http://localhost:3001",
 ]);
 
-const PRESENCE_SHARDS = 16;
-const PRESENCE_TTL_MS = 70_000;
-const MAX_PRESENCE_CHANNELS = 80;
+const PRESENCE_TTL_MS = 120_000; 
+const MAX_PRESENCE_CHANNELS = 20; 
 const MAX_MESSAGE_LENGTH = 160;
-const MAX_MESSAGES = 200;
+const MAX_MESSAGES = 50; // Reducido para ahorrar memoria
 const RATE_LIMIT_MS = 7000;
 const BLOCKED_WORDS = [
-  "puta",
-  "puto",
-  "mierda",
-  "malparido",
-  "gonorrea",
-  "hijueputa",
-  "marica",
-  "pendejo",
-  "idiota",
-  "imbecil",
-  "imbécil",
-  "spam",
+  "puta", "puto", "mierda", "malparido", "gonorrea", "hijueputa", "marica", "pendejo", "idiota", "imbecil", "imbécil", "spam",
 ];
 
 const jsonHeaders = {
@@ -58,8 +50,8 @@ function isAllowedRequestOrigin(request: Request): boolean {
   if (!origin) return true;
   try {
     const { hostname, protocol } = new URL(origin);
+    if (ALLOWED_ORIGINS.has(origin)) return true;
     return protocol === "https:" && (
-      ALLOWED_ORIGINS.has(origin) ||
       hostname === "golea.pages.dev" ||
       hostname.endsWith(".golea.pages.dev")
     );
@@ -92,19 +84,6 @@ function cleanPresenceChannel(value: unknown): string | null {
   return channel || null;
 }
 
-function hashString(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function presenceShardName(sessionId: string): string {
-  return `presence-${hashString(sessionId) % PRESENCE_SHARDS}`;
-}
-
 function cleanName(value: string | null): string {
   const name = (value || "").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().slice(0, 18);
   return name || `Invitado${Math.floor(100 + Math.random() * 900)}`;
@@ -131,100 +110,57 @@ function errorResponse(request: Request, message: string, status = 400): Respons
 }
 
 export class PresenceShard extends DurableObject<Env> {
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    this.ctx.blockConcurrencyWhile(async () => {
-      this.ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS presence_sessions (
-          session_id TEXT PRIMARY KEY,
-          channel_id TEXT,
-          updated_at INTEGER NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_presence_updated_at ON presence_sessions(updated_at);
-        CREATE INDEX IF NOT EXISTS idx_presence_channel_id ON presence_sessions(channel_id);
-      `);
-    });
-  }
+  private presence = new Map<string, { channelId: string | null; expires: number }>();
+  private lastCleanup = 0;
 
-  heartbeat(sessionId: string, channelId: string | null): { ok: true; expiresInMs: number } {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
     const now = Date.now();
-    this.cleanup(now);
-    this.ctx.storage.sql.exec(
-      "INSERT OR REPLACE INTO presence_sessions (session_id, channel_id, updated_at) VALUES (?, ?, ?)",
-      sessionId,
-      channelId,
-      now
-    );
-    return { ok: true, expiresInMs: PRESENCE_TTL_MS };
-  }
 
-  getCounts(channelIds: string[]): PresenceCounts {
-    const now = Date.now();
-    this.cleanup(now);
-
-    const totalRow = this.ctx.storage.sql.exec<{ count: number } & Record<string, SqlStorageValue>>(
-      "SELECT COUNT(*) AS count FROM presence_sessions WHERE updated_at >= ?",
-      now - PRESENCE_TTL_MS
-    ).toArray()[0];
-
-    const counts: Record<string, number> = {};
-    const uniqueChannelIds = Array.from(new Set(channelIds)).slice(0, MAX_PRESENCE_CHANNELS);
-
-    if (uniqueChannelIds.length > 0) {
-      const placeholders = uniqueChannelIds.map(() => "?").join(",");
-      const rows = this.ctx.storage.sql.exec<{ channel_id: string; count: number } & Record<string, SqlStorageValue>>(
-        `SELECT channel_id, COUNT(*) AS count
-         FROM presence_sessions
-         WHERE updated_at >= ? AND channel_id IN (${placeholders})
-         GROUP BY channel_id`,
-        now - PRESENCE_TTL_MS,
-        ...uniqueChannelIds
-      ).toArray();
-
-      rows.forEach((row) => {
-        if (row.channel_id) counts[row.channel_id] = Number(row.count) || 0;
-      });
+    // Cleanup every 30 seconds
+    if (now - this.lastCleanup > 30000) {
+      for (const [id, data] of this.presence.entries()) {
+        if (now > data.expires) this.presence.delete(id);
+      }
+      this.lastCleanup = now;
     }
 
-    return { total: Number(totalRow?.count) || 0, channels: counts };
-  }
+    if (url.pathname === "/presence" && request.method === "POST") {
+      const body = await request.json().catch(() => null) as { sessionId?: string; channelId?: string | null } | null;
+      const sessionId = cleanPresenceId(body?.sessionId);
+      if (!sessionId) return new Response("Invalid session", { status: 400 });
+      const channelId = cleanPresenceChannel(body?.channelId || null);
+      this.presence.set(sessionId, { channelId, expires: now + PRESENCE_TTL_MS });
+      return Response.json({ ok: true, expiresInMs: PRESENCE_TTL_MS });
+    }
 
-  private cleanup(now: number): void {
-    this.ctx.storage.sql.exec(
-      "DELETE FROM presence_sessions WHERE updated_at < ?",
-      now - PRESENCE_TTL_MS
-    );
+    if (url.pathname === "/presence/counts" && request.method === "GET") {
+      const channelIds = (url.searchParams.get("channels") || "").split(",").map(cleanPresenceChannel).filter(id => !!id);
+      
+      const counts: Record<string, number> = {};
+      channelIds.forEach(id => { if(id) counts[id] = 0; });
+      
+      let total = 0;
+      for (const data of this.presence.values()) {
+        total++;
+        if (data.channelId && counts.hasOwnProperty(data.channelId)) {
+          counts[data.channelId]++;
+        }
+      }
+
+      return Response.json({ total, channels: counts });
+    }
+
+    return new Response("Not found", { status: 404 });
   }
 }
 
 export class ChatRoom extends DurableObject<Env> {
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    this.ctx.blockConcurrencyWhile(async () => {
-      this.ctx.storage.sql.exec(`
-        CREATE TABLE IF NOT EXISTS messages (
-          id TEXT PRIMARY KEY,
-          ts INTEGER NOT NULL,
-          name TEXT NOT NULL,
-          text TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS rate_limits (
-          ip TEXT PRIMARY KEY,
-          last_ts INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS reports (
-          id TEXT PRIMARY KEY,
-          message_id TEXT NOT NULL,
-          ts INTEGER NOT NULL,
-          ip TEXT NOT NULL
-        );
-      `);
-    });
-  }
+  private messages: ChatMessage[] = [];
+  private rateLimits = new Map<string, number>();
 
   async fetch(request: Request): Promise<Response> {
     if (request.method === "OPTIONS") {
-      if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
     if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
@@ -232,189 +168,69 @@ export class ChatRoom extends DurableObject<Env> {
     const url = new URL(request.url);
 
     if (url.pathname === "/ws") {
-      return this.handleWebSocket(request);
+      if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
+        return errorResponse(request, "Se esperaba WebSocket", 426);
+      }
+
+      const name = cleanName(url.searchParams.get("name"));
+      const ip = request.headers.get("cf-connecting-ip") || "unknown";
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+
+      server.serializeAttachment({ name, ip } satisfies SocketAttachment);
+      this.ctx.acceptWebSocket(server);
+      server.send(JSON.stringify({ type: "history", messages: this.messages }));
+
+      return new Response(null, { status: 101, webSocket: client, headers: corsHeaders(request) });
     }
 
     if (url.pathname === "/messages" && request.method === "GET") {
-      return Response.json({ messages: this.getMessages() }, { headers: corsHeaders(request) });
-    }
-
-    if (url.pathname === "/messages" && request.method === "POST") {
-      const ip = request.headers.get("cf-connecting-ip") || "unknown";
-      const body = await request.json().catch(() => null) as { name?: string; text?: string } | null;
-      const result = this.createMessage(request, cleanName(body?.name || null), normalizeText(body?.text), ip);
-      if (result instanceof Response) return result;
-      this.broadcast({ type: "message", message: result });
-      return Response.json({ message: result }, { headers: corsHeaders(request) });
-    }
-
-    if (url.pathname === "/report" && request.method === "POST") {
-      const ip = request.headers.get("cf-connecting-ip") || "unknown";
-      const body = await request.json().catch(() => null) as { messageId?: string } | null;
-      const messageId = String(body?.messageId || "").slice(0, 80);
-      if (!messageId) return errorResponse(request, "Mensaje invalido");
-      this.ctx.storage.sql.exec(
-        "INSERT INTO reports (id, message_id, ts, ip) VALUES (?, ?, ?, ?)",
-        crypto.randomUUID(),
-        messageId,
-        Date.now(),
-        ip
-      );
-      return Response.json({ ok: true }, { headers: corsHeaders(request) });
+      return Response.json({ messages: this.messages }, { headers: corsHeaders(request) });
     }
 
     return new Response("Not found", { status: 404, headers: corsHeaders(request) });
-  }
-
-  private handleWebSocket(request: Request): Response {
-    if (!isAllowedRequestOrigin(request)) {
-      return new Response("Forbidden", { status: 403 });
-    }
-
-    if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
-      return errorResponse(request, "Se esperaba WebSocket", 426);
-    }
-
-    const url = new URL(request.url);
-    const name = cleanName(url.searchParams.get("name"));
-    const ip = request.headers.get("cf-connecting-ip") || "unknown";
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
-
-    server.serializeAttachment({ name, ip } satisfies SocketAttachment);
-    this.ctx.acceptWebSocket(server);
-    server.send(JSON.stringify({ type: "history", messages: this.getMessages() }));
-
-    return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
     const attachment = ws.deserializeAttachment() as SocketAttachment | undefined;
     const name = cleanName(attachment?.name || null);
     const ip = attachment?.ip || "unknown";
-    const parsed = this.parseSocketMessage(message);
-
-    if (!parsed) {
-      this.sendError(ws, "Mensaje invalido");
-      return;
-    }
+    
+    let parsed;
+    try {
+      const text = typeof message === "string" ? message : new TextDecoder().decode(message);
+      parsed = JSON.parse(text);
+    } catch { return; }
 
     if (parsed.type === "ping") {
       ws.send(JSON.stringify({ type: "pong", ts: Date.now() }));
       return;
     }
 
-    if (parsed.type === "report") {
-      const messageId = String(parsed.messageId || "").slice(0, 80);
-      if (!messageId) {
-        this.sendError(ws, "Reporte invalido");
-        return;
-      }
-      this.ctx.storage.sql.exec(
-        "INSERT INTO reports (id, message_id, ts, ip) VALUES (?, ?, ?, ?)",
-        crypto.randomUUID(),
-        messageId,
-        Date.now(),
-        ip
-      );
-      ws.send(JSON.stringify({ type: "reported", messageId }));
-      return;
-    }
-
     if (parsed.type !== "message") return;
 
-    const result = this.createMessage(new Request("https://chat.local"), name, normalizeText(parsed.text), ip);
-    if (result instanceof Response) {
-      const body = await result.json().catch(() => ({ error: "No se pudo enviar" })) as { error?: string };
-      this.sendError(ws, body.error || "No se pudo enviar");
+    const text = normalizeText(parsed.text);
+    if (!text || text.length > MAX_MESSAGE_LENGTH || hasLink(text) || hasBlockedWord(text)) {
+      ws.send(JSON.stringify({ type: "error", error: "Mensaje invalido" }));
       return;
     }
 
-    this.broadcast({ type: "message", message: result });
-  }
-
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    ws.close();
-  }
-
-  private parseSocketMessage(message: ArrayBuffer | string): Record<string, unknown> | null {
-    try {
-      const text = typeof message === "string" ? message : new TextDecoder().decode(message);
-      return JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  }
-
-  private createMessage(request: Request, name: string, text: string, ip: string): ChatMessage | Response {
-    if (!text) return errorResponse(request, "Escribe un mensaje");
-    if (text.length > MAX_MESSAGE_LENGTH) return errorResponse(request, "Maximo 160 caracteres");
-    if (hasLink(text)) return errorResponse(request, "No se permiten enlaces");
-    if (hasBlockedWord(text)) return errorResponse(request, "Mensaje bloqueado por moderacion");
-
     const now = Date.now();
-    const previous = this.ctx.storage.sql.exec<{ last_ts: number } & Record<string, SqlStorageValue>>(
-      "SELECT last_ts FROM rate_limits WHERE ip = ?",
-      ip
-    ).toArray()[0];
-
-    if (previous && now - previous.last_ts < RATE_LIMIT_MS) {
-      const remaining = Math.ceil((RATE_LIMIT_MS - (now - previous.last_ts)) / 1000);
-      return errorResponse(request, `Espera ${remaining}s antes de enviar otro mensaje`, 429);
+    const lastTs = this.rateLimits.get(ip) || 0;
+    if (now - lastTs < RATE_LIMIT_MS) {
+      ws.send(JSON.stringify({ type: "error", error: "Espera un momento" }));
+      return;
     }
+    this.rateLimits.set(ip, now);
 
-    this.ctx.storage.sql.exec(
-      "INSERT OR REPLACE INTO rate_limits (ip, last_ts) VALUES (?, ?)",
-      ip,
-      now
-    );
+    const item: ChatMessage = { id: crypto.randomUUID(), ts: now, name, text };
+    this.messages.push(item);
+    if (this.messages.length > MAX_MESSAGES) this.messages.shift();
 
-    const item: ChatMessage = {
-      id: crypto.randomUUID(),
-      ts: now,
-      name,
-      text,
-    };
-
-    this.ctx.storage.sql.exec(
-      "INSERT INTO messages (id, ts, name, text) VALUES (?, ?, ?, ?)",
-      item.id,
-      item.ts,
-      item.name,
-      item.text
-    );
-    this.ctx.storage.sql.exec(`
-      DELETE FROM messages
-      WHERE id NOT IN (
-        SELECT id FROM messages ORDER BY ts DESC LIMIT ${MAX_MESSAGES}
-      )
-    `);
-
-    return item;
-  }
-
-  private getMessages(): ChatMessage[] {
-    const rows = this.ctx.storage.sql.exec(
-      "SELECT id, ts, name, text FROM messages ORDER BY ts DESC LIMIT ?",
-      MAX_MESSAGES
-    ).toArray() as unknown as ChatMessage[];
-
-    return rows.reverse();
-  }
-
-  private broadcast(payload: unknown): void {
-    const encoded = JSON.stringify(payload);
-    this.ctx.getWebSockets().forEach((ws) => {
-      try {
-        ws.send(encoded);
-      } catch {
-        ws.close();
-      }
+    const broadcast = JSON.stringify({ type: "message", message: item });
+    this.ctx.getWebSockets().forEach(s => {
+      try { s.send(broadcast); } catch { s.close(); }
     });
-  }
-
-  private sendError(ws: WebSocket, message: string): void {
-    ws.send(JSON.stringify({ type: "error", error: message }));
   }
 }
 
@@ -423,7 +239,6 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
     if (!isAllowedRequestOrigin(request)) return new Response("Forbidden", { status: 403 });
@@ -432,55 +247,17 @@ export default {
       return Response.json({ ok: true, service: "golea-chat" }, { headers: corsHeaders(request) });
     }
 
-    if (url.pathname === "/presence" && request.method === "POST") {
-      const body = await request.json().catch(() => null) as { sessionId?: string; channelId?: string | null } | null;
-      const sessionId = cleanPresenceId(body?.sessionId);
-      if (!sessionId) return errorResponse(request, "Sesion invalida");
-
-      const channelId = cleanPresenceChannel(body?.channelId || null);
-      const stub = env.PRESENCE_SHARD.getByName(presenceShardName(sessionId));
-      const result = await stub.heartbeat(sessionId, channelId);
-      return Response.json(result, {
-        headers: { ...corsHeaders(request), "Cache-Control": "no-store" },
+    if (url.pathname.startsWith("/presence")) {
+      const stub = env.PRESENCE_SHARD.getByName("global");
+      const response = await stub.fetch(request);
+      // Ensure CORS headers are added to the DO response
+      const newHeaders = new Headers(response.headers);
+      const cors = corsHeaders(request);
+      Object.entries(cors).forEach(([k, v]) => newHeaders.set(k, v as string));
+      return new Response(response.body, {
+        status: response.status,
+        headers: newHeaders
       });
-    }
-
-    if (url.pathname === "/presence/counts" && request.method === "GET") {
-      const channelIds = (url.searchParams.get("channels") || "")
-        .split(",")
-        .map(cleanPresenceChannel)
-        .filter((channelId): channelId is string => Boolean(channelId))
-        .slice(0, MAX_PRESENCE_CHANNELS);
-
-      const results = await Promise.all(
-        Array.from({ length: PRESENCE_SHARDS }, (_, index) =>
-          env.PRESENCE_SHARD.getByName(`presence-${index}`).getCounts(channelIds)
-        )
-      );
-
-      const merged: PresenceCounts = {
-        total: 0,
-        channels: Object.fromEntries(channelIds.map((channelId) => [channelId, 0])),
-      };
-
-      results.forEach((result) => {
-        merged.total += result.total;
-        Object.entries(result.channels).forEach(([channelId, count]) => {
-          merged.channels[channelId] = (merged.channels[channelId] || 0) + count;
-        });
-      });
-
-      return Response.json({
-        ...merged,
-        ttlSeconds: Math.round(PRESENCE_TTL_MS / 1000),
-        updatedAt: Date.now(),
-      }, {
-        headers: { ...corsHeaders(request), "Cache-Control": "no-store" },
-      });
-    }
-
-    if (!["/ws", "/messages", "/report"].includes(url.pathname)) {
-      return new Response("Not found", { status: 404, headers: corsHeaders(request) });
     }
 
     const room = cleanRoom(url.searchParams.get("room"));

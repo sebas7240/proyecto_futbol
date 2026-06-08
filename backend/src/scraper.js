@@ -1,4 +1,4 @@
-﻿const { chromium } = require("playwright-extra");
+const { chromium } = require("playwright-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const needle = require("needle");
 
@@ -171,25 +171,49 @@ async function getChannelsFromRojaDirecta() {
 }
 
 async function getChannelsFromNoveo() {
-  try {
-    const url = "https://noveopartidos.xyz";
-    const response = await needle("get", `${url}/api/channels`, {
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
+  const mirrors = ["https://la18hd.com", "https://vopartidos.tv", "https://fubo18.com"];
+  let data = null;
+  let usedMirror = "";
 
-    if (!Array.isArray(response.body)) return [];
+  for (const mirror of mirrors) {
+    try {
+      const response = await needle("get", `${mirror}/status.json`, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        json: true,
+        timeout: 5000
+      });
 
-    return response.body.map(ch => ({
-      id: `noveo-${ch.id}`,
-      name: ch.name,
-      category: "Premium",
-      source: "noveopartidos",
-      original_id: ch.id
-    }));
-  } catch (err) {
-    console.error("[Scraper] Error en Noveo Channels:", err.message);
-    return [];
+      if (response.body && typeof response.body === 'object' && !Array.isArray(response.body)) {
+        data = response.body;
+        usedMirror = mirror;
+        break;
+      }
+    } catch (e) {
+      console.warn(`[Scraper] Mirror ${mirror} no disponible para Premium`);
+    }
   }
+
+  if (!data) return [];
+
+  const channels = [];
+  const allowedCategories = ["LATINOAMERICA", "DEPORTES", "ARGENTINA", "URUGUAY", "CHILE", "COLOMBIA", "ESPAÑA"];
+  
+  for (const category in data) {
+    if (allowedCategories.includes(category)) {
+      data[category].forEach(ch => {
+        if (ch.Estado === "Activo" && ch.Link.includes("stream=")) {
+          channels.push({
+            id: `premium-v2-${ch.Link.split("stream=")[1]}`,
+            name: ch.Canal,
+            category: "Premium",
+            source: "la18hd",
+            mirror: usedMirror
+          });
+        }
+      });
+    }
+  }
+  return channels;
 }
 
 let noveoTokenCache = {
@@ -266,52 +290,45 @@ async function getChannelsFromTvTvHd() {
   }
 }
 
-async function getTvTvHdStreamUrl(id) {
-  const streamId = id.replace("tvtvhd-", "");
-  const baseUrl = "https://tvtvhd.com";
+async function getLa18hdStreamUrl(id) {
+  const streamId = id.replace("tvtvhd-", "").replace("premium-v2-", "");
+  const mirrors = ["https://la18hd.com", "https://vopartidos.tv", "https://fubo18.com", "https://tvtvhd.com"];
   const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
-  try {
-    // 1. Get iframe source
-    const r1 = await needle("get", `${baseUrl}/vivo/canales.php?stream=${streamId}`, {
-      headers: { "User-Agent": userAgent }
-    });
-    const body1 = r1.body.toString();
-    const iframeMatch = body1.match(/src=["'](https:\/\/la18hd\.com\/vivo\/canales\.php\?stream=.*?)["']/);
-    if (!iframeMatch) return null;
-
-    const iframeUrl = iframeMatch[1];
-
-    // 2. Get playbackURL from iframe
-    const r2 = await needle("get", iframeUrl, {
-      headers: { "User-Agent": userAgent, "Referer": baseUrl }
-    });
-    const body2 = r2.body.toString();
-    const playbackMatch = body2.match(/playbackURL\s*=\s*["']([^"']+)["']/);
-
-    if (playbackMatch) {
-      const playlistUrl = playbackMatch[1];
-      const playlistCheck = await needle("get", playlistUrl, {
-        headers: {
-          "User-Agent": userAgent,
-          "Referer": "https://la18hd.com/",
-          "Origin": "https://la18hd.com"
-        },
-        open_timeout: 10000,
-        response_timeout: 10000
+  for (const baseUrl of mirrors) {
+    try {
+      console.log(`[Scraper] Intentando obtener señal de ${baseUrl} para ${streamId}`);
+      // 2. Get playbackURL from channel page
+      const r2 = await needle("get", `${baseUrl}/vivo/canales.php?stream=${streamId}`, {
+        headers: { "User-Agent": userAgent, "Referer": baseUrl },
+        timeout: 7000
       });
+      const body2 = r2.body.toString();
+      const playbackMatch = body2.match(/playbackURL\s*=\s*["']([^"']+)["']/);
 
-      if (playlistCheck.statusCode >= 200 && playlistCheck.statusCode < 300) {
-        return { url: playlistUrl, headers: { "Referer": "https://la18hd.com/" } };
+      if (playbackMatch) {
+        const playlistUrl = playbackMatch[1];
+        const playlistCheck = await needle("get", playlistUrl, {
+          headers: {
+            "User-Agent": userAgent,
+            "Referer": `${baseUrl}/`,
+            "Origin": baseUrl
+          },
+          open_timeout: 10000,
+          response_timeout: 10000
+        });
+
+        if (playlistCheck.statusCode >= 200 && playlistCheck.statusCode < 300) {
+          return { url: playlistUrl, headers: { "Referer": `${baseUrl}/` } };
+        }
+
+        console.error(`[Scraper] Mirror ${baseUrl} playlist no disponible (${playlistCheck.statusCode}) para ${streamId}`);
       }
-
-      console.error(`[Scraper] TVTVHD playlist no disponible (${playlistCheck.statusCode}) para ${streamId}`);
+    } catch (err) {
+      console.error(`[Scraper] Error en Mirror ${baseUrl}:`, err.message);
     }
-    return null;
-  } catch (err) {
-    console.error("[Scraper] Error en TVTVHD Stream:", err.message);
-    return null;
   }
+  return null;
 }
 
 async function getChannels() {
@@ -347,8 +364,8 @@ async function getStreamUrl(channelUrl) {
   if (channelUrl.startsWith("noveo-")) {
     return await getNoveoStreamUrl(channelUrl);
   }
-  if (channelUrl.startsWith("tvtvhd-")) {
-    return await getTvTvHdStreamUrl(channelUrl);
+  if (channelUrl.startsWith("tvtvhd-") || channelUrl.startsWith("premium-v2-")) {
+    return await getLa18hdStreamUrl(channelUrl);
   }
   console.log("[Scraper] Obteniendo seÃ±al para: " + channelUrl);
   const browser = await getBrowser();
