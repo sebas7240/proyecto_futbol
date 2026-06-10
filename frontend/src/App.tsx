@@ -280,11 +280,6 @@ declare global {
 
 function App() {
   const playerFrameRef = useRef<HTMLDivElement>(null);
-  
-  if (process.env.REACT_APP_MAINTENANCE_MODE === 'true') {
-    return <MaintenanceOverlay />;
-  }
-
   const [channels, setChannels] = useState<Channel[]>(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY));
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(() => readStoredString(ACTIVE_CATEGORY_KEY, 'Todos'));
@@ -949,6 +944,10 @@ function App() {
     return presenceCounts.channels[getPresenceChannelKey(channel.id)] || 0;
   };
   const selectedChannelViewers = selectedChannel ? getChannelViewerCount(selectedChannel) : 0;
+
+  if (process.env.REACT_APP_MAINTENANCE_MODE === 'true') {
+    return <MaintenanceOverlay />;
+  }
 
   const renderChannelCard = (channel: Channel) => {
     const channelStatus = getChannelStatus(channel);
