@@ -5,6 +5,7 @@ import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
 import AdsterraGlobalAds from './components/AdsterraGlobalAds';
+import MaintenanceOverlay from './components/MaintenanceOverlay';
 
 interface Channel {
   id: string;
@@ -279,6 +280,11 @@ declare global {
 
 function App() {
   const playerFrameRef = useRef<HTMLDivElement>(null);
+  
+  if (process.env.REACT_APP_MAINTENANCE_MODE === 'true') {
+    return <MaintenanceOverlay />;
+  }
+
   const [channels, setChannels] = useState<Channel[]>(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY));
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(() => readStoredString(ACTIVE_CATEGORY_KEY, 'Todos'));
