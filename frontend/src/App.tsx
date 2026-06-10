@@ -869,6 +869,38 @@ function App() {
     .filter((channel): channel is Channel => Boolean(channel));
   const recentSet = new Set(recentChannels.map(channel => channel.id));
   const regularChannels = filteredChannels.filter(channel => !favoriteSet.has(channel.id) && !recentSet.has(channel.id));
+
+  const currentMatchInfo = useMemo(() => {
+    if (!selectedChannel) return null;
+    
+    // Find the active event for this channel
+    const event = activeAgenda.find(item => channelMatchesEvent(selectedChannel, item));
+    if (!event) return null;
+
+    // Try to parse team names from title: "Team A vs Team B" or "Team A - Team B"
+    let local = 'Local';
+    let visitor = 'Visita';
+    const title = event.title;
+    
+    const separators = [' vs ', ' VS ', ' - ', ' v ', ' v. '];
+    for (const sep of separators) {
+      if (title.includes(sep)) {
+        const parts = title.split(sep);
+        if (parts.length >= 2) {
+          local = parts[0].trim().split(' ').slice(-2).join(' '); // Take last two words to avoid "Live:" etc
+          visitor = parts[1].trim().split(' ').slice(0, 2).join(' '); // Take first two words
+          break;
+        }
+      }
+    }
+
+    return {
+      matchId: `${event.date}-${event.time}-${hashString(event.title)}`,
+      localTeam: local,
+      visitorTeam: visitor
+    };
+  }, [selectedChannel, activeAgenda]);
+
   const selectedChannelRoom = selectedChannel
     ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
     : null;
@@ -1387,6 +1419,9 @@ function App() {
                 baseUrl={CHAT_URL}
                 channelRoom={selectedChannelRoom}
                 channelName={selectedChannel?.name || null}
+                matchId={currentMatchInfo?.matchId || null}
+                localTeam={currentMatchInfo?.localTeam || 'Local'}
+                visitorTeam={currentMatchInfo?.visitorTeam || 'Visita'}
               />
             )}
           </div>

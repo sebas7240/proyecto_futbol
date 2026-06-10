@@ -159,20 +159,34 @@ export class ChatRoom extends DurableObject<Env> {
   private messages: ChatMessage[] = [];
   private votes: Record<string, number> = { local: 0, draw: 0, visitor: 0 };
   private voters = new Set<string>();
+  private matchId: string | null = null;
   private rateLimits = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
-      const [messages, votes, voters] = await Promise.all([
+      const [messages, votes, voters, matchId] = await Promise.all([
         this.ctx.storage.get<ChatMessage[]>("messages"),
         this.ctx.storage.get<Record<string, number>>("votes"),
         this.ctx.storage.get<string[]>("voters"),
+        this.ctx.storage.get<string>("matchId"),
       ]);
       this.messages = messages || [];
       this.votes = votes || { local: 0, draw: 0, visitor: 0 };
       this.voters = new Set(voters || []);
+      this.matchId = matchId || null;
     });
+  }
+
+  private async resetPoll(newMatchId: string) {
+    this.votes = { local: 0, draw: 0, visitor: 0 };
+    this.voters = new Set();
+    this.matchId = newMatchId;
+    await Promise.all([
+      this.ctx.storage.put("votes", this.votes),
+      this.ctx.storage.put("voters", []),
+      this.ctx.storage.put("matchId", newMatchId),
+    ]);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -189,20 +203,27 @@ export class ChatRoom extends DurableObject<Env> {
       }
 
       const name = cleanName(url.searchParams.get("name"));
+      const incomingMatchId = url.searchParams.get("matchId");
       const ip = request.headers.get("cf-connecting-ip") || "unknown";
+      
+      // Automatic reset if match changed
+      if (incomingMatchId && incomingMatchId !== this.matchId) {
+        await this.resetPoll(incomingMatchId);
+      }
+
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
       server.serializeAttachment({ name, ip } satisfies SocketAttachment);
       this.ctx.acceptWebSocket(server);
       
-      // Send history and current poll status
       server.send(JSON.stringify({ 
         type: "history", 
         messages: this.messages,
         poll: {
           votes: this.votes,
-          hasVoted: this.voters.has(ip)
+          hasVoted: this.voters.has(ip),
+          matchId: this.matchId
         }
       }));
 
@@ -212,7 +233,8 @@ export class ChatRoom extends DurableObject<Env> {
     if (url.pathname === "/messages" && request.method === "GET") {
       return Response.json({ 
         messages: this.messages,
-        poll: this.votes
+        poll: this.votes,
+        matchId: this.matchId
       }, { headers: corsHeaders(request) });
     }
 
@@ -237,20 +259,30 @@ export class ChatRoom extends DurableObject<Env> {
 
     if (parsed.type === "vote") {
       const option = String(parsed.option).toLowerCase();
+      const incomingMatchId = parsed.matchId;
+
       if (!["local", "draw", "visitor"].includes(option)) return;
+      
+      if (incomingMatchId && incomingMatchId !== this.matchId) {
+        await this.resetPoll(incomingMatchId);
+      }
+
       if (this.voters.has(ip)) {
-        ws.send(JSON.stringify({ type: "error", error: "Ya has votado en este canal" }));
+        ws.send(JSON.stringify({ type: "error", error: "Ya has votado en este partido" }));
         return;
       }
 
       this.voters.add(ip);
       this.votes[option] = (this.votes[option] || 0) + 1;
       
-      // Persist poll data
       this.ctx.storage.put("votes", this.votes);
-      this.ctx.storage.put("voters", Array.from(this.voters).slice(-1000)); // Limit stored voters to avoid DO bloat
+      this.ctx.storage.put("voters", Array.from(this.voters).slice(-1000));
 
-      const pollUpdate = JSON.stringify({ type: "poll_update", votes: this.votes });
+      const pollUpdate = JSON.stringify({ 
+        type: "poll_update", 
+        votes: this.votes,
+        matchId: this.matchId
+      });
       this.ctx.getWebSockets().forEach(s => {
         try { s.send(pollUpdate); } catch { s.close(); }
       });
@@ -277,7 +309,6 @@ export class ChatRoom extends DurableObject<Env> {
     this.messages.push(item);
     if (this.messages.length > MAX_MESSAGES) this.messages.shift();
 
-    // Persist messages to storage
     this.ctx.storage.put("messages", this.messages);
 
     const broadcast = JSON.stringify({ type: "message", message: item });
