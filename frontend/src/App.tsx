@@ -12,7 +12,6 @@ interface Channel {
   category: string;
   logo: string;
 }
-
 interface AgendaEvent {
   category: string;
   link?: string;
@@ -22,6 +21,10 @@ interface AgendaEvent {
   status: string;
   language: string;
   channelId: string | null;
+  channelName?: string;
+  date: string;
+}
+
   date: string;
 }
 
@@ -849,26 +852,30 @@ function App() {
   const agendaTitle = uniqueAgenda[0]?.dateLabel || 'Agenda de hoy';
 
   const channelMatchesEvent = (channel: Channel, event: AgendaEvent) => {
-    if (!event.channelId && !event.title) return false;
-    
-    const channelId = channel.id.toLowerCase();
-    const channelName = channel.name.toLowerCase();
-    const eventChannelId = (event.channelId || '').toLowerCase();
-    const eventTitle = (event.title || '').toLowerCase();
-    
-    // Direct ID match
+    if (!event.title) return false;
+
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const channelId = normalize(channel.id);
+    const channelName = normalize(channel.name);
+    const eventChannelId = normalize(event.channelId || '');
+    const eventChannelName = normalize(event.channelName || '');
+    const eventLink = normalize(event.link || '');
+    const eventTitle = normalize(event.title || '');
+
+    // Direct ID or URL match
     if (eventChannelId && (channelId.includes(eventChannelId) || eventChannelId.includes(channelId))) return true;
-    
-    // Match by channel name mentioned in event title (fuzzy)
-    // e.g. "ESPN" in "Amistoso: Argentina vs Islandia (ESPN)"
+    if (eventLink && (channelId.includes(eventLink) || eventLink.includes(channelId))) return true;
+
+    // Direct channelName match from agenda metadata
+    if (eventChannelName && (channelName.includes(eventChannelName) || eventChannelName.includes(channelName))) return true;
+
+    // Match by channel name mentioned in event title
     if (eventTitle.includes(channelName) || channelName.includes(eventTitle)) return true;
-    
+
     // Special handling for generic "Eventos" channels
     if (channelName === 'eventos' || channelId.includes('evento')) {
-       // If the channel is generic, match if the event has this specific channel assigned
-       if (event.channelName?.toLowerCase().includes('eventos')) return true;
-       // Or if the link matches
-       if (event.link && channelId.includes(event.link.split('=').pop() || 'never-match')) return true;
+      if (eventChannelName.includes('eventos')) return true;
+      if (eventLink && channelId.includes(eventLink)) return true;
     }
 
     return false;
