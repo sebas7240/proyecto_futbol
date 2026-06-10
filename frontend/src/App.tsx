@@ -823,7 +823,7 @@ function App() {
     }
   };
 
-  const getEventStatus = (event: AgendaEvent) => {
+  const getEventStatus = useCallback((event: AgendaEvent) => {
     try {
         const [year, month, day] = event.date.split('-').map(Number);
         const timeMatch = event.time.trim().toLowerCase().match(/^(\d{1,2}):(\d{2})(am|pm)?$/);
@@ -844,13 +844,13 @@ function App() {
     } catch (e) {
         return { label: 'PROGRAMADO', color: 'bg-slate-700 text-slate-400', active: true };
     }
-  };
+  }, [currentTime]);
 
-  const activeAgenda = uniqueAgenda.filter(event => getEventStatus(event).active);
-  const featuredAgenda = activeAgenda.slice(0, 3);
+  const activeAgenda = useMemo(() => uniqueAgenda.filter(event => getEventStatus(event).active), [uniqueAgenda, getEventStatus]);
+  const featuredAgenda = useMemo(() => activeAgenda.slice(0, 3), [activeAgenda]);
   const agendaTitle = uniqueAgenda[0]?.dateLabel || 'Agenda de hoy';
 
-  const channelMatchesEvent = (channel: Channel, event: AgendaEvent) => {
+  const channelMatchesEvent = useCallback((channel: Channel, event: AgendaEvent) => {
     if (!event.title) return false;
 
     const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -878,12 +878,12 @@ function App() {
     }
 
     return false;
-  };
+  }, []);
 
-  const getChannelStatus = (channel: Channel) => {
+  const getChannelStatus = useCallback((channel: Channel) => {
     const event = activeAgenda.find(item => channelMatchesEvent(channel, item));
     return event ? getEventStatus(event) : null;
-  };
+  }, [activeAgenda, channelMatchesEvent, getEventStatus]);
 
   const favoriteChannels = favoriteChannelIds
     .map(id => filteredChannels.find(channel => channel.id === id))
