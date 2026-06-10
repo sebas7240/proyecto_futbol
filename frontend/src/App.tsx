@@ -936,7 +936,7 @@ function App() {
       visitorTeam: visitor,
       title: event.title
     };
-  }, [selectedChannel, uniqueAgenda]);
+  }, [selectedChannel, uniqueAgenda, channelMatchesEvent, getEventStatus]);
 
   const selectedChannelRoom = selectedChannel
     ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
