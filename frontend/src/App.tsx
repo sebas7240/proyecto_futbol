@@ -874,7 +874,10 @@ function App() {
     if (!selectedChannel) return null;
     
     // Find the active event for this channel
-    const event = activeAgenda.find(item => channelMatchesEvent(selectedChannel, item));
+    // We look in all agenda events, not just active ones, but we prioritize active ones
+    const event = uniqueAgenda.find(item => channelMatchesEvent(selectedChannel, item) && getEventStatus(item).active)
+               || uniqueAgenda.find(item => channelMatchesEvent(selectedChannel, item));
+               
     if (!event) return null;
 
     // Try to parse team names from title: "Team A vs Team B" or "Team A - Team B"
@@ -883,23 +886,32 @@ function App() {
     const title = event.title;
     
     const separators = [' vs ', ' VS ', ' - ', ' v ', ' v. '];
+    let found = false;
     for (const sep of separators) {
       if (title.includes(sep)) {
         const parts = title.split(sep);
         if (parts.length >= 2) {
-          local = parts[0].trim().split(' ').slice(-2).join(' '); // Take last two words to avoid "Live:" etc
-          visitor = parts[1].trim().split(' ').slice(0, 2).join(' '); // Take first two words
+          local = parts[0].trim().split(' ').slice(-2).join(' ');
+          visitor = parts[1].trim().split(' ').slice(0, 2).join(' ');
+          found = true;
           break;
         }
       }
     }
 
+    // Fallback if no separator found
+    if (!found && title.length > 3) {
+      local = title.slice(0, 15);
+      visitor = 'Visita';
+    }
+
     return {
       matchId: `${event.date}-${event.time}-${hashString(event.title)}`,
       localTeam: local,
-      visitorTeam: visitor
+      visitorTeam: visitor,
+      title: event.title
     };
-  }, [selectedChannel, activeAgenda]);
+  }, [selectedChannel, uniqueAgenda]);
 
   const selectedChannelRoom = selectedChannel
     ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
