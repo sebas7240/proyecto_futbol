@@ -44,6 +44,7 @@ const ACTIVE_CATEGORY_KEY = 'golea_active_category';
 const FIRST_CHANNEL_UNLOCK_KEY = 'golea_first_channel_unlocked';
 const CHANNELS_CACHE_TTL_MS = 10 * 60 * 1000;
 const AGENDA_CACHE_TTL_MS = 5 * 60 * 1000;
+// Build version: 2026-06-10-maintenance-trigger
 const FIRST_CHANNEL_AD_GRACE_MS = 90000;
 const GLOBAL_AD_DELAY_MS = 12000;
 const SOLANA_DONATION_ADDRESS = 'ar65x4bnv19SqAkr6p3Ts6Wx9G3jGp4Pxrj5q4dYndK';
