@@ -71,6 +71,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   const [soundEnabled, setSoundEnabled] = useState(() => {
     return localStorage.getItem('golea_chat_sound') !== 'false';
   });
+  const [pollVotes, setVotes] = useState<Record<string, number>>({ local: 0, draw: 0, visitor: 0 });
+  const [hasVoted, setHasVoted] = useState(false);
 
   // Ensure AudioContext is ready on first interaction
   const initAudio = () => {
@@ -95,6 +97,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   const activeRoom = mode === 'channel' && channelRoom ? channelRoom : 'global';
   const activeTitle = mode === 'channel' && channelName ? channelName : 'Chat general';
 
+  const totalVotes = useMemo(() => {
+    return (pollVotes.local || 0) + (pollVotes.draw || 0) + (pollVotes.visitor || 0);
+  }, [pollVotes]);
+
+  const pollPercentages = useMemo(() => {
+    if (totalVotes === 0) return { local: 0, draw: 0, visitor: 0 };
+    return {
+      local: Math.round(((pollVotes.local || 0) / totalVotes) * 100),
+      draw: Math.round(((pollVotes.draw || 0) / totalVotes) * 100),
+      visitor: Math.round(((pollVotes.visitor || 0) / totalVotes) * 100),
+    };
+  }, [pollVotes, totalVotes]);
+
   const wsUrl = useMemo(() => {
     const url = new URL(baseUrl);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -116,6 +131,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
     setError(null);
     setIsConnected(false);
     setMessages([]);
+    setVotes({ local: 0, draw: 0, visitor: 0 });
+    setHasVoted(false);
 
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
@@ -129,9 +146,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
         if (data.type === 'history') {
           const history = data.messages || [];
           setMessages(history);
+          if (data.poll) {
+            setVotes(data.poll.votes || { local: 0, draw: 0, visitor: 0 });
+            setHasVoted(!!data.poll.hasVoted);
+          }
           if (history.length > 0) {
             lastMessageIdRef.current = history[history.length - 1].id;
           }
+        }
+        if (data.type === 'poll_update') {
+          setVotes(data.votes);
         }
         if (data.type === 'message') {
           const newMessage = data.message;
@@ -178,6 +202,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
 
     socketRef.current.send(JSON.stringify({ type: 'message', text }));
     setInput('');
+  };
+
+  const handleVote = (option: string) => {
+    if (hasVoted) return;
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return;
+    
+    socketRef.current.send(JSON.stringify({ type: 'vote', option }));
+    setHasVoted(true);
   };
 
   const reportMessage = (messageId: string) => {
@@ -230,6 +262,58 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
             Canal
           </button>
         </div>
+      </div>
+
+      {/* Polla Flash Section */}
+      <div className="p-3 bg-slate-900/60 border-b border-slate-700/50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
+            <Flag className="w-3 h-3" />
+            POLLA FLASH
+          </span>
+          <span className="text-[9px] text-slate-500 font-bold">{totalVotes} VOTOS</span>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: 'local', label: 'Local', color: 'bg-blue-500' },
+            { id: 'draw', label: 'Empate', color: 'bg-slate-500' },
+            { id: 'visitor', label: 'Visita', color: 'bg-emerald-500' }
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              disabled={hasVoted}
+              onClick={() => handleVote(opt.id)}
+              className={`relative overflow-hidden rounded-lg p-2 transition-all border ${
+                hasVoted 
+                  ? 'border-transparent bg-slate-800/50 cursor-default' 
+                  : 'border-slate-700 hover:border-blue-500 bg-slate-800 hover:bg-slate-700'
+              }`}
+            >
+              {/* Progress Bar Background */}
+              {hasVoted && (
+                <div 
+                  className={`absolute left-0 top-0 bottom-0 opacity-20 ${opt.color} transition-all duration-1000 ease-out`}
+                  style={{ width: `${pollPercentages[opt.id as keyof typeof pollPercentages]}%` }}
+                />
+              )}
+              
+              <div className="relative z-10 flex flex-col items-center">
+                <span className={`text-[9px] font-black uppercase ${hasVoted ? 'text-slate-400' : 'text-slate-200'}`}>
+                  {opt.label}
+                </span>
+                {hasVoted && (
+                  <span className="text-xs font-black text-white mt-0.5">
+                    {pollPercentages[opt.id as keyof typeof pollPercentages]}%
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+        {!hasVoted && (
+          <p className="text-[9px] text-slate-500 mt-2 text-center italic">Vota para ver los resultados en vivo</p>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2 bg-slate-950/40">

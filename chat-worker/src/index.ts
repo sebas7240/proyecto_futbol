@@ -157,7 +157,23 @@ export class PresenceShard extends DurableObject<Env> {
 
 export class ChatRoom extends DurableObject<Env> {
   private messages: ChatMessage[] = [];
+  private votes: Record<string, number> = { local: 0, draw: 0, visitor: 0 };
+  private voters = new Set<string>();
   private rateLimits = new Map<string, number>();
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.ctx.blockConcurrencyWhile(async () => {
+      const [messages, votes, voters] = await Promise.all([
+        this.ctx.storage.get<ChatMessage[]>("messages"),
+        this.ctx.storage.get<Record<string, number>>("votes"),
+        this.ctx.storage.get<string[]>("voters"),
+      ]);
+      this.messages = messages || [];
+      this.votes = votes || { local: 0, draw: 0, visitor: 0 };
+      this.voters = new Set(voters || []);
+    });
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (request.method === "OPTIONS") {
@@ -179,13 +195,25 @@ export class ChatRoom extends DurableObject<Env> {
 
       server.serializeAttachment({ name, ip } satisfies SocketAttachment);
       this.ctx.acceptWebSocket(server);
-      server.send(JSON.stringify({ type: "history", messages: this.messages }));
+      
+      // Send history and current poll status
+      server.send(JSON.stringify({ 
+        type: "history", 
+        messages: this.messages,
+        poll: {
+          votes: this.votes,
+          hasVoted: this.voters.has(ip)
+        }
+      }));
 
       return new Response(null, { status: 101, webSocket: client, headers: corsHeaders(request) });
     }
 
     if (url.pathname === "/messages" && request.method === "GET") {
-      return Response.json({ messages: this.messages }, { headers: corsHeaders(request) });
+      return Response.json({ 
+        messages: this.messages,
+        poll: this.votes
+      }, { headers: corsHeaders(request) });
     }
 
     return new Response("Not found", { status: 404, headers: corsHeaders(request) });
@@ -204,6 +232,28 @@ export class ChatRoom extends DurableObject<Env> {
 
     if (parsed.type === "ping") {
       ws.send(JSON.stringify({ type: "pong", ts: Date.now() }));
+      return;
+    }
+
+    if (parsed.type === "vote") {
+      const option = String(parsed.option).toLowerCase();
+      if (!["local", "draw", "visitor"].includes(option)) return;
+      if (this.voters.has(ip)) {
+        ws.send(JSON.stringify({ type: "error", error: "Ya has votado en este canal" }));
+        return;
+      }
+
+      this.voters.add(ip);
+      this.votes[option] = (this.votes[option] || 0) + 1;
+      
+      // Persist poll data
+      this.ctx.storage.put("votes", this.votes);
+      this.ctx.storage.put("voters", Array.from(this.voters).slice(-1000)); // Limit stored voters to avoid DO bloat
+
+      const pollUpdate = JSON.stringify({ type: "poll_update", votes: this.votes });
+      this.ctx.getWebSockets().forEach(s => {
+        try { s.send(pollUpdate); } catch { s.close(); }
+      });
       return;
     }
 
@@ -226,6 +276,9 @@ export class ChatRoom extends DurableObject<Env> {
     const item: ChatMessage = { id: crypto.randomUUID(), ts: now, name, text };
     this.messages.push(item);
     if (this.messages.length > MAX_MESSAGES) this.messages.shift();
+
+    // Persist messages to storage
+    this.ctx.storage.put("messages", this.messages);
 
     const broadcast = JSON.stringify({ type: "message", message: item });
     this.ctx.getWebSockets().forEach(s => {
