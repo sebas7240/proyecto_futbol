@@ -137,6 +137,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   }, [channelRoom, mode]);
 
   useEffect(() => {
+    if (channelRoom && matchId && mode === 'general') {
+      setMode('channel');
+    }
+  }, [channelRoom, matchId, mode]);
+
+  useEffect(() => {
     setError(null);
     setIsConnected(false);
     setMessages([]);

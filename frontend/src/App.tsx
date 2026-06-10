@@ -1522,7 +1522,7 @@ function App() {
         href="https://t.me/goleafutbol" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="hidden md:flex fixed bottom-6 right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 items-center justify-center group animate-bounce hover:animate-none"
+        className="flex fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-3 md:p-4 rounded-full shadow-2xl transition-all hover:scale-110 items-center justify-center group animate-bounce hover:animate-none"
         title="Únete a nuestro Telegram"
       >
         <MessageCircle className="w-6 h-6" />
