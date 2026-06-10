@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies including pm2
 RUN npm install
 
 # Copy source code
@@ -20,5 +20,5 @@ EXPOSE 3001
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Command to run the application
-CMD ["node", "src/server.js"]
+# Command to run the application in cluster mode with pm2
+CMD ["npm", "run", "cluster"]

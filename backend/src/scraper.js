@@ -171,7 +171,14 @@ async function getChannelsFromRojaDirecta() {
 }
 
 async function getChannelsFromNoveo() {
-  const mirrors = ["https://la18hd.com", "https://vopartidos.tv", "https://fubo18.com"];
+  const mirrors = [
+    "https://la18hd.com", 
+    "https://vopartidos.tv", 
+    "https://fubo18.com",
+    "https://la18hd.org",
+    "https://vopartidos.org",
+    "https://fubo18.org"
+  ];
   let data = null;
   let usedMirror = "";
 
@@ -189,17 +196,17 @@ async function getChannelsFromNoveo() {
         break;
       }
     } catch (e) {
-      console.warn(`[Scraper] Mirror ${mirror} no disponible para Premium`);
+      console.warn(`[Scraper] Mirror ${mirror} no disponible`);
     }
   }
 
   if (!data) return [];
 
   const channels = [];
-  const allowedCategories = ["LATINOAMERICA", "DEPORTES", "ARGENTINA", "URUGUAY", "CHILE", "COLOMBIA", "ESPAÑA"];
+  const allowedCategories = ["LATINOAMERICA", "DEPORTES", "ARGENTINA", "URUGUAY", "CHILE", "COLOMBIA", "ESPAÑA", "MÉXICO", "PERÚ", "USA"];
   
   for (const category in data) {
-    if (allowedCategories.includes(category)) {
+    if (allowedCategories.includes(category.toUpperCase())) {
       data[category].forEach(ch => {
         if (ch.Estado === "Activo" && ch.Link.includes("stream=")) {
           channels.push({
@@ -292,19 +299,26 @@ async function getChannelsFromTvTvHd() {
 
 async function getLa18hdStreamUrl(id) {
   const streamId = id.replace("tvtvhd-", "").replace("premium-v2-", "");
-  const mirrors = ["https://la18hd.com", "https://vopartidos.tv", "https://fubo18.com", "https://tvtvhd.com"];
-  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+  const mirrors = [
+    "https://la18hd.com", 
+    "https://vopartidos.tv", 
+    "https://fubo18.com", 
+    "https://tvtvhd.com",
+    "https://la18hd.org",
+    "https://vopartidos.org",
+    "https://fubo18.org"
+  ];
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
   for (const baseUrl of mirrors) {
     try {
       console.log(`[Scraper] Intentando obtener señal de ${baseUrl} para ${streamId}`);
-      // 2. Get playbackURL from channel page
       const r2 = await needle("get", `${baseUrl}/vivo/canales.php?stream=${streamId}`, {
         headers: { "User-Agent": userAgent, "Referer": baseUrl },
         timeout: 7000
       });
       const body2 = r2.body.toString();
-      const playbackMatch = body2.match(/playbackURL\s*=\s*["']([^"']+)["']/);
+      const playbackMatch = body2.match(/playbackURL\s*=\s*['"]([^'"]+)['"]/);
 
       if (playbackMatch) {
         const playlistUrl = playbackMatch[1];

@@ -314,6 +314,66 @@ function App() {
   });
   const [showControls, setShowControls] = useState(true);
 
+  // Dynamic SEO and Structured Data
+  useEffect(() => {
+    let title = 'Golea - Fútbol en Vivo, Partidos de Hoy y Deporte Premium';
+    let description = 'Mira fútbol en vivo gratis. Transmisiones premium de partidos de hoy, Copa Libertadores, Champions League y más. La mejor alternativa a Pelota Libre.';
+
+    if (selectedChannel) {
+      title = `Ver ${selectedChannel.name} en Vivo Online - Golea`;
+      description = `Disfruta de la transmisión en vivo de ${selectedChannel.name} en Golea. Calidad HD y sin cortes para todos los partidos de hoy.`;
+    } else if (activeTab === 'agenda') {
+      title = 'Agenda de Fútbol de Hoy - Partidos en Vivo - Golea';
+      description = 'Consulta la agenda completa de partidos de fútbol para hoy. Horarios, canales y transmisiones en vivo de todas las ligas.';
+    }
+
+    document.title = title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', description);
+
+    // Update Open Graph tags too
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogTitle) ogTitle.setAttribute('content', title);
+    if (ogDesc) ogDesc.setAttribute('content', description);
+
+    // Structured Data (JSON-LD) for Sports Events
+    const existingScript = document.getElementById('golea-structured-data');
+    if (existingScript) existingScript.remove();
+
+    if (agenda.length > 0) {
+      const script = document.createElement('script');
+      script.id = 'golea-structured-data';
+      script.type = 'application/ld+json';
+      
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "itemListElement": agenda.slice(0, 10).map((event, index) => ({
+          "@type": "ListItem",
+          "position": index + 1,
+          "item": {
+            "@type": "SportsEvent",
+            "name": event.title,
+            "startDate": `${event.date}T${event.time.includes('pm') && !event.time.startsWith('12') ? (parseInt(event.time) + 12) : event.time.replace(/(am|pm)/, '').padStart(5, '0')}:00`,
+            "description": `Partido de ${event.category} en vivo`,
+            "location": {
+              "@type": "Place",
+              "name": "Estadio Virtual"
+            },
+            "organizer": {
+              "@type": "Organization",
+              "name": "Golea"
+            }
+          }
+        }))
+      };
+
+      script.text = JSON.stringify(structuredData);
+      document.head.appendChild(script);
+    }
+  }, [selectedChannel, activeTab, agenda]);
+
   useEffect(() => {
     if (!streamUrl) return;
 
