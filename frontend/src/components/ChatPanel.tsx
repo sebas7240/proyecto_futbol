@@ -21,12 +21,26 @@ const hasLink = (text: string) => /https?:\/\/|www\.|t\.me|discord\.gg|\.com|\.n
 const makeGuestName = () => `Invitado${Math.floor(100 + Math.random() * 900)}`;
 
 // Function to play a subtle notification sound using Web Audio API
+let sharedAudioCtx: AudioContext | null = null;
+
 const playNotificationSound = () => {
   try {
     const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     
-    const ctx = new AudioContextClass();
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioContextClass();
+    }
+    
+    const ctx = sharedAudioCtx!;
+    
+    // If suspended (browser policy), we can't play yet
+    if (ctx.state === 'suspended') {
+      // Try to resume - this only works during a user gesture
+      ctx.resume();
+      return;
+    }
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
@@ -43,9 +57,6 @@ const playNotificationSound = () => {
     
     osc.start();
     osc.stop(ctx.currentTime + 0.1);
-    
-    // Close context after play to save resources
-    setTimeout(() => ctx.close(), 200);
   } catch (e) {
     console.debug('Audio play blocked:', e);
   }
@@ -60,6 +71,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   const [soundEnabled, setSoundEnabled] = useState(() => {
     return localStorage.getItem('golea_chat_sound') !== 'false';
   });
+
+  // Ensure AudioContext is ready on first interaction
+  const initAudio = () => {
+    if (sharedAudioCtx?.state === 'suspended') {
+      sharedAudioCtx.resume();
+    } else if (!sharedAudioCtx) {
+      const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) sharedAudioCtx = new AudioContextClass();
+    }
+  };
   const [guestName] = useState(() => {
     const stored = localStorage.getItem('golea_chat_name');
     if (stored) return stored;
@@ -165,7 +186,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   };
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden flex flex-col min-h-[420px] max-h-[620px]">
+    <div 
+      onClick={initAudio}
+      className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden flex flex-col min-h-[420px] max-h-[620px]"
+    >
       <div className="p-3 border-b border-slate-700 bg-slate-900/40">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -177,7 +201,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
+              onClick={(e) => {
+                e.stopPropagation();
+                initAudio();
+                setSoundEnabled(!soundEnabled);
+              }}
               className={`p-1.5 rounded-lg transition-colors ${soundEnabled ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 bg-slate-900'}`}
               title={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
             >
@@ -189,13 +217,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
 
         <div className="grid grid-cols-2 gap-1 mt-3 bg-slate-950 p-1 rounded-lg">
           <button
-            onClick={() => setMode('general')}
+            onClick={() => { initAudio(); setMode('general'); }}
             className={`py-1.5 rounded-md text-[11px] font-bold transition-colors ${mode === 'general' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             General
           </button>
           <button
-            onClick={() => setMode('channel')}
+            onClick={() => { initAudio(); setMode('channel'); }}
             disabled={!channelRoom}
             className={`py-1.5 rounded-md text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${mode === 'channel' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
           >
@@ -235,15 +263,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
         <div className="flex items-center gap-2">
           <input
             value={input}
-            onChange={(event) => setInput(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+            onChange={(event) => {
+              initAudio();
+              setInput(event.target.value.slice(0, MAX_MESSAGE_LENGTH));
+            }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') sendMessage();
+              if (event.key === 'Enter') {
+                initAudio();
+                sendMessage();
+              }
             }}
             placeholder={`Escribe como ${guestName}`}
             className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
-            onClick={sendMessage}
+            onClick={() => {
+              initAudio();
+              sendMessage();
+            }}
             className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white rounded-lg p-2 transition-colors"
             title="Enviar"
           >
