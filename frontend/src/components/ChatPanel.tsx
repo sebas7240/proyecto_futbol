@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Flag, MessageCircle, Send } from 'lucide-react';
+import { Flag, MessageCircle, Send, Volume2, VolumeX } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -20,12 +20,46 @@ const hasLink = (text: string) => /https?:\/\/|www\.|t\.me|discord\.gg|\.com|\.n
 
 const makeGuestName = () => `Invitado${Math.floor(100 + Math.random() * 900)}`;
 
+// Function to play a subtle notification sound using Web Audio API
+const playNotificationSound = () => {
+  try {
+    const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1); // A4 note
+    
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+    
+    // Close context after play to save resources
+    setTimeout(() => ctx.close(), 200);
+  } catch (e) {
+    console.debug('Audio play blocked:', e);
+  }
+};
+
 const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName }) => {
   const [mode, setMode] = useState<'general' | 'channel'>('general');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    return localStorage.getItem('golea_chat_sound') !== 'false';
+  });
   const [guestName] = useState(() => {
     const stored = localStorage.getItem('golea_chat_name');
     if (stored) return stored;
@@ -35,6 +69,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
   });
   const socketRef = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const activeRoom = mode === 'channel' && channelRoom ? channelRoom : 'global';
   const activeTitle = mode === 'channel' && channelName ? channelName : 'Chat general';
@@ -47,6 +82,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
     url.searchParams.set('name', guestName);
     return url.toString();
   }, [activeRoom, baseUrl, guestName]);
+
+  useEffect(() => {
+    localStorage.setItem('golea_chat_sound', String(soundEnabled));
+  }, [soundEnabled]);
 
   useEffect(() => {
     if (mode === 'channel' && !channelRoom) setMode('general');
@@ -67,10 +106,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'history') {
-          setMessages(data.messages || []);
+          const history = data.messages || [];
+          setMessages(history);
+          if (history.length > 0) {
+            lastMessageIdRef.current = history[history.length - 1].id;
+          }
         }
         if (data.type === 'message') {
-          setMessages((current) => [...current, data.message].slice(-200));
+          const newMessage = data.message;
+          setMessages((current) => [...current, newMessage].slice(-200));
+          
+          // Play sound if enabled and it's a new message (not from history)
+          if (soundEnabled && newMessage.name !== guestName) {
+            playNotificationSound();
+          }
+          lastMessageIdRef.current = newMessage.id;
         }
         if (data.type === 'error') {
           setError(data.error || 'No se pudo enviar el mensaje.');
@@ -81,7 +131,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
     };
 
     return () => socket.close();
-  }, [wsUrl]);
+  }, [wsUrl, soundEnabled, guestName]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -125,7 +175,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ baseUrl, channelRoom, channelName
             </h3>
             <p className="text-[10px] text-slate-500 truncate">{activeTitle}</p>
           </div>
-          <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-slate-600'}`} />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-1.5 rounded-lg transition-colors ${soundEnabled ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 bg-slate-900'}`}
+              title={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-slate-600'}`} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-1 mt-3 bg-slate-950 p-1 rounded-lg">
