@@ -25,9 +25,6 @@ interface AgendaEvent {
   date: string;
 }
 
-  date: string;
-}
-
 interface PresenceCounts {
   total: number;
   channels: Record<string, number>;
