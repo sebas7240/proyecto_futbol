@@ -946,7 +946,10 @@ function App() {
   };
   const selectedChannelViewers = selectedChannel ? getChannelViewerCount(selectedChannel) : 0;
 
-  if (process.env.REACT_APP_MAINTENANCE_MODE === 'true') {
+  const isMaintenanceMode = process.env.REACT_APP_MAINTENANCE_MODE === 'true' || 
+                           new URLSearchParams(window.location.search).get('maintenance') === 'true';
+
+  if (isMaintenanceMode) {
     return <MaintenanceOverlay />;
   }
 
