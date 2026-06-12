@@ -107,6 +107,13 @@ function getStatusLabel(status: string) {
   return status;
 }
 
+function parseScoreInput(value: string) {
+  if (!value.trim()) return null;
+
+  const score = Number(value.trim().replace(',', '.'));
+  return Number.isInteger(score) && score >= 0 && score <= 30 ? score : null;
+}
+
 function isPredictionOpen(match?: Match | null) {
   if (!match) return false;
   if (match.status === 'SCHEDULED') return true;
@@ -396,8 +403,8 @@ function App() {
       return;
     }
 
-    const homeScore = Number(predictedHomeScore);
-    const awayScore = Number(predictedAwayScore);
+    const homeScore = parseScoreInput(predictedHomeScore);
+    const awayScore = parseScoreInput(predictedAwayScore);
 
     if (!selectedMatchId || !selectedOutcome) {
       setStatusMessage('Selecciona un partido y un ganador.');
@@ -409,7 +416,7 @@ function App() {
       return;
     }
 
-    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+    if (homeScore === null || awayScore === null) {
       setStatusMessage('Ingresa un marcador exacto válido.');
       return;
     }
@@ -424,7 +431,14 @@ function App() {
     try {
       const response = await axios.post<{ prediction: Prediction; user: User }>(
         `${API_BASE}/api/predictions`,
-        { matchId: selectedMatchId, outcome: selectedOutcome, homeScore, awayScore },
+        {
+          matchId: selectedMatchId,
+          outcome: selectedOutcome,
+          homeScore,
+          awayScore,
+          predictedHomeScore: homeScore,
+          predictedAwayScore: awayScore
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

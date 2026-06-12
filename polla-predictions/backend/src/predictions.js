@@ -17,7 +17,9 @@ const PREDICTION_COST = 20;
 const OUTCOMES = ['HOME', 'DRAW', 'AWAY'];
 
 function normalizeScore(value) {
-  const score = Number(value);
+  if (value === null || value === undefined || value === '') return null;
+
+  const score = Number(String(value).trim().replace(',', '.'));
   if (!Number.isInteger(score) || score < 0 || score > 30) return null;
   return score;
 }
@@ -65,7 +67,9 @@ predictionRouter.get('/me', firebaseAuthMiddleware, async (req, res) => {
 });
 
 predictionRouter.post('/', firebaseAuthMiddleware, async (req, res) => {
-  const { matchId, outcome, homeScore, awayScore } = req.body;
+  const { matchId, outcome } = req.body;
+  const homeScore = req.body.homeScore ?? req.body.predictedHomeScore;
+  const awayScore = req.body.awayScore ?? req.body.predictedAwayScore;
   const firebaseUser = req.firebaseUser;
   const match = await getStoredMatchById(matchId) || matches.find((item) => item.id === matchId);
   const predictedHomeScore = normalizeScore(homeScore);
