@@ -102,8 +102,9 @@ Objetivo: sincronizar partidos y resultados sin depender de carga manual.
   - empate
   - mas/menos de 2.5 goles
   - ambos anotan
-- [ ] Crear motor de liquidacion de puntos.
-- [ ] Registrar auditoria de liquidaciones.
+- [x] Crear motor de liquidacion de puntos por marcador exacto.
+- [x] Registrar auditoria de liquidaciones en Firestore.
+- [ ] Conectar liquidacion automatica desde resultados reales.
 
 Criterio de terminado:
 

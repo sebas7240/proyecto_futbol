@@ -1,11 +1,69 @@
 import { Router } from 'express';
 import https from 'https';
+import { matches } from './store.js';
+import { listSettledResults, settleExactScorePredictions } from './dataStore.js';
 
 export const resultRouter = Router();
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cachedResults = null;
 let cacheExpires = 0;
+
+function normalizeScore(value) {
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0 || score > 30) return null;
+  return score;
+}
+
+function requireAdmin(req, res, next) {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    return res.status(503).json({ error: 'ADMIN_SECRET no configurado.' });
+  }
+
+  if (req.headers['x-admin-secret'] !== adminSecret) {
+    return res.status(401).json({ error: 'No autorizado.' });
+  }
+
+  next();
+}
+
+resultRouter.get('/settlements', async (req, res) => {
+  try {
+    const settlements = await listSettledResults();
+    res.json(settlements);
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudieron cargar las liquidaciones.' });
+  }
+});
+
+resultRouter.post('/settle', requireAdmin, async (req, res) => {
+  const { matchId, homeScore, awayScore } = req.body;
+  const match = matches.find((item) => item.id === matchId);
+  const finalHomeScore = normalizeScore(homeScore);
+  const finalAwayScore = normalizeScore(awayScore);
+
+  if (!match) {
+    return res.status(400).json({ error: 'Partido no valido.' });
+  }
+
+  if (finalHomeScore === null || finalAwayScore === null) {
+    return res.status(400).json({ error: 'Marcador final no valido.' });
+  }
+
+  try {
+    const settlement = await settleExactScorePredictions({
+      match,
+      homeScore: finalHomeScore,
+      awayScore: finalAwayScore
+    });
+
+    res.json(settlement);
+  } catch (error) {
+    console.error('[Settlement] Error:', error);
+    res.status(500).json({ error: 'No se pudo liquidar el partido.' });
+  }
+});
 
 resultRouter.get('/', async (req, res) => {
   try {

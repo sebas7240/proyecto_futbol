@@ -1,7 +1,10 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { db } from './firebaseAdmin.js';
 
 const USERS_COLLECTION = 'polla_users';
 const PREDICTIONS_COLLECTION = 'polla_predictions';
+const RESULTS_COLLECTION = 'polla_results';
+const EXACT_SCORE_POINTS = 10;
 
 export function publicUser(user) {
   return {
@@ -160,4 +163,102 @@ export async function countTodayPredictions(userId) {
       date.getMonth() === now.getMonth() &&
       date.getDate() === now.getDate();
   }).length;
+}
+
+export async function listSettledResults(limit = 100) {
+  const snapshot = await db
+    .collection(RESULTS_COLLECTION)
+    .orderBy('settledAt', 'desc')
+    .limit(limit)
+    .get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function settleExactScorePredictions({ match, homeScore, awayScore, source = 'manual' }) {
+  const resultRef = db.collection(RESULTS_COLLECTION).doc(match.id);
+  const existingResult = await resultRef.get();
+
+  if (existingResult.exists && existingResult.data()?.settledAt) {
+    return {
+      alreadySettled: true,
+      result: { id: existingResult.id, ...existingResult.data() },
+      checked: 0,
+      winners: 0,
+      losers: 0,
+      pointsAwarded: 0
+    };
+  }
+
+  const now = new Date().toISOString();
+  const pendingSnapshot = await db
+    .collection(PREDICTIONS_COLLECTION)
+    .where('matchId', '==', match.id)
+    .where('status', '==', 'PENDING')
+    .get();
+
+  const result = {
+    id: match.id,
+    matchId: match.id,
+    home: match.home,
+    away: match.away,
+    league: match.league,
+    date: match.date,
+    time: match.time,
+    homeScore,
+    awayScore,
+    status: 'FINISHED',
+    source,
+    settledAt: now
+  };
+
+  const batch = db.batch();
+  const userPoints = new Map();
+  let winners = 0;
+  let losers = 0;
+  let pointsAwarded = 0;
+
+  batch.set(resultRef, result, { merge: true });
+
+  pendingSnapshot.docs.forEach((doc) => {
+    const prediction = doc.data();
+    const won = prediction.predictedHomeScore === homeScore &&
+      prediction.predictedAwayScore === awayScore;
+    const predictionPoints = won ? EXACT_SCORE_POINTS : 0;
+
+    if (won) {
+      winners += 1;
+      pointsAwarded += predictionPoints;
+      userPoints.set(prediction.userId, (userPoints.get(prediction.userId) || 0) + predictionPoints);
+    } else {
+      losers += 1;
+    }
+
+    batch.update(doc.ref, {
+      status: won ? 'WON' : 'LOST',
+      actualHomeScore: homeScore,
+      actualAwayScore: awayScore,
+      pointsAwarded: predictionPoints,
+      settledAt: now
+    });
+  });
+
+  for (const [userId, points] of userPoints.entries()) {
+    const userRef = db.collection(USERS_COLLECTION).doc(userId);
+    batch.set(userRef, {
+      points: FieldValue.increment(points),
+      updatedAt: now
+    }, { merge: true });
+  }
+
+  await batch.commit();
+
+  return {
+    alreadySettled: false,
+    result,
+    checked: pendingSnapshot.size,
+    winners,
+    losers,
+    pointsAwarded
+  };
 }

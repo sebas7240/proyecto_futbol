@@ -30,4 +30,23 @@ Validar una experiencia jugable sin afectar la web principal. La primera version
 
 ## Estado
 
-El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto y persistencia inicial en Firestore para usuarios, predicciones y ranking.
+El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto, persistencia inicial en Firestore y motor de liquidacion manual.
+
+## Liquidacion manual
+
+Mientras se integra una API deportiva real, un administrador puede liquidar un partido manualmente:
+
+```bash
+curl -X POST http://localhost:4000/api/results/settle \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: TU_ADMIN_SECRET" \
+  -d "{\"matchId\":\"match-001\",\"homeScore\":2,\"awayScore\":1}"
+```
+
+El motor:
+
+- guarda el resultado final en Firestore
+- revisa predicciones pendientes del partido
+- marca cada prediccion como `WON` o `LOST`
+- suma puntos solo si el marcador exacto coincide
+- evita volver a sumar puntos si el partido ya fue liquidado

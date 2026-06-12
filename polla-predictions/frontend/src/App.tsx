@@ -21,6 +21,9 @@ export type Prediction = {
   selection: string;
   predictedHomeScore?: number;
   predictedAwayScore?: number;
+  actualHomeScore?: number;
+  actualAwayScore?: number;
+  pointsAwarded?: number;
   cost?: number;
   createdAt: string;
   status: string;
@@ -65,6 +68,7 @@ function App() {
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [results, setResults] = useState<Result[]>([]);
+  const [settlements, setSettlements] = useState<Result[]>([]);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [selectedOutcome, setSelectedOutcome] = useState<string>('HOME');
   const [predictedHomeScore, setPredictedHomeScore] = useState<string>('1');
@@ -145,11 +149,18 @@ function App() {
     [selectedResults]
   );
 
+  const recentSettlements = useMemo(
+    () => settlements.slice(0, 10),
+    [settlements]
+  );
+
   const fetchResults = async () => {
     setResultsLoading(true);
     try {
       const response = await axios.get<Result[]>(`${API_BASE}/api/results`);
       setResults(response.data);
+      const settlementResponse = await axios.get<Result[]>(`${API_BASE}/api/results/settlements`);
+      setSettlements(settlementResponse.data);
     } catch (error) {
       setStatusMessage('No se pudieron cargar los resultados.');
     } finally {
@@ -532,6 +543,25 @@ function App() {
                     </ul>
                   </div>
                 )}
+
+                {recentSettlements.length > 0 && (
+                  <div className="results-group">
+                    <h3>Partidos liquidados</h3>
+                    <ul>
+                      {recentSettlements.map((result) => (
+                        <li key={result.id} className="result-item">
+                          <div>
+                            <strong>{result.home}</strong> {result.homeScore} - {result.awayScore} <strong>{result.away}</strong>
+                          </div>
+                          <div className="result-meta">
+                            <span>{result.league ?? 'Sin liga'}</span>
+                            <span>Liquidado</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -548,6 +578,13 @@ function App() {
                   <strong>
                     {getOutcomeLabel(prediction.selection)} · {prediction.predictedHomeScore ?? '-'} - {prediction.predictedAwayScore ?? '-'}
                   </strong>
+                  <span>
+                    Estado: {prediction.status}
+                    {typeof prediction.pointsAwarded === 'number' ? ` · Puntos: ${prediction.pointsAwarded}` : ''}
+                  </span>
+                  {typeof prediction.actualHomeScore === 'number' && typeof prediction.actualAwayScore === 'number' && (
+                    <span>Final: {prediction.actualHomeScore} - {prediction.actualAwayScore}</span>
+                  )}
                   <span>{new Date(prediction.createdAt).toLocaleString()}</span>
                 </li>
               ))}
