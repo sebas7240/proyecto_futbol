@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import https from 'https';
 import { matches } from './store.js';
-import { listSettledResults, settleExactScorePredictions } from './dataStore.js';
+import { requireAdmin } from './adminMiddleware.js';
+import { getStoredMatchById, listSettledResults, settleExactScorePredictions } from './dataStore.js';
 
 export const resultRouter = Router();
 
@@ -15,19 +16,6 @@ function normalizeScore(value) {
   return score;
 }
 
-function requireAdmin(req, res, next) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) {
-    return res.status(503).json({ error: 'ADMIN_SECRET no configurado.' });
-  }
-
-  if (req.headers['x-admin-secret'] !== adminSecret) {
-    return res.status(401).json({ error: 'No autorizado.' });
-  }
-
-  next();
-}
-
 resultRouter.get('/settlements', async (req, res) => {
   try {
     const settlements = await listSettledResults();
@@ -39,7 +27,7 @@ resultRouter.get('/settlements', async (req, res) => {
 
 resultRouter.post('/settle', requireAdmin, async (req, res) => {
   const { matchId, homeScore, awayScore } = req.body;
-  const match = matches.find((item) => item.id === matchId);
+  const match = await getStoredMatchById(matchId) || matches.find((item) => item.id === matchId);
   const finalHomeScore = normalizeScore(homeScore);
   const finalAwayScore = normalizeScore(awayScore);
 

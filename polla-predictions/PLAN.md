@@ -24,17 +24,18 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 - Login con Firebase/Google iniciado.
 - Endpoints iniciales de usuarios, partidos, predicciones, ranking y resultados.
 - Campo de wallet Solana en perfil.
-- Datos simulados de partidos.
+- Datos simulados de partidos como respaldo.
+- Sincronizacion manual de partidos desde TheSportsDB hacia Firestore.
+- Vista admin interna para sincronizar partidos y liquidar marcador exacto.
 - Scraper experimental de resultados.
 
 ### Problemas Detectados
 
 - El frontend no compila por resolucion de tipos de Firebase.
 - `nodemon` no esta instalado aunque el script `npm run dev` lo usa.
-- Los partidos siguen simulados en memoria hasta integrar TheSportsDB.
+- Falta programar la sincronizacion automatica de partidos y resultados.
 - Hay dos sistemas de autenticacion mezclados: Firebase y JWT local.
-- Los partidos simulados no estan conectados a los resultados reales.
-- No existe motor de liquidacion de predicciones.
+- Los partidos sincronizados aun no se liquidan automaticamente desde resultados reales.
 - No hay limites diarios de predicciones ni creditos.
 - Algunos endpoints publicos exponen datos que deberian protegerse.
 - El frontend usa marcador exacto con ganador local/empate/visitante.
@@ -92,18 +93,18 @@ Criterio de terminado:
 
 Objetivo: sincronizar partidos y resultados sin depender de carga manual.
 
-- [ ] Integrar TheSportsDB como primera fuente.
-- [ ] Guardar partidos localmente desde la API externa.
+- [x] Integrar TheSportsDB como primera fuente.
+- [x] Guardar partidos localmente desde la API externa.
+- [x] Crear vista admin interna para sincronizar partidos.
 - [ ] Crear tarea programada para sincronizar proximos partidos.
 - [ ] Crear tarea programada para actualizar resultados.
 - [ ] Relacionar resultado final con predicciones.
 - [ ] Calcular automaticamente:
-  - ganador
-  - empate
-  - mas/menos de 2.5 goles
-  - ambos anotan
+  - marcador exacto
+  - ganador derivado del marcador
 - [x] Crear motor de liquidacion de puntos por marcador exacto.
 - [x] Registrar auditoria de liquidaciones en Firestore.
+- [x] Crear vista admin interna para liquidacion manual.
 - [ ] Conectar liquidacion automatica desde resultados reales.
 
 Criterio de terminado:

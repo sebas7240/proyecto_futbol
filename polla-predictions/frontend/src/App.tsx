@@ -11,6 +11,9 @@ export type Match = {
   time: string;
   league: string;
   status: string;
+  source?: string;
+  homeBadge?: string | null;
+  awayBadge?: string | null;
 };
 
 export type Prediction = {
@@ -78,6 +81,11 @@ function App() {
   const [walletAddressInput, setWalletAddressInput] = useState<string>('');
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [selectedCompetition, setSelectedCompetition] = useState<string>('Todas');
+  const [adminSecret, setAdminSecret] = useState<string>('');
+  const [adminMatchId, setAdminMatchId] = useState<string>('');
+  const [adminHomeScore, setAdminHomeScore] = useState<string>('0');
+  const [adminAwayScore, setAdminAwayScore] = useState<string>('0');
+  const [adminLoading, setAdminLoading] = useState<boolean>(false);
 
   const fetchUserProfile = async (authToken: string) => {
     try {
@@ -154,6 +162,18 @@ function App() {
     [settlements]
   );
 
+  const fetchMatches = async () => {
+    const response = await axios.get<Match[]>(`${API_BASE}/api/matches`);
+    setMatches(response.data);
+    setSelectedMatchId((current) => current || response.data[0]?.id || '');
+    setAdminMatchId((current) => current || response.data[0]?.id || '');
+  };
+
+  const fetchPredictions = async () => {
+    const response = await axios.get<Prediction[]>(`${API_BASE}/api/predictions`);
+    setPredictions(response.data);
+  };
+
   const fetchResults = async () => {
     setResultsLoading(true);
     try {
@@ -183,19 +203,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    axios
-      .get<Match[]>(`${API_BASE}/api/matches`)
-      .then((response) => setMatches(response.data))
-      .catch(() => setStatusMessage('No se pudieron cargar los partidos.'));
+    fetchMatches().catch(() => setStatusMessage('No se pudieron cargar los partidos.'));
 
     fetchResults();
   }, []);
 
   useEffect(() => {
-    axios
-      .get<Prediction[]>(`${API_BASE}/api/predictions`)
-      .then((response) => setPredictions(response.data))
-      .catch(() => setStatusMessage('No se pudieron cargar las predicciones.'));
+    fetchPredictions().catch(() => setStatusMessage('No se pudieron cargar las predicciones.'));
   }, []);
 
 
@@ -284,6 +298,82 @@ function App() {
         ? error.response.data.error
         : 'No se pudo enviar la prediccion.';
       setStatusMessage(message);
+    }
+  };
+
+  const syncSportsDbMatches = async () => {
+    if (!adminSecret.trim()) {
+      setStatusMessage('Ingresa ADMIN_SECRET para sincronizar.');
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      const response = await axios.post<{ synced: number; matches: Match[] }>(
+        `${API_BASE}/api/matches/sync/thesportsdb`,
+        {},
+        {
+          headers: {
+            'x-admin-secret': adminSecret.trim()
+          }
+        }
+      );
+
+      if (response.data.matches.length > 0) {
+        setMatches(response.data.matches);
+        setSelectedMatchId((current) => current || response.data.matches[0]?.id || '');
+        setAdminMatchId((current) => current || response.data.matches[0]?.id || '');
+      }
+      setStatusMessage(`TheSportsDB sincronizo ${response.data.synced} partido(s).`);
+    } catch (error) {
+      const message = axios.isAxiosError(error) && error.response?.data?.error
+        ? error.response.data.error
+        : 'No se pudo sincronizar TheSportsDB.';
+      setStatusMessage(message);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const settleMatchFromAdmin = async () => {
+    if (!adminSecret.trim()) {
+      setStatusMessage('Ingresa ADMIN_SECRET para liquidar.');
+      return;
+    }
+
+    const homeScore = Number(adminHomeScore);
+    const awayScore = Number(adminAwayScore);
+
+    if (!adminMatchId || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+      setStatusMessage('Selecciona partido y marcador final valido.');
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_BASE}/api/results/settle`,
+        {
+          matchId: adminMatchId,
+          homeScore,
+          awayScore
+        },
+        {
+          headers: {
+            'x-admin-secret': adminSecret.trim()
+          }
+        }
+      );
+
+      await Promise.all([fetchResults(), fetchPredictions()]);
+      setStatusMessage(`Partido liquidado. Ganadores: ${response.data.winners ?? 0}.`);
+    } catch (error) {
+      const message = axios.isAxiosError(error) && error.response?.data?.error
+        ? error.response.data.error
+        : 'No se pudo liquidar el partido.';
+      setStatusMessage(message);
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -590,6 +680,68 @@ function App() {
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="admin-panel">
+          <div className="admin-header">
+            <div>
+              <h2>Admin interno</h2>
+              <p>Sincroniza partidos y liquida marcadores exactos.</p>
+            </div>
+            <button type="button" onClick={syncSportsDbMatches} disabled={adminLoading}>
+              {adminLoading ? 'Procesando...' : 'Sincronizar TheSportsDB'}
+            </button>
+          </div>
+
+          <div className="admin-grid">
+            <label>
+              <span>ADMIN_SECRET</span>
+              <input
+                type="password"
+                value={adminSecret}
+                onChange={(event) => setAdminSecret(event.target.value)}
+                placeholder="Clave admin del backend"
+              />
+            </label>
+
+            <label>
+              <span>Partido</span>
+              <select value={adminMatchId} onChange={(event) => setAdminMatchId(event.target.value)}>
+                <option value="">Selecciona partido</option>
+                {matches.map((match) => (
+                  <option key={match.id} value={match.id}>
+                    {match.home} vs {match.away} - {match.league}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Local</span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                value={adminHomeScore}
+                onChange={(event) => setAdminHomeScore(event.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>Visitante</span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                value={adminAwayScore}
+                onChange={(event) => setAdminAwayScore(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <button type="button" className="settle-button" onClick={settleMatchFromAdmin} disabled={adminLoading}>
+            Liquidar partido
+          </button>
         </section>
       </main>
     </div>

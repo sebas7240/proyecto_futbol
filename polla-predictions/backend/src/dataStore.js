@@ -4,6 +4,7 @@ import { db } from './firebaseAdmin.js';
 const USERS_COLLECTION = 'polla_users';
 const PREDICTIONS_COLLECTION = 'polla_predictions';
 const RESULTS_COLLECTION = 'polla_results';
+const MATCHES_COLLECTION = 'polla_matches';
 const EXACT_SCORE_POINTS = 10;
 
 export function publicUser(user) {
@@ -72,6 +73,38 @@ export async function listRanking() {
       credits: user.credits || 0
     }))
     .sort((a, b) => b.points - a.points);
+}
+
+export async function listStoredMatches(limit = 100) {
+  const snapshot = await db
+    .collection(MATCHES_COLLECTION)
+    .orderBy('date', 'asc')
+    .limit(limit)
+    .get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function getStoredMatchById(matchId) {
+  if (!matchId) return null;
+
+  const snapshot = await db.collection(MATCHES_COLLECTION).doc(matchId).get();
+  return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+}
+
+export async function upsertMatches(matches) {
+  if (!Array.isArray(matches) || matches.length === 0) {
+    return [];
+  }
+
+  const batch = db.batch();
+  matches.forEach((match) => {
+    const matchRef = db.collection(MATCHES_COLLECTION).doc(match.id);
+    batch.set(matchRef, match, { merge: true });
+  });
+
+  await batch.commit();
+  return matches;
 }
 
 export async function listPredictions(limit = 100) {

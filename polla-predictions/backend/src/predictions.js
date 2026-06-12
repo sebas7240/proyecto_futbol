@@ -4,6 +4,7 @@ import { firebaseAuthMiddleware } from './firebaseMiddleware.js';
 import {
   countTodayPredictions,
   createExactScorePrediction,
+  getStoredMatchById,
   listPredictions,
   publicUser
 } from './dataStore.js';
@@ -38,7 +39,7 @@ predictionRouter.get('/', async (req, res) => {
 predictionRouter.post('/', firebaseAuthMiddleware, async (req, res) => {
   const { matchId, outcome, homeScore, awayScore } = req.body;
   const firebaseUser = req.firebaseUser;
-  const match = matches.find((item) => item.id === matchId);
+  const match = await getStoredMatchById(matchId) || matches.find((item) => item.id === matchId);
   const predictedHomeScore = normalizeScore(homeScore);
   const predictedAwayScore = normalizeScore(awayScore);
 
