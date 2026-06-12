@@ -24,16 +24,19 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function parseOptionalScore(value) {
+  if (value === null || value === undefined || value === '') return null;
+
+  const score = Number(value);
+  return Number.isInteger(score) ? score : null;
+}
+
 function toInternalMatch(event) {
   const timestamp = event.strTimestamp || null;
   const date = event.dateEvent || (timestamp ? timestamp.slice(0, 10) : null);
   const time = event.strTime ? event.strTime.slice(0, 5) : '';
-  const homeScore = event.intHomeScore !== null && event.intHomeScore !== undefined
-    ? Number(event.intHomeScore)
-    : null;
-  const awayScore = event.intAwayScore !== null && event.intAwayScore !== undefined
-    ? Number(event.intAwayScore)
-    : null;
+  const homeScore = parseOptionalScore(event.intHomeScore);
+  const awayScore = parseOptionalScore(event.intAwayScore);
 
   return {
     id: `tsdb-${event.idEvent}`,

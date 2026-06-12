@@ -73,6 +73,7 @@ export type RankingUser = {
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 const PREDICTION_COST = 20;
+const EXACT_SCORE_POINTS = 10;
 
 const OUTCOME_OPTIONS = [
   { id: 'HOME', label: 'Gana local' },
@@ -106,6 +107,20 @@ function getStatusLabel(status: string) {
   return status;
 }
 
+function isPredictionOpen(match?: Match | null) {
+  if (!match) return false;
+  if (match.status === 'SCHEDULED') return true;
+
+  if (match.date) {
+    const kickoff = new Date(`${match.date}T${match.time || '00:00'}`);
+    if (!Number.isNaN(kickoff.getTime()) && kickoff.getTime() > Date.now()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function getFirebaseErrorMessage(error: unknown) {
   if (!axios.isAxiosError(error) && typeof error === 'object' && error && 'code' in error) {
     const code = String((error as { code?: string }).code || '');
@@ -128,6 +143,20 @@ function getFirebaseErrorMessage(error: unknown) {
   }
 
   return 'No se pudo iniciar sesión con Google.';
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (!axios.isAxiosError(error)) return fallback;
+
+  if (error.response?.data?.error) {
+    return error.response.data.error;
+  }
+
+  if (!error.response) {
+    return `No se pudo conectar con el backend (${API_BASE}). Revisa que la API esté encendida y que VITE_API_BASE apunte al backend correcto.`;
+  }
+
+  return fallback;
 }
 
 function App() {
@@ -154,6 +183,7 @@ function App() {
   const [adminHomeScore, setAdminHomeScore] = useState<string>('0');
   const [adminAwayScore, setAdminAwayScore] = useState<string>('0');
   const [adminLoading, setAdminLoading] = useState<boolean>(false);
+  const [predictionSubmitting, setPredictionSubmitting] = useState<boolean>(false);
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId),
@@ -374,6 +404,11 @@ function App() {
       return;
     }
 
+    if (!isPredictionOpen(selectedMatch)) {
+      setStatusMessage('Este partido ya no acepta predicciones. Selecciona un partido abierto.');
+      return;
+    }
+
     if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
       setStatusMessage('Ingresa un marcador exacto válido.');
       return;
@@ -385,6 +420,7 @@ function App() {
       return;
     }
 
+    setPredictionSubmitting(true);
     try {
       const response = await axios.post<{ prediction: Prediction; user: User }>(
         `${API_BASE}/api/predictions`,
@@ -396,13 +432,13 @@ function App() {
       setMyPredictions((prev) => [response.data.prediction, ...prev]);
       setUser(response.data.user);
       localStorage.setItem('polla-user', JSON.stringify(response.data.user));
-      setStatusMessage('Predicción guardada.');
-      await fetchRanking();
+      setActiveTab('history');
+      setStatusMessage(`Predicción registrada. Se descontaron ${PREDICTION_COST} créditos. Si aciertas el marcador exacto sumas ${EXACT_SCORE_POINTS} puntos.`);
+      await Promise.all([fetchRanking(), fetchMyPredictions()]);
     } catch (error) {
-      const message = axios.isAxiosError(error) && error.response?.data?.error
-        ? error.response.data.error
-        : 'No se pudo enviar la predicción.';
-      setStatusMessage(message);
+      setStatusMessage(getApiErrorMessage(error, 'No se pudo enviar la predicción.'));
+    } finally {
+      setPredictionSubmitting(false);
     }
   };
 
@@ -641,7 +677,7 @@ function App() {
                           <strong>{match.home} vs {match.away}</strong>
                           <span>{match.league} · {formatMatchDate(match)}</span>
                         </div>
-                        <em>{getStatusLabel(match.status)}</em>
+                        <em>{isPredictionOpen(match) ? getStatusLabel(match.status) : 'Cerrado'}</em>
                       </button>
                     </li>
                   ))}
@@ -695,9 +731,16 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="submit-row">
+                  <div className="prediction-rules">
                     <span>Costo: {PREDICTION_COST} créditos</span>
-                    <button type="button" onClick={submitPrediction}>Enviar predicción</button>
+                    <span>Acierto exacto: +{EXACT_SCORE_POINTS} puntos</span>
+                  </div>
+
+                  <div className="submit-row">
+                    <span>{isPredictionOpen(selectedMatch) ? 'Tu jugada quedará pendiente hasta el resultado final.' : 'Este partido está cerrado para predicciones.'}</span>
+                    <button type="button" onClick={submitPrediction} disabled={predictionSubmitting || !isPredictionOpen(selectedMatch)}>
+                      {predictionSubmitting ? 'Registrando...' : 'Enviar predicción'}
+                    </button>
                   </div>
                 </>
               ) : (

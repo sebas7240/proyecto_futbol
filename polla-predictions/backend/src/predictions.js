@@ -28,6 +28,24 @@ function getOutcomeFromScore(homeScore, awayScore) {
   return 'DRAW';
 }
 
+function getKickoffDate(match) {
+  if (!match?.date) return null;
+
+  const value = `${match.date}T${match.time || '00:00'}`;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isPredictionOpen(match) {
+  if (!match) return false;
+  if (match.status === 'SCHEDULED') return true;
+
+  const kickoff = getKickoffDate(match);
+  if (kickoff && kickoff.getTime() > Date.now()) return true;
+
+  return false;
+}
+
 predictionRouter.get('/', async (req, res) => {
   try {
     const predictions = await listPredictions();
@@ -57,7 +75,7 @@ predictionRouter.post('/', firebaseAuthMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Partido no valido.' });
   }
 
-  if (match.status !== 'SCHEDULED') {
+  if (!isPredictionOpen(match)) {
     return res.status(400).json({ error: 'Este partido ya no acepta predicciones.' });
   }
 

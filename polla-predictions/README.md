@@ -49,6 +49,17 @@ El frontend intenta primero popup y, si el navegador lo bloquea o lo cierra, usa
 
 El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto, persistencia inicial en Firestore, ranking visible, historial personal, motor de liquidacion manual y sincronizacion inicial de partidos desde TheSportsDB.
 
+## Regla de juego actual
+
+- El usuario selecciona un partido abierto.
+- Elige ganador: local, empate o visitante.
+- Escribe el marcador exacto que cree que quedara.
+- Al enviar, se descuentan 20 creditos.
+- La prediccion queda en estado `PENDING`.
+- Cuando el partido se liquida, solo el marcador exacto suma puntos.
+- Cada acierto exacto suma 10 puntos al ranking.
+- Si el marcador exacto no coincide, la prediccion queda `LOST` y suma 0 puntos.
+
 ## Experiencia publica
 
 La pantalla principal esta pensada como una web/app deportiva:
