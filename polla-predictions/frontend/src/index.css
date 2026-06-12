@@ -1,0 +1,283 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #111827;
+  background: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  margin-bottom: 24px;
+}
+
+.app-header h1 {
+  margin: 0 0 8px;
+  font-size: 2rem;
+}
+
+.app-header p {
+  color: #4b5563;
+}
+
+.app-main {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1.2fr 1fr;
+}
+
+.match-list,
+.prediction-panel,
+.prediction-history,
+.results-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.match-list h2,
+.prediction-panel h2,
+.prediction-history h2,
+.results-panel h2 {
+  margin-top: 0;
+}
+
+.match-list ul,
+.prediction-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.match-list li,
+.prediction-history li {
+  margin-bottom: 12px;
+}
+
+.match-list button {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: #f3f4f6;
+}
+
+.match-list button.selected {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+.google-button {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.google-button:hover {
+  background: #3367d6;
+}
+
+.match-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #334155;
+}
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  resize: vertical;
+}
+
+.market-picker,
+.selection-picker {
+  margin-top: 16px;
+}
+
+.market-picker p,
+.selection-picker p,
+.prediction-cost {
+  margin: 0 0 10px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.prediction-panel .option-grid button {
+  margin: 0;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.prediction-panel .option-grid button.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.prediction-cost {
+  margin-top: 16px;
+}
+
+.prediction-panel button {
+  margin-top: 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.results-header h2 {
+  margin: 0;
+}
+
+.results-header p {
+  margin: 4px 0 0;
+  color: #475569;
+}
+
+.competition-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.competition-filter label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.competition-filter select {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: white;
+}
+
+.results-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #475569;
+}
+
+.results-list {
+  display: grid;
+  gap: 16px;
+}
+
+.results-group h3 {
+  margin: 0 0 12px;
+  color: #111827;
+}
+
+.results-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.result-item {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.result-status-live {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.refresh-button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #10b981;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.status-message {
+  margin-top: 16px;
+  color: #475569;
+}
+
+.prediction-history span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .app-main {
+    grid-template-columns: 1fr;
+  }
+}
