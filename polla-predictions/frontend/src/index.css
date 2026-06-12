@@ -611,6 +611,22 @@ button:disabled {
   font-weight: 900;
 }
 
+.match-filter {
+  flex-wrap: wrap;
+}
+
+.match-filter select {
+  min-width: 220px;
+  flex: 1;
+}
+
+.agenda-date {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
 .results-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

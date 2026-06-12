@@ -24,6 +24,29 @@ function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function getDateTimeParts(timestamp) {
+  if (!timestamp) return null;
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: process.env.MATCH_TIMEZONE || 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${byType.year}-${byType.month}-${byType.day}`,
+    time: `${byType.hour}:${byType.minute}`
+  };
+}
+
 function parseOptionalScore(value) {
   if (value === null || value === undefined || value === '') return null;
 
@@ -33,8 +56,9 @@ function parseOptionalScore(value) {
 
 function toInternalMatch(event) {
   const timestamp = event.strTimestamp || null;
-  const date = event.dateEvent || (timestamp ? timestamp.slice(0, 10) : null);
-  const time = event.strTime ? event.strTime.slice(0, 5) : '';
+  const localParts = getDateTimeParts(timestamp);
+  const date = localParts?.date || event.dateEvent || (timestamp ? timestamp.slice(0, 10) : null);
+  const time = localParts?.time || (event.strTime ? event.strTime.slice(0, 5) : '');
   const homeScore = parseOptionalScore(event.intHomeScore);
   const awayScore = parseOptionalScore(event.intAwayScore);
 

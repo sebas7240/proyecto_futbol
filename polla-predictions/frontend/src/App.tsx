@@ -20,6 +20,7 @@ export type Match = {
   source?: string;
   homeBadge?: string | null;
   awayBadge?: string | null;
+  rawTimestamp?: string | null;
 };
 
 export type Prediction = {
@@ -93,6 +94,13 @@ function getOutcomeLabel(selection: string) {
   return OUTCOME_OPTIONS.find((option) => option.id === selection)?.label || selection;
 }
 
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatMatchDate(match?: Match | null) {
   if (!match?.date) return 'Fecha por confirmar';
   const value = `${match.date}T${match.time || '00:00'}`;
@@ -117,7 +125,15 @@ function parseScoreInput(value: string) {
 
 function isPredictionOpen(match?: Match | null) {
   if (!match) return false;
-  if (match.status === 'SCHEDULED') return true;
+  if (match.status !== 'SCHEDULED') return false;
+
+  if (match.rawTimestamp) {
+    const normalizedTimestamp = /z$/i.test(match.rawTimestamp)
+      ? match.rawTimestamp
+      : `${match.rawTimestamp}Z`;
+    const kickoff = new Date(normalizedTimestamp);
+    if (!Number.isNaN(kickoff.getTime())) return kickoff.getTime() > Date.now();
+  }
 
   if (match.date) {
     const kickoff = new Date(`${match.date}T${match.time || '00:00'}`);
@@ -126,7 +142,7 @@ function isPredictionOpen(match?: Match | null) {
     }
   }
 
-  return false;
+  return !match.date;
 }
 
 function getFirebaseErrorMessage(error: unknown) {
@@ -185,6 +201,8 @@ function App() {
   const [walletAddressInput, setWalletAddressInput] = useState<string>('');
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [selectedCompetition, setSelectedCompetition] = useState<string>('Todas');
+  const [selectedMatchCompetition, setSelectedMatchCompetition] = useState<string>('Todas');
+  const [matchDate] = useState<string>(() => getLocalDateString());
   const [activeTab, setActiveTab] = useState<string>('play');
   const [adminSecret, setAdminSecret] = useState<string>('');
   const [adminMatchId, setAdminMatchId] = useState<string>('');
@@ -203,12 +221,27 @@ function App() {
     [results, selectedMatchId]
   );
 
-  const scheduledMatches = useMemo(
-    () => matches.filter((match) => match.status === 'SCHEDULED'),
-    [matches]
+  const matchCompetitionOptions = useMemo(() => {
+    const competitions = new Set<string>();
+    matches.forEach((match) => {
+      if (match.league) competitions.add(match.league);
+    });
+    return ['Todas', ...Array.from(competitions).sort()];
+  }, [matches]);
+
+  const filteredMatches = useMemo(
+    () => selectedMatchCompetition === 'Todas'
+      ? matches
+      : matches.filter((match) => match.league === selectedMatchCompetition),
+    [matches, selectedMatchCompetition]
   );
 
-  const openMatches = scheduledMatches.length || matches.length;
+  const scheduledMatches = useMemo(
+    () => filteredMatches.filter(isPredictionOpen),
+    [filteredMatches]
+  );
+
+  const openMatches = scheduledMatches.length;
   const userRank = useMemo(
     () => ranking.findIndex((item) => item.id === user?.id) + 1,
     [ranking, user]
@@ -249,9 +282,14 @@ function App() {
   );
 
   const fetchMatches = async () => {
-    const response = await axios.get<Match[]>(`${API_BASE}/api/matches`);
+    const response = await axios.get<Match[]>(`${API_BASE}/api/matches`, {
+      params: { date: matchDate }
+    });
     setMatches(response.data);
-    setSelectedMatchId((current) => current || response.data.find((match) => match.status === 'SCHEDULED')?.id || response.data[0]?.id || '');
+    setSelectedMatchId((current) => {
+      if (response.data.some((match) => match.id === current)) return current;
+      return response.data.find(isPredictionOpen)?.id || response.data[0]?.id || '';
+    });
     setAdminMatchId((current) => current || response.data[0]?.id || '');
   };
 
@@ -312,6 +350,19 @@ function App() {
   useEffect(() => {
     refreshPublicData();
   }, []);
+
+  useEffect(() => {
+    if (filteredMatches.length === 0) {
+      setSelectedMatchId('');
+      return;
+    }
+
+    setSelectedMatchId((current) => (
+      filteredMatches.some((match) => match.id === current)
+        ? current
+        : filteredMatches.find(isPredictionOpen)?.id || filteredMatches[0].id
+    ));
+  }, [filteredMatches]);
 
   const fetchUserProfile = async (authToken: string) => {
     try {
@@ -674,13 +725,27 @@ function App() {
             <section className="panel match-list">
               <div className="panel-heading">
                 <span className="eyebrow">Agenda</span>
-                <h2>Partidos disponibles</h2>
+                <h2>Partidos de hoy</h2>
               </div>
+              <div className="competition-filter match-filter">
+                <label htmlFor="match-competition">Competencia</label>
+                <select id="match-competition" value={selectedMatchCompetition} onChange={(event) => setSelectedMatchCompetition(event.target.value)}>
+                  {matchCompetitionOptions.map((competition) => (
+                    <option key={competition} value={competition}>{competition}</option>
+                  ))}
+                </select>
+                <button type="button" className="ghost-button" onClick={() => fetchMatches()}>
+                  Actualizar
+                </button>
+              </div>
+              <p className="agenda-date">Disponibles para {new Date(`${matchDate}T12:00:00`).toLocaleDateString([], { weekday: 'long', day: '2-digit', month: 'long' })}</p>
               {matches.length === 0 ? (
-                <p>Cargando partidos...</p>
+                <p>No hay partidos abiertos para hoy. Intenta actualizar en unos minutos.</p>
+              ) : filteredMatches.length === 0 ? (
+                <p>No hay partidos abiertos en esta competencia para hoy.</p>
               ) : (
                 <ul className="match-card-list">
-                  {matches.map((match) => (
+                  {filteredMatches.map((match) => (
                     <li key={match.id}>
                       <button type="button" className={match.id === selectedMatchId ? 'match-card selected' : 'match-card'} onClick={() => selectMatch(match.id)}>
                         <div className="match-card-teams">
