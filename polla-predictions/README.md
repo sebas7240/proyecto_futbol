@@ -29,6 +29,22 @@ Validar una experiencia jugable sin afectar la web principal. La primera version
 5. Ejecutar backend: `npm run dev`.
 6. Ejecutar frontend: `npm run dev`.
 
+## Login con Google
+
+El frontend usa Firebase Auth con Google. Si la ventana se abre y se cierra, normalmente falta autorizar el dominio en Firebase:
+
+```txt
+Firebase Console > Authentication > Settings > Authorized domains
+```
+
+Agrega los dominios donde se abra la app, por ejemplo:
+
+- `localhost`
+- dominio de Cloudflare Pages
+- dominio propio de produccion
+
+El frontend intenta primero popup y, si el navegador lo bloquea o lo cierra, usa redireccion como fallback.
+
 ## Estado
 
 El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto, persistencia inicial en Firestore, ranking visible, historial personal, motor de liquidacion manual y sincronizacion inicial de partidos desde TheSportsDB.

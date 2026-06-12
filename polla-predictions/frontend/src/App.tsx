@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from './firebaseConfig';
+import {
+  getRedirectResult,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type User as FirebaseAuthUser
+} from 'firebase/auth';
+import { auth, firebaseConfigReady, googleProvider, missingFirebaseConfigKeys } from './firebaseConfig';
 
 export type Match = {
   id: string;
@@ -98,6 +104,30 @@ function getStatusLabel(status: string) {
   if (status === 'LIVE') return 'En vivo';
   if (status === 'FINISHED') return 'Finalizado';
   return status;
+}
+
+function getFirebaseErrorMessage(error: unknown) {
+  if (!axios.isAxiosError(error) && typeof error === 'object' && error && 'code' in error) {
+    const code = String((error as { code?: string }).code || '');
+    if (code === 'auth/popup-closed-by-user') {
+      return 'La ventana de Google se cerró antes de terminar. Intentando con redirección segura...';
+    }
+    if (code === 'auth/popup-blocked') {
+      return 'El navegador bloqueó la ventana de Google. Intentando con redirección segura...';
+    }
+    if (code === 'auth/unauthorized-domain') {
+      return `Este dominio no está autorizado en Firebase Auth: ${window.location.hostname}. Agrégalo en Firebase Console > Authentication > Settings > Authorized domains.`;
+    }
+    if (code === 'auth/operation-not-allowed') {
+      return 'El proveedor Google no está habilitado en Firebase Authentication.';
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'Firebase no pudo conectarse. Revisa internet, bloqueadores o restricciones del navegador.';
+    }
+    return `Firebase rechazó el inicio de sesión: ${code}.`;
+  }
+
+  return 'No se pudo iniciar sesión con Google.';
 }
 
 function App() {
@@ -259,6 +289,38 @@ function App() {
     }
   };
 
+  const completeFirebaseLogin = async (firebaseUser: FirebaseAuthUser, messagePrefix = 'Sesión iniciada') => {
+    const tokenId = await firebaseUser.getIdToken();
+    const username = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'jugador';
+    const appUser = {
+      id: firebaseUser.uid,
+      email: firebaseUser.email || '',
+      username,
+      walletAddress: null
+    };
+
+    setUser(appUser);
+    setToken(tokenId);
+    localStorage.setItem('polla-user', JSON.stringify(appUser));
+    localStorage.setItem('polla-token', tokenId);
+    setStatusMessage(`${messagePrefix} como ${username}.`);
+    await Promise.all([fetchUserProfile(tokenId), fetchMyPredictions(tokenId), fetchRanking()]);
+  };
+
+  useEffect(() => {
+    if (!firebaseConfigReady) return;
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          completeFirebaseLogin(result.user, 'Sesión completada');
+        }
+      })
+      .catch((error) => {
+        setStatusMessage(getFirebaseErrorMessage(error));
+      });
+  }, []);
+
   const logout = async () => {
     await signOut(auth).catch(() => undefined);
     setUser(null);
@@ -271,26 +333,25 @@ function App() {
   };
 
   const loginWithGoogle = async () => {
+    if (!firebaseConfigReady) {
+      setStatusMessage(`Falta configuración de Firebase: ${missingFirebaseConfigKeys.join(', ')}.`);
+      return;
+    }
+
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const firebaseUser = result.user;
-      const tokenId = await firebaseUser.getIdToken();
-      const username = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'jugador';
-      const appUser = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        username,
-        walletAddress: null
-      };
-
-      setUser(appUser);
-      setToken(tokenId);
-      localStorage.setItem('polla-user', JSON.stringify(appUser));
-      localStorage.setItem('polla-token', tokenId);
-      setStatusMessage(`Sesión iniciada como ${username}.`);
-      await Promise.all([fetchUserProfile(tokenId), fetchMyPredictions(tokenId), fetchRanking()]);
+      await completeFirebaseLogin(result.user);
     } catch (error) {
-      setStatusMessage('No se pudo iniciar sesión con Google.');
+      const message = getFirebaseErrorMessage(error);
+      setStatusMessage(message);
+
+      const code = typeof error === 'object' && error && 'code' in error
+        ? String((error as { code?: string }).code || '')
+        : '';
+
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, googleProvider);
+      }
     }
   };
 

@@ -29,6 +29,7 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 - Vista admin interna para sincronizar partidos y liquidar marcador exacto.
 - Rediseño publico inicial con marca Golea Predictions, tabs moviles, ranking, historial y tarjetas de partido con escudos.
 - Admin separado de la vista publica en `/admin`.
+- Login Google reforzado con fallback por redireccion y diagnostico de dominios no autorizados.
 - Scraper experimental de resultados.
 
 ### Problemas Detectados
@@ -88,6 +89,7 @@ Objetivo: que un usuario pueda jugar una polla basica de forma real.
 - [x] Mostrar ranking general basico.
 - [x] Rediseñar la vista publica para que sea responsive y llamativa.
 - [x] Separar el admin interno de la experiencia publica.
+- [x] Reforzar login con Google para popup bloqueado/cerrado y dominios no autorizados.
 
 Criterio de terminado:
 

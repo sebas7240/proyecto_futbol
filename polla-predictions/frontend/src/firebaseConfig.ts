@@ -10,6 +10,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+export const missingFirebaseConfigKeys = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+export const firebaseConfigReady = missingFirebaseConfigKeys.length === 0;
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+auth.useDeviceLanguage();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
