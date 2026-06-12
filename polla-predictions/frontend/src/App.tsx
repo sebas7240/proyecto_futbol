@@ -20,6 +20,11 @@ export type Prediction = {
   id: string;
   userId: string;
   matchId: string;
+  matchHome?: string;
+  matchAway?: string;
+  matchDate?: string;
+  matchTime?: string;
+  league?: string;
   market: string;
   selection: string;
   predictedHomeScore?: number;
@@ -53,6 +58,13 @@ export type User = {
   credits?: number;
 };
 
+export type RankingUser = {
+  id: string;
+  username: string;
+  points: number;
+  credits: number;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 const PREDICTION_COST = 20;
 
@@ -62,14 +74,39 @@ const OUTCOME_OPTIONS = [
   { id: 'AWAY', label: 'Gana visitante' }
 ];
 
+const TABS = [
+  { id: 'play', label: 'Jugar' },
+  { id: 'ranking', label: 'Ranking' },
+  { id: 'history', label: 'Mis jugadas' },
+  { id: 'results', label: 'Resultados' }
+];
+
 function getOutcomeLabel(selection: string) {
   return OUTCOME_OPTIONS.find((option) => option.id === selection)?.label || selection;
 }
 
+function formatMatchDate(match?: Match | null) {
+  if (!match?.date) return 'Fecha por confirmar';
+  const value = `${match.date}T${match.time || '00:00'}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return `${match.date} ${match.time || ''}`.trim();
+  return date.toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function getStatusLabel(status: string) {
+  if (status === 'SCHEDULED') return 'Abierto';
+  if (status === 'LIVE') return 'En vivo';
+  if (status === 'FINISHED') return 'Finalizado';
+  return status;
+}
+
 function App() {
+  const isAdminRoute = window.location.pathname.replace(/\/$/, '') === '/admin';
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [myPredictions, setMyPredictions] = useState<Prediction[]>([]);
+  const [ranking, setRanking] = useState<RankingUser[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [settlements, setSettlements] = useState<Result[]>([]);
   const [statusMessage, setStatusMessage] = useState<string>('');
@@ -81,29 +118,12 @@ function App() {
   const [walletAddressInput, setWalletAddressInput] = useState<string>('');
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [selectedCompetition, setSelectedCompetition] = useState<string>('Todas');
+  const [activeTab, setActiveTab] = useState<string>('play');
   const [adminSecret, setAdminSecret] = useState<string>('');
   const [adminMatchId, setAdminMatchId] = useState<string>('');
   const [adminHomeScore, setAdminHomeScore] = useState<string>('0');
   const [adminAwayScore, setAdminAwayScore] = useState<string>('0');
   const [adminLoading, setAdminLoading] = useState<boolean>(false);
-
-  const fetchUserProfile = async (authToken: string) => {
-    try {
-      const response = await axios.get<{ user: User }>(`${API_BASE}/api/users/me`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`
-        }
-      });
-      const profile = response.data.user;
-      setUser(profile);
-      localStorage.setItem('polla-user', JSON.stringify(profile));
-      if (profile.walletAddress) {
-        setWalletAddressInput(profile.walletAddress);
-      }
-    } catch (error) {
-      console.warn('No se pudo obtener perfil de usuario.', error);
-    }
-  };
 
   const selectedMatch = useMemo(
     () => matches.find((match) => match.id === selectedMatchId),
@@ -115,39 +135,37 @@ function App() {
     [results, selectedMatchId]
   );
 
-  const liveResults = useMemo(
-    () => results.filter((result) => result.status === 'LIVE'),
-    [results]
+  const scheduledMatches = useMemo(
+    () => matches.filter((match) => match.status === 'SCHEDULED'),
+    [matches]
   );
 
-  const upcomingResults = useMemo(
-    () => results.filter((result) => result.status === 'SCHEDULED'),
-    [results]
+  const openMatches = scheduledMatches.length || matches.length;
+  const userRank = useMemo(
+    () => ranking.findIndex((item) => item.id === user?.id) + 1,
+    [ranking, user]
   );
 
   const competitionOptions = useMemo(() => {
     const competitions = new Set<string>();
     results.forEach((result) => {
-      if (result.league) {
-        competitions.add(result.league);
-      }
+      if (result.league) competitions.add(result.league);
     });
     return ['Todas', ...Array.from(competitions).sort()];
   }, [results]);
 
   const selectedResults = useMemo(() => {
-    const filtered = selectedCompetition === 'Todas'
+    return selectedCompetition === 'Todas'
       ? results
       : results.filter((result) => result.league === selectedCompetition);
-    return filtered;
   }, [results, selectedCompetition]);
 
-  const filteredLiveResults = useMemo(
+  const liveResults = useMemo(
     () => selectedResults.filter((result) => result.status === 'LIVE'),
     [selectedResults]
   );
 
-  const filteredUpcomingResults = useMemo(
+  const upcomingResults = useMemo(
     () => selectedResults.filter((result) => result.status === 'SCHEDULED'),
     [selectedResults]
   );
@@ -158,20 +176,33 @@ function App() {
   );
 
   const recentSettlements = useMemo(
-    () => settlements.slice(0, 10),
+    () => settlements.slice(0, 8),
     [settlements]
   );
 
   const fetchMatches = async () => {
     const response = await axios.get<Match[]>(`${API_BASE}/api/matches`);
     setMatches(response.data);
-    setSelectedMatchId((current) => current || response.data[0]?.id || '');
+    setSelectedMatchId((current) => current || response.data.find((match) => match.status === 'SCHEDULED')?.id || response.data[0]?.id || '');
     setAdminMatchId((current) => current || response.data[0]?.id || '');
+  };
+
+  const fetchRanking = async () => {
+    const response = await axios.get<RankingUser[]>(`${API_BASE}/api/ranking`);
+    setRanking(response.data);
   };
 
   const fetchPredictions = async () => {
     const response = await axios.get<Prediction[]>(`${API_BASE}/api/predictions`);
     setPredictions(response.data);
+  };
+
+  const fetchMyPredictions = async (authToken = token) => {
+    if (!authToken) return;
+    const response = await axios.get<Prediction[]>(`${API_BASE}/api/predictions/me`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    setMyPredictions(response.data);
   };
 
   const fetchResults = async () => {
@@ -188,6 +219,15 @@ function App() {
     }
   };
 
+  const refreshPublicData = async () => {
+    await Promise.all([
+      fetchMatches().catch(() => setStatusMessage('No se pudieron cargar los partidos.')),
+      fetchRanking().catch(() => setStatusMessage('No se pudo cargar el ranking.')),
+      fetchPredictions().catch(() => undefined),
+      fetchResults()
+    ]);
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem('polla-user');
     const savedToken = localStorage.getItem('polla-token');
@@ -195,29 +235,36 @@ function App() {
       const parsedUser = JSON.parse(savedUser) as User;
       setUser(parsedUser);
       setToken(savedToken);
-      if (parsedUser.walletAddress) {
-        setWalletAddressInput(parsedUser.walletAddress);
-      }
+      if (parsedUser.walletAddress) setWalletAddressInput(parsedUser.walletAddress);
       fetchUserProfile(savedToken);
+      fetchMyPredictions(savedToken).catch(() => undefined);
     }
   }, []);
 
   useEffect(() => {
-    fetchMatches().catch(() => setStatusMessage('No se pudieron cargar los partidos.'));
-
-    fetchResults();
+    refreshPublicData();
   }, []);
 
-  useEffect(() => {
-    fetchPredictions().catch(() => setStatusMessage('No se pudieron cargar las predicciones.'));
-  }, []);
-
+  const fetchUserProfile = async (authToken: string) => {
+    try {
+      const response = await axios.get<{ user: User }>(`${API_BASE}/api/users/me`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      const profile = response.data.user;
+      setUser(profile);
+      localStorage.setItem('polla-user', JSON.stringify(profile));
+      if (profile.walletAddress) setWalletAddressInput(profile.walletAddress);
+    } catch (error) {
+      console.warn('No se pudo obtener perfil de usuario.', error);
+    }
+  };
 
   const logout = async () => {
     await signOut(auth).catch(() => undefined);
     setUser(null);
     setToken('');
     setWalletAddressInput('');
+    setMyPredictions([]);
     localStorage.removeItem('polla-user');
     localStorage.removeItem('polla-token');
     setStatusMessage('Sesión cerrada.');
@@ -228,8 +275,7 @@ function App() {
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
       const tokenId = await firebaseUser.getIdToken();
-      const username = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'firebase-user';
-
+      const username = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'jugador';
       const appUser = {
         id: firebaseUser.uid,
         email: firebaseUser.email || '',
@@ -242,10 +288,15 @@ function App() {
       localStorage.setItem('polla-user', JSON.stringify(appUser));
       localStorage.setItem('polla-token', tokenId);
       setStatusMessage(`Sesión iniciada como ${username}.`);
-      fetchUserProfile(tokenId);
+      await Promise.all([fetchUserProfile(tokenId), fetchMyPredictions(tokenId), fetchRanking()]);
     } catch (error) {
       setStatusMessage('No se pudo iniciar sesión con Google.');
     }
+  };
+
+  const selectMatch = (matchId: string) => {
+    setSelectedMatchId(matchId);
+    setActiveTab('play');
   };
 
   const submitPrediction = async () => {
@@ -263,7 +314,7 @@ function App() {
     }
 
     if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
-      setStatusMessage('Ingresa un marcador exacto valido.');
+      setStatusMessage('Ingresa un marcador exacto válido.');
       return;
     }
 
@@ -276,28 +327,41 @@ function App() {
     try {
       const response = await axios.post<{ prediction: Prediction; user: User }>(
         `${API_BASE}/api/predictions`,
-        {
-          matchId: selectedMatchId,
-          outcome: selectedOutcome,
-          homeScore,
-          awayScore
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+        { matchId: selectedMatchId, outcome: selectedOutcome, homeScore, awayScore },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setPredictions((prev) => [response.data.prediction, ...prev]);
+      setMyPredictions((prev) => [response.data.prediction, ...prev]);
       setUser(response.data.user);
       localStorage.setItem('polla-user', JSON.stringify(response.data.user));
-      setStatusMessage('Prediccion guardada.');
+      setStatusMessage('Predicción guardada.');
+      await fetchRanking();
     } catch (error) {
       const message = axios.isAxiosError(error) && error.response?.data?.error
         ? error.response.data.error
-        : 'No se pudo enviar la prediccion.';
+        : 'No se pudo enviar la predicción.';
       setStatusMessage(message);
+    }
+  };
+
+  const saveWallet = async () => {
+    if (!walletAddressInput.trim()) {
+      setStatusMessage('Ingresa una wallet válida.');
+      return;
+    }
+
+    try {
+      const response = await axios.put<{ user: User }>(
+        `${API_BASE}/api/users/me`,
+        { walletAddress: walletAddressInput.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUser(response.data.user);
+      localStorage.setItem('polla-user', JSON.stringify(response.data.user));
+      setStatusMessage('Wallet guardada.');
+    } catch (error) {
+      setStatusMessage('No se pudo guardar la wallet.');
     }
   };
 
@@ -309,14 +373,10 @@ function App() {
 
     setAdminLoading(true);
     try {
-      const response = await axios.post<{ synced: number; matches: Match[] }>(
+      const response = await axios.post<{ synced: number; settled: number; matches: Match[] }>(
         `${API_BASE}/api/matches/sync/thesportsdb`,
-        {},
-        {
-          headers: {
-            'x-admin-secret': adminSecret.trim()
-          }
-        }
+        { settleFinished: true },
+        { headers: { 'x-admin-secret': adminSecret.trim() } }
       );
 
       if (response.data.matches.length > 0) {
@@ -324,7 +384,8 @@ function App() {
         setSelectedMatchId((current) => current || response.data.matches[0]?.id || '');
         setAdminMatchId((current) => current || response.data.matches[0]?.id || '');
       }
-      setStatusMessage(`TheSportsDB sincronizo ${response.data.synced} partido(s).`);
+      await Promise.all([fetchResults(), fetchRanking(), fetchPredictions()]);
+      setStatusMessage(`TheSportsDB sincronizó ${response.data.synced} partido(s). Liquidó ${response.data.settled}.`);
     } catch (error) {
       const message = axios.isAxiosError(error) && error.response?.data?.error
         ? error.response.data.error
@@ -345,7 +406,7 @@ function App() {
     const awayScore = Number(adminAwayScore);
 
     if (!adminMatchId || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
-      setStatusMessage('Selecciona partido y marcador final valido.');
+      setStatusMessage('Selecciona partido y marcador final válido.');
       return;
     }
 
@@ -353,19 +414,11 @@ function App() {
     try {
       const response = await axios.post(
         `${API_BASE}/api/results/settle`,
-        {
-          matchId: adminMatchId,
-          homeScore,
-          awayScore
-        },
-        {
-          headers: {
-            'x-admin-secret': adminSecret.trim()
-          }
-        }
+        { matchId: adminMatchId, homeScore, awayScore },
+        { headers: { 'x-admin-secret': adminSecret.trim() } }
       );
 
-      await Promise.all([fetchResults(), fetchPredictions()]);
+      await Promise.all([fetchResults(), fetchPredictions(), fetchRanking()]);
       setStatusMessage(`Partido liquidado. Ganadores: ${response.data.winners ?? 0}.`);
     } catch (error) {
       const message = axios.isAxiosError(error) && error.response?.data?.error
@@ -377,373 +430,409 @@ function App() {
     }
   };
 
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <h1>Polla Predictions MVP</h1>
-        <p>Escoge un partido y envía tu pronóstico.</p>
-        <div className="auth-card">
-          {user ? (
-            <div className="auth-info">
-              <span>Hola, {user.username}</span>
-              <span>{user.email}</span>
-              <div className="profile-details">
-                <div>Créditos: {user.credits ?? 0}</div>
-                <div>Pts: {user.points ?? 0}</div>
-              </div>
-              <div className="wallet-form">
-                <input
-                  type="text"
-                  value={walletAddressInput}
-                  onChange={(event) => setWalletAddressInput(event.target.value)}
-                  placeholder="Wallet Solana (USDT)"
-                />
-                <button type="button" onClick={async () => {
-                  if (!walletAddressInput.trim()) {
-                    setStatusMessage('Ingresa una wallet válida.');
-                    return;
-                  }
-                  try {
-                    const response = await axios.put<{ user: User }>(
-                      `${API_BASE}/api/users/me`,
-                      { walletAddress: walletAddressInput.trim() },
-                      {
-                        headers: {
-                          Authorization: `Bearer ${token}`
-                        }
-                      }
-                    );
-                    setUser(response.data.user);
-                    localStorage.setItem('polla-user', JSON.stringify(response.data.user));
-                    setStatusMessage('Wallet guardada.');
-                  } catch (error) {
-                    setStatusMessage('No se pudo guardar la wallet.');
-                  }
-                }}>
-                  Guardar wallet
-                </button>
-              </div>
-              <button type="button" onClick={logout}>
-                Cerrar sesión
-              </button>
-            </div>
-          ) : (
-            <div className="login-form">
-              <button type="button" onClick={loginWithGoogle} className="google-button">
-                Iniciar con Google
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      <main className="app-main">
-        <section className="match-list">
-          <h2>Partidos disponibles</h2>
-          {matches.length === 0 ? (
-            <p>Cargando partidos...</p>
-          ) : (
-            <ul>
-              {matches.map((match) => (
-                <li key={match.id}>
-                  <button
-                    type="button"
-                    className={match.id === selectedMatchId ? 'selected' : ''}
-                    onClick={() => setSelectedMatchId(match.id)}
-                  >
-                    {match.home} vs {match.away} · {match.league}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="prediction-panel">
-          <h2>Tu predicción</h2>
-          {selectedMatch ? (
-            <>
-              <div className="match-summary">
-                <strong>{selectedMatch.home}</strong> vs <strong>{selectedMatch.away}</strong>
-                <span>
-                  {selectedMatch.date} · {selectedMatch.time}
-                </span>
-              </div>
-              {selectedResult ? (
-                <div className="match-result">
-                  <p>Resultado actual:</p>
-                  <strong>
-                    {selectedResult.home} {selectedResult.homeScore} - {selectedResult.awayScore} {selectedResult.away}
-                  </strong>
-                  <p>{selectedResult.status}</p>
-                </div>
-              ) : (
-                <p>No hay resultado disponible aún para este partido.</p>
-              )}
-              <div className="market-picker">
-                <p>Ganador</p>
-                <div className="option-grid">
-                  {OUTCOME_OPTIONS.map((outcome) => (
-                    <button
-                      key={outcome.id}
-                      type="button"
-                      className={outcome.id === selectedOutcome ? 'selected' : ''}
-                      onClick={() => setSelectedOutcome(outcome.id)}
-                    >
-                      {outcome.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="score-picker">
-                <p>Marcador exacto</p>
-                <div className="score-grid">
-                  <label>
-                    <span>{selectedMatch.home}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      value={predictedHomeScore}
-                      onChange={(event) => setPredictedHomeScore(event.target.value)}
-                    />
-                  </label>
-                  <strong>-</strong>
-                  <label>
-                    <span>{selectedMatch.away}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      value={predictedAwayScore}
-                      onChange={(event) => setPredictedAwayScore(event.target.value)}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <p className="prediction-cost">Costo: {PREDICTION_COST} creditos</p>
-              <button type="button" onClick={submitPrediction}>
-                Enviar prediccion
-              </button>
-            </>
-          ) : (
-            <p>Selecciona un partido para comenzar.</p>
-          )}
-
-          {statusMessage && <div className="status-message">{statusMessage}</div>}
-        </section>
-
-        <section className="results-panel">
-          <div className="results-header">
-            <div>
-              <h2>Resultados</h2>
-              <p>Ver partidos en vivo y próximos por competición.</p>
-            </div>
-            <button
-              type="button"
-              className="refresh-button"
-              onClick={fetchResults}
-              disabled={resultsLoading}
-            >
-              {resultsLoading ? 'Actualizando...' : 'Actualizar resultados'}
-            </button>
+  if (isAdminRoute) {
+    return (
+      <div className="app-shell admin-shell">
+        <header className="admin-page-header">
+          <div>
+            <span className="eyebrow">Golea Predictions</span>
+            <h1>Admin interno</h1>
+            <p>Sincroniza partidos, liquida marcadores y revisa la operación sin mezclarlo con la vista pública.</p>
           </div>
+          <a href="/" className="text-link">Volver a la web</a>
+        </header>
 
-          {results.length === 0 ? (
-            <p>Cargando resultados...</p>
-          ) : (
-            <>
-              <div className="competition-filter">
-                <label htmlFor="competition-select">Competición:</label>
-                <select
-                  id="competition-select"
-                  value={selectedCompetition}
-                  onChange={(event) => setSelectedCompetition(event.target.value)}
-                >
-                  {competitionOptions.map((competition) => (
-                    <option key={competition} value={competition}>
-                      {competition}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="results-summary">
-                <div>{filteredLiveResults.length} partido(s) en vivo</div>
-                <div>{filteredUpcomingResults.length} próximos partidos</div>
-                <div>{recentResults.length} resultados recientes</div>
-              </div>
-
-              <div className="results-list">
-                {filteredLiveResults.length > 0 && (
-                  <div className="results-group">
-                    <h3>En vivo</h3>
-                    <ul>
-                      {filteredLiveResults.map((result) => (
-                        <li key={result.id} className="result-item">
-                          <div>
-                            <strong>{result.home}</strong> {result.homeScore} - {result.awayScore} <strong>{result.away}</strong>
-                          </div>
-                          <div className="result-meta">
-                            <span>{result.league ?? 'Sin liga'}</span>
-                            <span className="result-status result-status-live">LIVE</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {filteredUpcomingResults.length > 0 && (
-                  <div className="results-group">
-                    <h3>Próximos partidos</h3>
-                    <ul>
-                      {filteredUpcomingResults.map((result) => (
-                        <li key={result.id} className="result-item">
-                          <div>
-                            <strong>{result.home}</strong> vs <strong>{result.away}</strong>
-                          </div>
-                          <div className="result-meta">
-                            <span>{result.league ?? 'Sin liga'}</span>
-                            <span>{new Date(result.date ?? '').toLocaleString()}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {recentResults.length > 0 && (
-                  <div className="results-group">
-                    <h3>Últimos resultados</h3>
-                    <ul>
-                      {recentResults.map((result) => (
-                        <li key={result.id} className="result-item">
-                          <div>
-                            <strong>{result.home}</strong> {result.homeScore} - {result.awayScore} <strong>{result.away}</strong>
-                          </div>
-                          <div className="result-meta">
-                            <span>{result.league ?? 'Sin liga'}</span>
-                            <span>{result.status}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {recentSettlements.length > 0 && (
-                  <div className="results-group">
-                    <h3>Partidos liquidados</h3>
-                    <ul>
-                      {recentSettlements.map((result) => (
-                        <li key={result.id} className="result-item">
-                          <div>
-                            <strong>{result.home}</strong> {result.homeScore} - {result.awayScore} <strong>{result.away}</strong>
-                          </div>
-                          <div className="result-meta">
-                            <span>{result.league ?? 'Sin liga'}</span>
-                            <span>Liquidado</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="prediction-history">
-          <h2>Predicciones recientes</h2>
-          {predictions.length === 0 ? (
-            <p>No hay predicciones aún.</p>
-          ) : (
-            <ul>
-              {predictions.map((prediction) => (
-                <li key={prediction.id}>
-                  <strong>
-                    {getOutcomeLabel(prediction.selection)} · {prediction.predictedHomeScore ?? '-'} - {prediction.predictedAwayScore ?? '-'}
-                  </strong>
-                  <span>
-                    Estado: {prediction.status}
-                    {typeof prediction.pointsAwarded === 'number' ? ` · Puntos: ${prediction.pointsAwarded}` : ''}
-                  </span>
-                  {typeof prediction.actualHomeScore === 'number' && typeof prediction.actualAwayScore === 'number' && (
-                    <span>Final: {prediction.actualHomeScore} - {prediction.actualAwayScore}</span>
-                  )}
-                  <span>{new Date(prediction.createdAt).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {statusMessage && <div className="status-message">{statusMessage}</div>}
 
         <section className="admin-panel">
           <div className="admin-header">
             <div>
-              <h2>Admin interno</h2>
-              <p>Sincroniza partidos y liquida marcadores exactos.</p>
+              <h2>Operación deportiva</h2>
+              <p>TheSportsDB gratis + liquidación exacta.</p>
             </div>
             <button type="button" onClick={syncSportsDbMatches} disabled={adminLoading}>
-              {adminLoading ? 'Procesando...' : 'Sincronizar TheSportsDB'}
+              {adminLoading ? 'Procesando...' : 'Sincronizar y liquidar'}
             </button>
           </div>
 
           <div className="admin-grid">
             <label>
               <span>ADMIN_SECRET</span>
-              <input
-                type="password"
-                value={adminSecret}
-                onChange={(event) => setAdminSecret(event.target.value)}
-                placeholder="Clave admin del backend"
-              />
+              <input type="password" value={adminSecret} onChange={(event) => setAdminSecret(event.target.value)} placeholder="Clave admin del backend" />
             </label>
-
             <label>
               <span>Partido</span>
               <select value={adminMatchId} onChange={(event) => setAdminMatchId(event.target.value)}>
                 <option value="">Selecciona partido</option>
                 {matches.map((match) => (
-                  <option key={match.id} value={match.id}>
-                    {match.home} vs {match.away} - {match.league}
-                  </option>
+                  <option key={match.id} value={match.id}>{match.home} vs {match.away} - {match.league}</option>
                 ))}
               </select>
             </label>
-
             <label>
               <span>Local</span>
-              <input
-                type="number"
-                min="0"
-                max="30"
-                value={adminHomeScore}
-                onChange={(event) => setAdminHomeScore(event.target.value)}
-              />
+              <input type="number" min="0" max="30" value={adminHomeScore} onChange={(event) => setAdminHomeScore(event.target.value)} />
             </label>
-
             <label>
               <span>Visitante</span>
-              <input
-                type="number"
-                min="0"
-                max="30"
-                value={adminAwayScore}
-                onChange={(event) => setAdminAwayScore(event.target.value)}
-              />
+              <input type="number" min="0" max="30" value={adminAwayScore} onChange={(event) => setAdminAwayScore(event.target.value)} />
             </label>
           </div>
 
-          <button type="button" className="settle-button" onClick={settleMatchFromAdmin} disabled={adminLoading}>
-            Liquidar partido
-          </button>
+          <button type="button" className="settle-button" onClick={settleMatchFromAdmin} disabled={adminLoading}>Liquidar partido manualmente</button>
         </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="hero">
+        <nav className="topbar">
+          <div className="brand-lockup">
+            <div className="brand-mark">G</div>
+            <div>
+              <strong>Golea Predictions</strong>
+              <span>Marcador exacto</span>
+            </div>
+          </div>
+          {user ? (
+            <div className="user-pill">
+              <span>{user.username}</span>
+              <button type="button" onClick={logout}>Salir</button>
+            </div>
+          ) : (
+            <button type="button" className="google-button compact" onClick={loginWithGoogle}>Entrar con Google</button>
+          )}
+        </nav>
+
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <span className="eyebrow">Polla deportiva diaria</span>
+            <h1>Acierta el marcador exacto y sube en el ranking.</h1>
+            <p>Elige un partido, marca ganador y resultado final. Cada jugada cuesta créditos virtuales y cada acierto exacto suma puntos.</p>
+            <div className="hero-actions">
+              <button type="button" onClick={() => setActiveTab('play')}>Jugar ahora</button>
+              <button type="button" className="ghost-button" onClick={() => setActiveTab('ranking')}>Ver ranking</button>
+            </div>
+          </div>
+
+          <div className="featured-match">
+            <span className="match-status">{selectedMatch ? getStatusLabel(selectedMatch.status) : 'Agenda'}</span>
+            {selectedMatch ? (
+              <>
+                <div className="team-row">
+                  <TeamBadge name={selectedMatch.home} badge={selectedMatch.homeBadge} />
+                  <strong>vs</strong>
+                  <TeamBadge name={selectedMatch.away} badge={selectedMatch.awayBadge} />
+                </div>
+                <h2>{selectedMatch.home} vs {selectedMatch.away}</h2>
+                <p>{selectedMatch.league} · {formatMatchDate(selectedMatch)}</p>
+              </>
+            ) : (
+              <>
+                <h2>Sin partidos cargados</h2>
+                <p>Sincroniza la agenda desde el admin para empezar.</p>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {statusMessage && <div className="status-message">{statusMessage}</div>}
+
+      <section className="stats-grid">
+        <StatCard label="Partidos abiertos" value={openMatches} />
+        <StatCard label="Tus créditos" value={user?.credits ?? 0} />
+        <StatCard label="Tus puntos" value={user?.points ?? 0} />
+        <StatCard label="Tu puesto" value={userRank > 0 ? `#${userRank}` : '-'} />
+      </section>
+
+      <nav className="section-tabs" aria-label="Secciones principales">
+        {TABS.map((tab) => (
+          <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="app-main">
+        {activeTab === 'play' && (
+          <>
+            <section className="panel match-list">
+              <div className="panel-heading">
+                <span className="eyebrow">Agenda</span>
+                <h2>Partidos disponibles</h2>
+              </div>
+              {matches.length === 0 ? (
+                <p>Cargando partidos...</p>
+              ) : (
+                <ul className="match-card-list">
+                  {matches.map((match) => (
+                    <li key={match.id}>
+                      <button type="button" className={match.id === selectedMatchId ? 'match-card selected' : 'match-card'} onClick={() => selectMatch(match.id)}>
+                        <div className="match-card-teams">
+                          <TeamBadge name={match.home} badge={match.homeBadge} compact />
+                          <span>vs</span>
+                          <TeamBadge name={match.away} badge={match.awayBadge} compact />
+                        </div>
+                        <div>
+                          <strong>{match.home} vs {match.away}</strong>
+                          <span>{match.league} · {formatMatchDate(match)}</span>
+                        </div>
+                        <em>{getStatusLabel(match.status)}</em>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="panel prediction-panel">
+              <div className="panel-heading">
+                <span className="eyebrow">Tu jugada</span>
+                <h2>Marcador exacto</h2>
+              </div>
+              {selectedMatch ? (
+                <>
+                  <div className="match-summary">
+                    <strong>{selectedMatch.home}</strong>
+                    <span>{selectedMatch.league} · {formatMatchDate(selectedMatch)}</span>
+                    <strong>{selectedMatch.away}</strong>
+                  </div>
+
+                  {selectedResult && (
+                    <div className="match-result">
+                      <span>Resultado actual</span>
+                      <strong>{selectedResult.home} {selectedResult.homeScore} - {selectedResult.awayScore} {selectedResult.away}</strong>
+                    </div>
+                  )}
+
+                  <div className="market-picker">
+                    <p>Ganador</p>
+                    <div className="option-grid">
+                      {OUTCOME_OPTIONS.map((outcome) => (
+                        <button key={outcome.id} type="button" className={outcome.id === selectedOutcome ? 'selected' : ''} onClick={() => setSelectedOutcome(outcome.id)}>
+                          {outcome.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="score-picker">
+                    <p>Resultado final</p>
+                    <div className="score-grid">
+                      <label>
+                        <span>{selectedMatch.home}</span>
+                        <input type="number" min="0" max="30" value={predictedHomeScore} onChange={(event) => setPredictedHomeScore(event.target.value)} />
+                      </label>
+                      <strong>-</strong>
+                      <label>
+                        <span>{selectedMatch.away}</span>
+                        <input type="number" min="0" max="30" value={predictedAwayScore} onChange={(event) => setPredictedAwayScore(event.target.value)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="submit-row">
+                    <span>Costo: {PREDICTION_COST} créditos</span>
+                    <button type="button" onClick={submitPrediction}>Enviar predicción</button>
+                  </div>
+                </>
+              ) : (
+                <p>Selecciona un partido para comenzar.</p>
+              )}
+            </section>
+          </>
+        )}
+
+        {activeTab === 'ranking' && (
+          <section className="panel full-panel">
+            <div className="panel-heading">
+              <span className="eyebrow">Competencia</span>
+              <h2>Ranking general</h2>
+            </div>
+            <RankingList ranking={ranking} currentUserId={user?.id} />
+          </section>
+        )}
+
+        {activeTab === 'history' && (
+          <section className="panel full-panel">
+            <div className="panel-heading">
+              <span className="eyebrow">Historial</span>
+              <h2>Mis jugadas</h2>
+            </div>
+            {!user ? (
+              <div className="empty-state">
+                <p>Inicia sesión para ver tus predicciones, puntos y resultados.</p>
+                <button type="button" onClick={loginWithGoogle}>Entrar con Google</button>
+              </div>
+            ) : (
+              <>
+                <WalletBox value={walletAddressInput} onChange={setWalletAddressInput} onSave={saveWallet} />
+                <PredictionList predictions={myPredictions} emptyText="Todavía no has hecho predicciones." />
+              </>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'results' && (
+          <section className="panel full-panel">
+            <div className="results-header">
+              <div className="panel-heading">
+                <span className="eyebrow">Resultados</span>
+                <h2>En vivo y liquidados</h2>
+              </div>
+              <button type="button" className="refresh-button" onClick={fetchResults} disabled={resultsLoading}>
+                {resultsLoading ? 'Actualizando...' : 'Actualizar'}
+              </button>
+            </div>
+
+            <div className="competition-filter">
+              <label htmlFor="competition-select">Competición</label>
+              <select id="competition-select" value={selectedCompetition} onChange={(event) => setSelectedCompetition(event.target.value)}>
+                {competitionOptions.map((competition) => (
+                  <option key={competition} value={competition}>{competition}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="results-summary">
+              <div>{liveResults.length} en vivo</div>
+              <div>{upcomingResults.length} próximos</div>
+              <div>{recentSettlements.length} liquidados</div>
+            </div>
+
+            <ResultGroups liveResults={liveResults} upcomingResults={upcomingResults} recentResults={recentResults} settlements={recentSettlements} />
+          </section>
+        )}
       </main>
+
+      <section className="panel activity-panel">
+        <div className="panel-heading">
+          <span className="eyebrow">Actividad</span>
+          <h2>Últimas predicciones</h2>
+        </div>
+        <PredictionList predictions={predictions.slice(0, 6)} emptyText="No hay predicciones aún." compact />
+      </section>
+    </div>
+  );
+}
+
+function TeamBadge({ name, badge, compact = false }: { name: string; badge?: string | null; compact?: boolean }) {
+  return (
+    <div className={compact ? 'team-badge compact-team' : 'team-badge'}>
+      {badge ? <img src={badge} alt="" loading="lazy" /> : <span>{name.slice(0, 1).toUpperCase()}</span>}
+      {!compact && <strong>{name}</strong>}
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function WalletBox({ value, onChange, onSave }: { value: string; onChange: (value: string) => void; onSave: () => void }) {
+  return (
+    <div className="wallet-box">
+      <div>
+        <strong>Wallet de premios</strong>
+        <span>Solo se usará si llegas a ser elegible para pagos manuales.</span>
+      </div>
+      <input type="text" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Wallet Solana" />
+      <button type="button" onClick={onSave}>Guardar</button>
+    </div>
+  );
+}
+
+function RankingList({ ranking, currentUserId }: { ranking: RankingUser[]; currentUserId?: string }) {
+  if (ranking.length === 0) {
+    return <p>No hay ranking todavía.</p>;
+  }
+
+  return (
+    <ol className="ranking-list">
+      {ranking.slice(0, 30).map((item, index) => (
+        <li key={item.id} className={item.id === currentUserId ? 'current-user' : ''}>
+          <span>#{index + 1}</span>
+          <strong>{item.username}</strong>
+          <em>{item.points} pts</em>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PredictionList({ predictions, emptyText, compact = false }: { predictions: Prediction[]; emptyText: string; compact?: boolean }) {
+  if (predictions.length === 0) {
+    return <p>{emptyText}</p>;
+  }
+
+  return (
+    <ul className={compact ? 'prediction-list compact-list' : 'prediction-list'}>
+      {predictions.map((prediction) => (
+        <li key={prediction.id}>
+          <div>
+            <strong>{prediction.matchHome && prediction.matchAway ? `${prediction.matchHome} vs ${prediction.matchAway}` : prediction.matchId}</strong>
+            <span>{getOutcomeLabel(prediction.selection)} · {prediction.predictedHomeScore ?? '-'} - {prediction.predictedAwayScore ?? '-'}</span>
+          </div>
+          <div>
+            <em className={`prediction-status status-${prediction.status.toLowerCase()}`}>{prediction.status}</em>
+            {typeof prediction.pointsAwarded === 'number' && <span>{prediction.pointsAwarded} pts</span>}
+            {typeof prediction.actualHomeScore === 'number' && typeof prediction.actualAwayScore === 'number' && (
+              <span>Final: {prediction.actualHomeScore} - {prediction.actualAwayScore}</span>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ResultGroups({ liveResults, upcomingResults, recentResults, settlements }: {
+  liveResults: Result[];
+  upcomingResults: Result[];
+  recentResults: Result[];
+  settlements: Result[];
+}) {
+  return (
+    <div className="results-list">
+      <ResultGroup title="En vivo" results={liveResults} live />
+      <ResultGroup title="Próximos partidos" results={upcomingResults} />
+      <ResultGroup title="Últimos resultados" results={recentResults} />
+      <ResultGroup title="Partidos liquidados" results={settlements} settled />
+    </div>
+  );
+}
+
+function ResultGroup({ title, results, live = false, settled = false }: { title: string; results: Result[]; live?: boolean; settled?: boolean }) {
+  if (results.length === 0) return null;
+
+  return (
+    <div className="results-group">
+      <h3>{title}</h3>
+      <ul>
+        {results.map((result) => (
+          <li key={result.id} className="result-item">
+            <div>
+              <strong>{result.home}</strong>
+              {typeof result.homeScore === 'number' && typeof result.awayScore === 'number'
+                ? <> {result.homeScore} - {result.awayScore} </>
+                : ' vs '}
+              <strong>{result.away}</strong>
+            </div>
+            <div className="result-meta">
+              <span>{result.league ?? 'Sin liga'}</span>
+              <span className={live ? 'result-status-live' : ''}>{settled ? 'Liquidado' : result.status}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

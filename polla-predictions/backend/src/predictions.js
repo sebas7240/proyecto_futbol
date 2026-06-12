@@ -6,6 +6,7 @@ import {
   createExactScorePrediction,
   getStoredMatchById,
   listPredictions,
+  listUserPredictions,
   publicUser
 } from './dataStore.js';
 
@@ -33,6 +34,15 @@ predictionRouter.get('/', async (req, res) => {
     res.json(predictions);
   } catch (error) {
     res.status(500).json({ error: 'No se pudieron cargar las predicciones.' });
+  }
+});
+
+predictionRouter.get('/me', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const predictions = await listUserPredictions(req.firebaseUser.uid);
+    res.json(predictions);
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudieron cargar tus predicciones.' });
   }
 });
 

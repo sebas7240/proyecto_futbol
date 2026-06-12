@@ -1,10 +1,11 @@
 import { Router } from 'express';
+import { requireAdmin } from './adminMiddleware.js';
 import { firebaseAuthMiddleware } from './firebaseMiddleware.js';
 import { ensureUser, listUsers, publicUser, updateUserWallet } from './dataStore.js';
 
 export const userRouter = Router();
 
-userRouter.get('/', async (req, res) => {
+userRouter.get('/', requireAdmin, async (req, res) => {
   try {
     const users = await listUsers();
     res.json(users.map(publicUser));

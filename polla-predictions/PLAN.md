@@ -27,6 +27,8 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 - Datos simulados de partidos como respaldo.
 - Sincronizacion manual de partidos desde TheSportsDB hacia Firestore.
 - Vista admin interna para sincronizar partidos y liquidar marcador exacto.
+- Rediseño publico inicial con marca Golea Predictions, tabs moviles, ranking, historial y tarjetas de partido con escudos.
+- Admin separado de la vista publica en `/admin`.
 - Scraper experimental de resultados.
 
 ### Problemas Detectados
@@ -34,10 +36,10 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 - El frontend no compila por resolucion de tipos de Firebase.
 - `nodemon` no esta instalado aunque el script `npm run dev` lo usa.
 - Falta programar la sincronizacion automatica de partidos y resultados.
-- Hay dos sistemas de autenticacion mezclados: Firebase y JWT local.
+- La API publica ya usa Firebase en la experiencia principal; queda pendiente borrar codigo legacy no montado si no se reutiliza.
 - Los partidos sincronizados aun no se liquidan automaticamente desde resultados reales.
-- No hay limites diarios de predicciones ni creditos.
-- Algunos endpoints publicos exponen datos que deberian protegerse.
+- Falta pulir creditos diarios y recompensas recurrentes.
+- Algunos endpoints publicos deben seguir revisandose antes de produccion.
 - El frontend usa marcador exacto con ganador local/empate/visitante.
 - El CSS tiene selectores erroneos con doble punto.
 - El proyecto se versionara dentro del repo principal `sebas7240/proyecto_futbol`.
@@ -64,7 +66,7 @@ Criterio de terminado:
 
 Objetivo: que un usuario pueda jugar una polla basica de forma real.
 
-- [ ] Elegir un solo sistema de autenticacion. Recomendado: Firebase Auth.
+- [x] Elegir un solo sistema de autenticacion. Recomendado: Firebase Auth.
 - [x] Crear persistencia real inicial con Firestore para usuarios, predicciones y ranking.
 - [ ] Crear modelo de datos:
   - usuarios
@@ -82,8 +84,10 @@ Objetivo: que un usuario pueda jugar una polla basica de forma real.
 - [ ] Bloquear predicciones cuando el partido inicia.
 - [x] Limitar predicciones por usuario por dia.
 - [x] Descontar creditos virtuales por prediccion.
-- [ ] Mostrar historial de predicciones del usuario.
-- [ ] Mostrar ranking general basico.
+- [x] Mostrar historial de predicciones del usuario.
+- [x] Mostrar ranking general basico.
+- [x] Rediseñar la vista publica para que sea responsive y llamativa.
+- [x] Separar el admin interno de la experiencia publica.
 
 Criterio de terminado:
 
@@ -96,8 +100,8 @@ Objetivo: sincronizar partidos y resultados sin depender de carga manual.
 - [x] Integrar TheSportsDB como primera fuente.
 - [x] Guardar partidos localmente desde la API externa.
 - [x] Crear vista admin interna para sincronizar partidos.
-- [ ] Crear tarea programada para sincronizar proximos partidos.
-- [ ] Crear tarea programada para actualizar resultados.
+- [x] Crear tarea programada opcional para sincronizar proximos partidos.
+- [x] Crear tarea programada opcional para actualizar resultados sincronizados.
 - [ ] Relacionar resultado final con predicciones.
 - [ ] Calcular automaticamente:
   - marcador exacto
@@ -105,7 +109,9 @@ Objetivo: sincronizar partidos y resultados sin depender de carga manual.
 - [x] Crear motor de liquidacion de puntos por marcador exacto.
 - [x] Registrar auditoria de liquidaciones en Firestore.
 - [x] Crear vista admin interna para liquidacion manual.
-- [ ] Conectar liquidacion automatica desde resultados reales.
+- [x] Conectar liquidacion automatica opcional desde resultados sincronizados.
+- [x] Preparar sincronizacion automatica opcional por variables de entorno.
+- [x] Preparar liquidacion opcional de partidos finalizados sincronizados.
 
 Criterio de terminado:
 
@@ -117,6 +123,8 @@ Objetivo: hacer que los usuarios vuelvan diariamente.
 
 - [ ] Creditos virtuales diarios.
 - [ ] Rachas por ingreso diario.
+- [ ] Mejorar estado vacio y onboarding para usuarios nuevos.
+- [ ] Mostrar tarjetas de logro o progreso diario.
 - [ ] Misiones diarias:
   - hacer 3 predicciones
   - acertar un ganador

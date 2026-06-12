@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { matches } from './store.js';
 import { requireAdmin } from './adminMiddleware.js';
-import { listStoredMatches, upsertMatches } from './dataStore.js';
-import { fetchSportsDbMatches } from './sportsDb.js';
+import { listStoredMatches } from './dataStore.js';
+import { syncSportsDbMatches } from './sportsSyncService.js';
 
 export const matchRouter = Router();
 
@@ -18,14 +18,9 @@ matchRouter.get('/', async (req, res) => {
 
 matchRouter.post('/sync/thesportsdb', requireAdmin, async (req, res) => {
   try {
-    const syncedMatches = await fetchSportsDbMatches();
-    await upsertMatches(syncedMatches);
-    const storedMatches = await listStoredMatches();
-
-    res.json({
-      synced: syncedMatches.length,
-      matches: storedMatches.length > 0 ? storedMatches : matches
-    });
+    const settleFinished = req.body?.settleFinished === true;
+    const result = await syncSportsDbMatches({ settleFinished });
+    res.json(result);
   } catch (error) {
     console.error('[Matches] TheSportsDB sync error:', error);
     res.status(502).json({ error: 'No se pudo sincronizar TheSportsDB.' });

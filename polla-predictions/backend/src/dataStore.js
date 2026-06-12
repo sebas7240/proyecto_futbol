@@ -123,7 +123,9 @@ export async function listUserPredictions(userId) {
     .where('userId', '==', userId)
     .get();
 
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
 export async function createExactScorePrediction({ firebaseUser, match, outcome, predictedHomeScore, predictedAwayScore, cost }) {

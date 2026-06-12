@@ -8,6 +8,7 @@ Modulo experimental dentro de `proyecto_futbol` para crear una plataforma de pre
 - creditos virtuales
 - ranking semanal/mensual
 - wallet Solana para posibles premios manuales
+- vista publica responsive con ranking, historial personal y tarjetas de partidos
 
 ## Estructura
 
@@ -30,11 +31,28 @@ Validar una experiencia jugable sin afectar la web principal. La primera version
 
 ## Estado
 
-El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto, persistencia inicial en Firestore, motor de liquidacion manual y sincronizacion inicial de partidos desde TheSportsDB.
+El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto, persistencia inicial en Firestore, ranking visible, historial personal, motor de liquidacion manual y sincronizacion inicial de partidos desde TheSportsDB.
+
+## Experiencia publica
+
+La pantalla principal esta pensada como una web/app deportiva:
+
+- hero con marca `Golea Predictions`
+- partido destacado
+- estadisticas del usuario
+- tabs para jugar, ranking, mis jugadas y resultados
+- vista movil con navegacion inferior
+- tarjetas con escudos cuando la API los entrega
 
 ## Admin interno
 
-El frontend incluye una seccion `Admin interno` para dos tareas protegidas por `ADMIN_SECRET`:
+El admin interno vive separado de la vista publica en:
+
+```txt
+/admin
+```
+
+Incluye dos tareas protegidas por `ADMIN_SECRET`:
 
 - sincronizar proximos partidos desde TheSportsDB
 - liquidar un partido con marcador final exacto
@@ -49,6 +67,9 @@ La sincronizacion usa la API v1 gratis de TheSportsDB. Por defecto:
 THESPORTSDB_API_KEY=123
 THESPORTSDB_LEAGUE_IDS=4429,4328,4335
 THESPORTSDB_SYNC_DAYS=3
+AUTO_SYNC_ENABLED=false
+AUTO_SYNC_INTERVAL_MINUTES=60
+AUTO_SETTLE_SYNCED_RESULTS=false
 ```
 
 Endpoint manual:
@@ -61,6 +82,8 @@ curl -X POST http://localhost:4000/api/matches/sync/thesportsdb \
 Los partidos se guardan en Firestore en `polla_matches`. Si no hay partidos sincronizados, el backend conserva los partidos demo como respaldo.
 
 La sincronizacion combina proximos partidos por liga con agenda diaria de futbol para los proximos dias. Con el plan gratis conviene mantener `THESPORTSDB_SYNC_DAYS` bajo para respetar el limite de solicitudes.
+
+Si `AUTO_SYNC_ENABLED=true`, el backend ejecuta sincronizacion en segundo plano cada `AUTO_SYNC_INTERVAL_MINUTES`. Si ademas `AUTO_SETTLE_SYNCED_RESULTS=true`, intenta liquidar partidos sincronizados que ya tengan marcador final.
 
 ## Liquidacion manual
 
