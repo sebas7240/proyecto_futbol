@@ -1,17 +1,13 @@
 import { Router } from 'express';
-import { users } from './store.js';
+import { listRanking } from './dataStore.js';
 
 export const rankingRouter = Router();
 
-rankingRouter.get('/', (req, res) => {
-  const ranking = users
-    .map((user) => ({
-      id: user.id,
-      username: user.username,
-      points: user.points || 0,
-      credits: user.credits || 0
-    }))
-    .sort((a, b) => b.points - a.points);
-
-  res.json(ranking);
+rankingRouter.get('/', async (req, res) => {
+  try {
+    const ranking = await listRanking();
+    res.json(ranking);
+  } catch (error) {
+    res.status(500).json({ error: 'No se pudo cargar el ranking.' });
+  }
 });

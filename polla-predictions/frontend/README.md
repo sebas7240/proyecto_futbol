@@ -25,7 +25,7 @@ VITE_FIREBASE_APP_ID=
 
 - Login con Google mediante Firebase Auth.
 - Lista de partidos del backend.
-- Panel de prediccion con mercados estructurados.
+- Panel de prediccion con ganador y marcador exacto.
 - Perfil con creditos, puntos y wallet Solana.
 - Resultados experimentales.
 - Historial de predicciones recientes.

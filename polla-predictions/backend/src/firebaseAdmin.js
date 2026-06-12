@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
 
@@ -17,3 +18,4 @@ if (serviceAccountBase64) {
 }
 
 export const firebaseAuth = getAuth();
+export const db = getFirestore();

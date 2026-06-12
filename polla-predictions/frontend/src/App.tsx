@@ -19,6 +19,8 @@ export type Prediction = {
   matchId: string;
   market: string;
   selection: string;
+  predictedHomeScore?: number;
+  predictedAwayScore?: number;
   cost?: number;
   createdAt: string;
   status: string;
@@ -48,41 +50,14 @@ export type User = {
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 const PREDICTION_COST = 20;
 
-const MARKET_OPTIONS = [
-  {
-    id: 'result',
-    label: 'Resultado',
-    selections: [
-      { id: 'HOME', label: 'Gana local' },
-      { id: 'DRAW', label: 'Empate' },
-      { id: 'AWAY', label: 'Gana visitante' }
-    ]
-  },
-  {
-    id: 'goals25',
-    label: 'Goles 2.5',
-    selections: [
-      { id: 'OVER_25', label: 'Mas de 2.5' },
-      { id: 'UNDER_25', label: 'Menos de 2.5' }
-    ]
-  },
-  {
-    id: 'bothScore',
-    label: 'Ambos anotan',
-    selections: [
-      { id: 'YES', label: 'Si' },
-      { id: 'NO', label: 'No' }
-    ]
-  }
+const OUTCOME_OPTIONS = [
+  { id: 'HOME', label: 'Gana local' },
+  { id: 'DRAW', label: 'Empate' },
+  { id: 'AWAY', label: 'Gana visitante' }
 ];
 
-function getMarketLabel(market: string) {
-  return MARKET_OPTIONS.find((option) => option.id === market)?.label || market;
-}
-
-function getSelectionLabel(market: string, selection: string) {
-  const option = MARKET_OPTIONS.find((item) => item.id === market);
-  return option?.selections.find((item) => item.id === selection)?.label || selection;
+function getOutcomeLabel(selection: string) {
+  return OUTCOME_OPTIONS.find((option) => option.id === selection)?.label || selection;
 }
 
 function App() {
@@ -91,8 +66,9 @@ function App() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [selectedMarket, setSelectedMarket] = useState<string>('result');
-  const [selectedSelection, setSelectedSelection] = useState<string>('HOME');
+  const [selectedOutcome, setSelectedOutcome] = useState<string>('HOME');
+  const [predictedHomeScore, setPredictedHomeScore] = useState<string>('1');
+  const [predictedAwayScore, setPredictedAwayScore] = useState<string>('0');
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string>('');
   const [walletAddressInput, setWalletAddressInput] = useState<string>('');
@@ -125,11 +101,6 @@ function App() {
   const selectedResult = useMemo(
     () => results.find((result) => result.id === selectedMatchId),
     [results, selectedMatchId]
-  );
-
-  const selectedMarketOption = useMemo(
-    () => MARKET_OPTIONS.find((option) => option.id === selectedMarket) || MARKET_OPTIONS[0],
-    [selectedMarket]
   );
 
   const liveResults = useMemo(
@@ -258,8 +229,22 @@ function App() {
       return;
     }
 
-    if (!selectedMatchId || !selectedSelection) {
-      setStatusMessage('Selecciona un partido y una prediccion.');
+    const homeScore = Number(predictedHomeScore);
+    const awayScore = Number(predictedAwayScore);
+
+    if (!selectedMatchId || !selectedOutcome) {
+      setStatusMessage('Selecciona un partido y un ganador.');
+      return;
+    }
+
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+      setStatusMessage('Ingresa un marcador exacto valido.');
+      return;
+    }
+
+    const scoreOutcome = homeScore > awayScore ? 'HOME' : awayScore > homeScore ? 'AWAY' : 'DRAW';
+    if (scoreOutcome !== selectedOutcome) {
+      setStatusMessage('El ganador seleccionado no coincide con el marcador.');
       return;
     }
 
@@ -268,8 +253,9 @@ function App() {
         `${API_BASE}/api/predictions`,
         {
           matchId: selectedMatchId,
-          market: selectedMarket,
-          selection: selectedSelection
+          outcome: selectedOutcome,
+          homeScore,
+          awayScore
         },
         {
           headers: {
@@ -394,37 +380,45 @@ function App() {
                 <p>No hay resultado disponible aún para este partido.</p>
               )}
               <div className="market-picker">
-                <p>Mercado</p>
+                <p>Ganador</p>
                 <div className="option-grid">
-                  {MARKET_OPTIONS.map((market) => (
+                  {OUTCOME_OPTIONS.map((outcome) => (
                     <button
-                      key={market.id}
+                      key={outcome.id}
                       type="button"
-                      className={market.id === selectedMarket ? 'selected' : ''}
-                      onClick={() => {
-                        setSelectedMarket(market.id);
-                        setSelectedSelection(market.selections[0].id);
-                      }}
+                      className={outcome.id === selectedOutcome ? 'selected' : ''}
+                      onClick={() => setSelectedOutcome(outcome.id)}
                     >
-                      {market.label}
+                      {outcome.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="selection-picker">
-                <p>Seleccion</p>
-                <div className="option-grid">
-                  {selectedMarketOption.selections.map((selection) => (
-                    <button
-                      key={selection.id}
-                      type="button"
-                      className={selection.id === selectedSelection ? 'selected' : ''}
-                      onClick={() => setSelectedSelection(selection.id)}
-                    >
-                      {selection.label}
-                    </button>
-                  ))}
+              <div className="score-picker">
+                <p>Marcador exacto</p>
+                <div className="score-grid">
+                  <label>
+                    <span>{selectedMatch.home}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      value={predictedHomeScore}
+                      onChange={(event) => setPredictedHomeScore(event.target.value)}
+                    />
+                  </label>
+                  <strong>-</strong>
+                  <label>
+                    <span>{selectedMatch.away}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      value={predictedAwayScore}
+                      onChange={(event) => setPredictedAwayScore(event.target.value)}
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -551,7 +545,9 @@ function App() {
             <ul>
               {predictions.map((prediction) => (
                 <li key={prediction.id}>
-                  <strong>{getMarketLabel(prediction.market)}: {getSelectionLabel(prediction.market, prediction.selection)}</strong>
+                  <strong>
+                    {getOutcomeLabel(prediction.selection)} · {prediction.predictedHomeScore ?? '-'} - {prediction.predictedAwayScore ?? '-'}
+                  </strong>
                   <span>{new Date(prediction.createdAt).toLocaleString()}</span>
                 </li>
               ))}

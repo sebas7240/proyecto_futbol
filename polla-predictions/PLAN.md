@@ -10,7 +10,7 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 
 - Mantener este modulo aislado dentro de `proyecto_futbol`, sin afectar la web principal.
 - Usar datos deportivos legales mediante API o fuentes permitidas.
-- Guardar partidos, predicciones y resultados en base de datos propia.
+- Guardar partidos, predicciones, usuarios y resultados en base de datos propia.
 - No depender del scraping como base principal del producto.
 - Priorizar experiencia movil, retencion diaria y reglas claras.
 - Evitar dinero real dentro de la app en la primera etapa; usar creditos virtuales.
@@ -31,13 +31,13 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 
 - El frontend no compila por resolucion de tipos de Firebase.
 - `nodemon` no esta instalado aunque el script `npm run dev` lo usa.
-- Los datos se guardan en memoria y se pierden al reiniciar.
+- Los partidos siguen simulados en memoria hasta integrar TheSportsDB.
 - Hay dos sistemas de autenticacion mezclados: Firebase y JWT local.
 - Los partidos simulados no estan conectados a los resultados reales.
 - No existe motor de liquidacion de predicciones.
 - No hay limites diarios de predicciones ni creditos.
 - Algunos endpoints publicos exponen datos que deberian protegerse.
-- El frontend usa textarea libre en vez de mercados estructurados.
+- El frontend usa marcador exacto con ganador local/empate/visitante.
 - El CSS tiene selectores erroneos con doble punto.
 - El proyecto se versionara dentro del repo principal `sebas7240/proyecto_futbol`.
 
@@ -64,7 +64,7 @@ Criterio de terminado:
 Objetivo: que un usuario pueda jugar una polla basica de forma real.
 
 - [ ] Elegir un solo sistema de autenticacion. Recomendado: Firebase Auth.
-- [ ] Crear persistencia real con Firestore o PostgreSQL.
+- [x] Crear persistencia real inicial con Firestore para usuarios, predicciones y ranking.
 - [ ] Crear modelo de datos:
   - usuarios
   - partidos
@@ -73,13 +73,11 @@ Objetivo: que un usuario pueda jugar una polla basica de forma real.
   - resultados
   - rankings
   - creditos diarios
-- [x] Reemplazar textarea por mercados estructurados:
+- [x] Reemplazar textarea por prediccion de marcador exacto:
   - ganador local
   - empate
   - ganador visitante
-  - mas de 2.5 goles
-  - menos de 2.5 goles
-  - ambos anotan
+- [x] Validar que el ganador elegido coincida con el marcador.
 - [ ] Bloquear predicciones cuando el partido inicia.
 - [x] Limitar predicciones por usuario por dia.
 - [x] Descontar creditos virtuales por prediccion.

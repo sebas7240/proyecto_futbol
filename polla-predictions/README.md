@@ -4,7 +4,7 @@ Modulo experimental dentro de `proyecto_futbol` para crear una plataforma de pre
 
 - login con Firebase/Google
 - agenda de partidos
-- mercados de prediccion estructurados
+- prediccion de ganador y marcador exacto
 - creditos virtuales
 - ranking semanal/mensual
 - wallet Solana para posibles premios manuales
@@ -17,7 +17,7 @@ Modulo experimental dentro de `proyecto_futbol` para crear una plataforma de pre
 
 ## Objetivo
 
-Validar una experiencia jugable sin afectar la web principal. La primera version debe permitir iniciar sesion, elegir un partido, hacer una prediccion, gastar creditos y aparecer en ranking.
+Validar una experiencia jugable sin afectar la web principal. La primera version debe permitir iniciar sesion, elegir un partido, predecir ganador y marcador exacto, gastar creditos y aparecer en ranking cuando el sistema liquide resultados.
 
 ## Como arrancar
 
@@ -30,4 +30,4 @@ Validar una experiencia jugable sin afectar la web principal. La primera version
 
 ## Estado
 
-El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos y mercados estructurados.
+El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones por dia, costo de 20 creditos, ganador + marcador exacto y persistencia inicial en Firestore para usuarios, predicciones y ranking.
