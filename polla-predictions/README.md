@@ -56,9 +56,10 @@ El frontend compila y el backend tiene reglas MVP basicas: maximo 5 predicciones
 - Escribe el marcador exacto que cree que quedara.
 - Al enviar, se descuentan 20 creditos.
 - La prediccion queda en estado `PENDING`.
-- Cuando el partido se liquida, solo el marcador exacto suma puntos.
-- Cada acierto exacto suma 10 puntos al ranking.
-- Si el marcador exacto no coincide, la prediccion queda `LOST` y suma 0 puntos.
+- Cuando el partido se liquida, el sistema calcula puntos.
+- Si acierta ganador/empate y marcador exacto, suma 10 puntos.
+- Si acierta solo ganador/empate pero falla el marcador exacto, suma 5 puntos.
+- Si no acierta ganador/empate, la prediccion queda `LOST` y suma 0 puntos.
 
 ## Experiencia publica
 
@@ -128,5 +129,6 @@ El motor:
 - guarda el resultado final en Firestore
 - revisa predicciones pendientes del partido
 - marca cada prediccion como `WON` o `LOST`
-- suma puntos solo si el marcador exacto coincide
+- suma 10 puntos si el marcador exacto coincide
+- suma 5 puntos si solo coincide el ganador/empate
 - evita volver a sumar puntos si el partido ya fue liquidado

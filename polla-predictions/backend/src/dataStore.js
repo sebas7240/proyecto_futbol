@@ -6,6 +6,7 @@ const PREDICTIONS_COLLECTION = 'polla_predictions';
 const RESULTS_COLLECTION = 'polla_results';
 const MATCHES_COLLECTION = 'polla_matches';
 const EXACT_SCORE_POINTS = 10;
+const OUTCOME_POINTS = 5;
 
 export function publicUser(user) {
   return {
@@ -210,6 +211,12 @@ export async function listSettledResults(limit = 100) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+function getOutcomeFromScore(homeScore, awayScore) {
+  if (homeScore > awayScore) return 'HOME';
+  if (awayScore > homeScore) return 'AWAY';
+  return 'DRAW';
+}
+
 export async function settleExactScorePredictions({ match, homeScore, awayScore, source = 'manual' }) {
   const resultRef = db.collection(RESULTS_COLLECTION).doc(match.id);
   const existingResult = await resultRef.get();
@@ -232,6 +239,7 @@ export async function settleExactScorePredictions({ match, homeScore, awayScore,
     .where('status', '==', 'PENDING')
     .get();
 
+  const finalOutcome = getOutcomeFromScore(homeScore, awayScore);
   const result = {
     id: match.id,
     matchId: match.id,
@@ -242,6 +250,7 @@ export async function settleExactScorePredictions({ match, homeScore, awayScore,
     time: match.time,
     homeScore,
     awayScore,
+    outcome: finalOutcome,
     status: 'FINISHED',
     source,
     settledAt: now
@@ -251,15 +260,29 @@ export async function settleExactScorePredictions({ match, homeScore, awayScore,
   const userPoints = new Map();
   let winners = 0;
   let losers = 0;
+  let exactWinners = 0;
+  let outcomeWinners = 0;
   let pointsAwarded = 0;
 
   batch.set(resultRef, result, { merge: true });
 
   pendingSnapshot.docs.forEach((doc) => {
     const prediction = doc.data();
-    const won = prediction.predictedHomeScore === homeScore &&
+    const exactScoreWon = prediction.predictedHomeScore === homeScore &&
       prediction.predictedAwayScore === awayScore;
-    const predictionPoints = won ? EXACT_SCORE_POINTS : 0;
+    const outcomeWon = prediction.selection === finalOutcome;
+    const predictionPoints = exactScoreWon
+      ? EXACT_SCORE_POINTS
+      : outcomeWon
+      ? OUTCOME_POINTS
+      : 0;
+    const won = predictionPoints > 0;
+
+    if (exactScoreWon) {
+      exactWinners += 1;
+    } else if (outcomeWon) {
+      outcomeWinners += 1;
+    }
 
     if (won) {
       winners += 1;
@@ -273,6 +296,9 @@ export async function settleExactScorePredictions({ match, homeScore, awayScore,
       status: won ? 'WON' : 'LOST',
       actualHomeScore: homeScore,
       actualAwayScore: awayScore,
+      actualOutcome: finalOutcome,
+      exactScoreWon,
+      outcomeWon,
       pointsAwarded: predictionPoints,
       settledAt: now
     });
@@ -294,6 +320,8 @@ export async function settleExactScorePredictions({ match, homeScore, awayScore,
     checked: pendingSnapshot.size,
     winners,
     losers,
+    exactWinners,
+    outcomeWinners,
     pointsAwarded
   };
 }

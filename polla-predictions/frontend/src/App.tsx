@@ -74,6 +74,7 @@ export type RankingUser = {
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 const PREDICTION_COST = 20;
 const EXACT_SCORE_POINTS = 10;
+const OUTCOME_POINTS = 5;
 
 const OUTCOME_OPTIONS = [
   { id: 'HOME', label: 'Gana local' },
@@ -447,7 +448,7 @@ function App() {
       setUser(response.data.user);
       localStorage.setItem('polla-user', JSON.stringify(response.data.user));
       setActiveTab('history');
-      setStatusMessage(`Predicción registrada. Se descontaron ${PREDICTION_COST} créditos. Si aciertas el marcador exacto sumas ${EXACT_SCORE_POINTS} puntos.`);
+      setStatusMessage(`Predicción registrada. Se descontaron ${PREDICTION_COST} créditos. Marcador exacto: +${EXACT_SCORE_POINTS} puntos. Solo resultado: +${OUTCOME_POINTS} puntos.`);
       await Promise.all([fetchRanking(), fetchMyPredictions()]);
     } catch (error) {
       setStatusMessage(getApiErrorMessage(error, 'No se pudo enviar la predicción.'));
@@ -620,8 +621,8 @@ function App() {
         <div className="hero-grid">
           <div className="hero-copy">
             <span className="eyebrow">Polla deportiva diaria</span>
-            <h1>Acierta el marcador exacto y sube en el ranking.</h1>
-            <p>Elige un partido, marca ganador y resultado final. Cada jugada cuesta créditos virtuales y cada acierto exacto suma puntos.</p>
+            <h1>Acierta resultados y sube en el ranking.</h1>
+            <p>Elige ganador y marcador final. El marcador exacto paga más, pero acertar solo el resultado también suma.</p>
             <div className="hero-actions">
               <button type="button" onClick={() => setActiveTab('play')}>Jugar ahora</button>
               <button type="button" className="ghost-button" onClick={() => setActiveTab('ranking')}>Ver ranking</button>
@@ -747,7 +748,8 @@ function App() {
 
                   <div className="prediction-rules">
                     <span>Costo: {PREDICTION_COST} créditos</span>
-                    <span>Acierto exacto: +{EXACT_SCORE_POINTS} puntos</span>
+                    <span>Marcador exacto: +{EXACT_SCORE_POINTS} puntos</span>
+                    <span>Solo resultado: +{OUTCOME_POINTS} puntos</span>
                   </div>
 
                   <div className="submit-row">

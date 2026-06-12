@@ -31,6 +31,7 @@ El MVP debe ser simple, justo y facil de entender: entrar, iniciar sesion, elegi
 - Admin separado de la vista publica en `/admin`.
 - Login Google reforzado con fallback por redireccion y diagnostico de dominios no autorizados.
 - Registro de predicciones reforzado: partidos abiertos, descuento de creditos, historial inmediato y mensajes claros si el backend no responde.
+- Puntuacion por liquidacion: 10 puntos por marcador exacto y 5 puntos por acertar solo ganador/empate.
 - Scraper experimental de resultados.
 
 ### Problemas Detectados
@@ -92,6 +93,7 @@ Objetivo: que un usuario pueda jugar una polla basica de forma real.
 - [x] Separar el admin interno de la experiencia publica.
 - [x] Reforzar login con Google para popup bloqueado/cerrado y dominios no autorizados.
 - [x] Confirmar registro de prediccion exacta, descuento de creditos e historial inmediato.
+- [x] Agregar puntuacion parcial por acertar solo ganador/empate.
 
 Criterio de terminado:
 
