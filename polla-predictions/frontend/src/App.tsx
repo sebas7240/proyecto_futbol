@@ -71,7 +71,7 @@ export type RankingUser = {
   credits: number;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.goleafutbol.com/polla';
 const PREDICTION_COST = 20;
 const EXACT_SCORE_POINTS = 10;
 const OUTCOME_POINTS = 5;
