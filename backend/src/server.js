@@ -283,6 +283,7 @@ function createStreamResponse(data) {
   if (data.direct === true) {
     return {
       directUrl: data.url,
+      fallbackProxyUrl: createProxyUrl(data.url),
       proxied: false
     };
   }

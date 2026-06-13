@@ -293,6 +293,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'channels' | 'agenda' | 'chat'>('channels');
   const [searchTerm, setSearchTerm] = useState('');
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [fallbackStreamUrl, setFallbackStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY).length === 0);
   const [loadingStream, setLoadingStream] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
@@ -755,14 +756,17 @@ function App() {
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
+      setFallbackStreamUrl(null);
       setRecentChannelIds(previous => [channel.id, ...previous.filter(id => id !== channel.id)].slice(0, 8));
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
       if (response.data.directUrl) {
+        setFallbackStreamUrl(response.data.fallbackProxyUrl || null);
         setStreamUrl(response.data.directUrl);
         if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
         return;
       }
       if (response.data.proxyUrl) {
+        setFallbackStreamUrl(null);
         setStreamUrl(response.data.proxyUrl);
         if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
         return;
@@ -770,6 +774,7 @@ function App() {
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
       const proxiedUrl = `${API_URL}/proxy?p=${encodeURIComponent(protectedUrl)}`;
+      setFallbackStreamUrl(null);
       setStreamUrl(proxiedUrl);
       if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
     } catch (err) {
@@ -779,6 +784,12 @@ function App() {
       setLoadingStream(false);
     }
   };
+
+  const handleStreamFatalError = useCallback(() => {
+    if (!fallbackStreamUrl || streamUrl === fallbackStreamUrl) return;
+    setStreamUrl(fallbackStreamUrl);
+    setFallbackStreamUrl(null);
+  }, [fallbackStreamUrl, streamUrl]);
 
   const handleCopyDonationAddress = async () => {
     try {
@@ -1153,7 +1164,7 @@ function App() {
                 aria-label={playerPaused ? 'Reproducir' : 'Pausar'}
                 title={playerPaused ? 'Reproducir' : 'Pausar'}
               >
-                <VideoPlayer src={streamUrl} />
+                <VideoPlayer src={streamUrl} onFatalError={handleStreamFatalError} />
                 <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur transition-opacity duration-500 ${
                   showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 } ${

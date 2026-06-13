@@ -3,14 +3,16 @@ import Hls from 'hls.js';
 
 interface VideoPlayerProps {
   src: string;
+  onFatalError?: () => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let hls: any = null;
+    let fatalErrorHandled = false;
 
     if (videoRef.current) {
       const video = videoRef.current;
@@ -32,6 +34,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
         hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
           console.error("HLS Error:", data);
           if (data.fatal) {
+            if (!fatalErrorHandled && onFatalError) {
+              fatalErrorHandled = true;
+              onFatalError();
+              return;
+            }
+
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 hls?.startLoad();
@@ -60,7 +68,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
         hls.destroy();
       }
     };
-  }, [src]);
+  }, [src, onFatalError]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-black relative">
