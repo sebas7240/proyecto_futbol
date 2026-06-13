@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, PauseCircle, Maximize2, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
