@@ -13,6 +13,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
   useEffect(() => {
     let hls: any = null;
     let fatalErrorHandled = false;
+    let networkErrorCount = 0;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerFallback = () => {
+      if (fatalErrorHandled || !onFatalError) return;
+      fatalErrorHandled = true;
+      onFatalError();
+    };
 
     if (videoRef.current) {
       const video = videoRef.current;
@@ -26,17 +34,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
 
         hls.loadSource(src);
         hls.attachMedia(video);
+        fallbackTimer = setTimeout(triggerFallback, 12000);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (fallbackTimer) clearTimeout(fallbackTimer);
           video.play().catch(e => console.error("Autoplay prevented", e));
         });
 
         hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
           console.error("HLS Error:", data);
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            networkErrorCount += 1;
+            if (networkErrorCount >= 2) {
+              triggerFallback();
+              return;
+            }
+          }
+
           if (data.fatal) {
-            if (!fatalErrorHandled && onFatalError) {
-              fatalErrorHandled = true;
-              onFatalError();
+            if (onFatalError) {
+              triggerFallback();
               return;
             }
 
@@ -64,6 +81,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
     }
 
     return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (hls) {
         hls.destroy();
       }
