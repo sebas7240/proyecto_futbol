@@ -1,14 +1,7 @@
 import React from 'react';
 import { MessageCircle, ShieldAlert, Timer } from 'lucide-react';
 
-interface MaintenanceOverlayProps {
-  headline: string;
-  description: string;
-  buttonText: string;
-  buttonUrl: string;
-}
-
-const MaintenanceOverlay: React.FC<MaintenanceOverlayProps> = ({ headline, description, buttonText, buttonUrl }) => {
+const MaintenanceOverlay: React.FC = () => {
   return (
     <div className="fixed inset-0 z-[9999] bg-slate-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-2xl text-center space-y-6">
@@ -28,10 +21,10 @@ const MaintenanceOverlay: React.FC<MaintenanceOverlayProps> = ({ headline, descr
 
         <div className="space-y-4">
           <p className="text-slate-200 font-bold leading-relaxed">
-            <span className="text-blue-400">{headline}</span>
+            Informamos a nuestra comunidad que, por motivos de seguridad y derechos de autor, <span className="text-blue-400">Golea no transmitirá encuentros de la Copa del Mundo.</span>
           </p>
           <p className="text-slate-400 text-sm leading-relaxed">
-            {description}
+            Hemos decidido pausar temporalmente la plataforma para proteger nuestra infraestructura y asegurar nuestro regreso una vez finalizado el certamen.
           </p>
         </div>
 
@@ -44,13 +37,13 @@ const MaintenanceOverlay: React.FC<MaintenanceOverlayProps> = ({ headline, descr
             Estaremos informando la fecha de reapertura exclusivamente a través de nuestra comunidad oficial.
           </p>
           <a 
-            href={buttonUrl}
+            href="https://t.me/goleafutbol" 
             target="_blank" 
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-3 bg-[#229ED9] hover:bg-[#1d8dbf] text-white py-3 px-6 rounded-xl font-black transition-all hover:scale-105 shadow-lg shadow-blue-500/20 group"
           >
             <MessageCircle className="w-5 h-5" />
-            {buttonText}
+            UNIRSE AL TELEGRAM
           </a>
         </div>
 

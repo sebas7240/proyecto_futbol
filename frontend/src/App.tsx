@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { Tv, Loader2, AlertCircle, Search, Globe, ChevronRight, MessageCircle, Calendar, Clock, PlayCircle, PauseCircle, Maximize2, Star, History, RefreshCw, Radio, Users, Wallet, Copy, ExternalLink, Check } from 'lucide-react';
 import VideoPlayer from './components/VideoPlayer';
 import AdBanner from './components/AdBanner';
 import ChatPanel from './components/ChatPanel';
-import MaintenanceOverlay from './components/MaintenanceOverlay';
 import AdsterraGlobalAds from './components/AdsterraGlobalAds';
+import MaintenanceOverlay from './components/MaintenanceOverlay';
 
 interface Channel {
   id: string;
@@ -35,13 +35,6 @@ interface PresenceCounts {
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 const CHAT_URL = process.env.REACT_APP_CHAT_URL || 'https://golea-chat.sebas7240.workers.dev';
-const MAINTENANCE_MODE =
-  process.env.REACT_APP_MAINTENANCE_MODE === 'true' &&
-  process.env.REACT_APP_MAINTENANCE_CONFIRM === 'PAUSE';
-const MAINTENANCE_MESSAGE = process.env.REACT_APP_MAINTENANCE_MESSAGE || 'Informamos a nuestra comunidad que, por motivos de seguridad y derechos de autor, Golea no transmitirá encuentros de la Copa del Mundo.';
-const MAINTENANCE_DESCRIPTION = process.env.REACT_APP_MAINTENANCE_DESCRIPTION || 'Hemos decidido pausar temporalmente la plataforma para proteger nuestra infraestructura y asegurar nuestro regreso una vez finalizado el certamen.';
-const MAINTENANCE_BUTTON_TEXT = process.env.REACT_APP_MAINTENANCE_BUTTON_TEXT || 'UNIRSE AL TELEGRAM';
-const MAINTENANCE_BUTTON_URL = process.env.REACT_APP_MAINTENANCE_BUTTON_URL || 'https://t.me/goleafutbol';
 const APP_BUILD_MARKER = 'tv-player-autofocus-expanded-2026-06-07';
 const PRESENCE_HEARTBEAT_MS = 25000;
 const PRESENCE_COUNTS_MS = 20000;
@@ -51,6 +44,7 @@ const ACTIVE_CATEGORY_KEY = 'golea_active_category';
 const FIRST_CHANNEL_UNLOCK_KEY = 'golea_first_channel_unlocked';
 const CHANNELS_CACHE_TTL_MS = 10 * 60 * 1000;
 const AGENDA_CACHE_TTL_MS = 5 * 60 * 1000;
+// Build version: 2026-06-10-maintenance-active-test
 const FIRST_CHANNEL_AD_GRACE_MS = 90000;
 const GLOBAL_AD_DELAY_MS = 12000;
 const SOLANA_DONATION_ADDRESS = 'ar65x4bnv19SqAkr6p3Ts6Wx9G3jGp4Pxrj5q4dYndK';
@@ -293,7 +287,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<'channels' | 'agenda' | 'chat'>('channels');
   const [searchTerm, setSearchTerm] = useState('');
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [fallbackStreamUrl, setFallbackStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => readCachedArray<Channel>(CHANNELS_CACHE_KEY).length === 0);
   const [loadingStream, setLoadingStream] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Sincronizando señal en vivo...');
@@ -756,17 +749,9 @@ function App() {
       setSelectedChannel(channel);
       setLoadingStream(true);
       setStreamUrl(null);
-      setFallbackStreamUrl(null);
       setRecentChannelIds(previous => [channel.id, ...previous.filter(id => id !== channel.id)].slice(0, 8));
       const response = await axios.get(`${API_URL}/stream-url?id=${encodeURIComponent(channel.id)}`);
-      if (response.data.directUrl) {
-        setFallbackStreamUrl(response.data.fallbackProxyUrl || null);
-        setStreamUrl(response.data.directUrl);
-        if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
-        return;
-      }
       if (response.data.proxyUrl) {
-        setFallbackStreamUrl(null);
         setStreamUrl(response.data.proxyUrl);
         if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
         return;
@@ -774,7 +759,6 @@ function App() {
       const rawUrl = response.data.url;
       const protectedUrl = btoa(rawUrl);
       const proxiedUrl = `${API_URL}/proxy?p=${encodeURIComponent(protectedUrl)}`;
-      setFallbackStreamUrl(null);
       setStreamUrl(proxiedUrl);
       if (!canShowAdsForThisSelection) unlockAdsAfterFirstChannel();
     } catch (err) {
@@ -784,12 +768,6 @@ function App() {
       setLoadingStream(false);
     }
   };
-
-  const handleStreamFatalError = useCallback(() => {
-    if (!fallbackStreamUrl || streamUrl === fallbackStreamUrl) return;
-    setStreamUrl(fallbackStreamUrl);
-    setFallbackStreamUrl(null);
-  }, [fallbackStreamUrl, streamUrl]);
 
   const handleCopyDonationAddress = async () => {
     try {
@@ -868,11 +846,11 @@ function App() {
     }
   }, [currentTime]);
 
-  const activeAgenda = uniqueAgenda.filter(event => getEventStatus(event).active);
-  const featuredAgenda = activeAgenda.slice(0, 3);
+  const activeAgenda = useMemo(() => uniqueAgenda.filter(event => getEventStatus(event).active), [uniqueAgenda, getEventStatus]);
+  const featuredAgenda = useMemo(() => activeAgenda.slice(0, 3), [activeAgenda]);
   const agendaTitle = uniqueAgenda[0]?.dateLabel || 'Agenda de hoy';
 
-  const channelMatchesEvent = (channel: Channel, event: AgendaEvent) => {
+  const channelMatchesEvent = useCallback((channel: Channel, event: AgendaEvent) => {
     if (!event.title) return false;
 
     const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -900,12 +878,12 @@ function App() {
     }
 
     return false;
-  };
+  }, []);
 
-  const getChannelStatus = (channel: Channel) => {
+  const getChannelStatus = useCallback((channel: Channel) => {
     const event = activeAgenda.find(item => channelMatchesEvent(channel, item));
     return event ? getEventStatus(event) : null;
-  };
+  }, [activeAgenda, channelMatchesEvent, getEventStatus]);
 
   const favoriteChannels = favoriteChannelIds
     .map(id => filteredChannels.find(channel => channel.id === id))
@@ -958,7 +936,7 @@ function App() {
       visitorTeam: visitor,
       title: event.title
     };
-  }, [selectedChannel, uniqueAgenda, getEventStatus]);
+  }, [selectedChannel, uniqueAgenda, channelMatchesEvent, getEventStatus]);
 
   const selectedChannelRoom = selectedChannel
     ? `channel-${selectedChannel.id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90)}`
@@ -967,6 +945,13 @@ function App() {
     return presenceCounts.channels[getPresenceChannelKey(channel.id)] || 0;
   };
   const selectedChannelViewers = selectedChannel ? getChannelViewerCount(selectedChannel) : 0;
+
+  const isMaintenanceMode = process.env.REACT_APP_MAINTENANCE_MODE === 'true' || 
+                           new URLSearchParams(window.location.search).get('maintenance') === 'true';
+
+  if (isMaintenanceMode) {
+    return <MaintenanceOverlay />;
+  }
 
   const renderChannelCard = (channel: Channel) => {
     const channelStatus = getChannelStatus(channel);
@@ -1066,14 +1051,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col" data-build={APP_BUILD_MARKER}>
-      {MAINTENANCE_MODE && (
-        <MaintenanceOverlay
-          headline={MAINTENANCE_MESSAGE}
-          description={MAINTENANCE_DESCRIPTION}
-          buttonText={MAINTENANCE_BUTTON_TEXT}
-          buttonUrl={MAINTENANCE_BUTTON_URL}
-        />
-      )}
       <AdsterraGlobalAds enabled={adsUnlocked} delayMs={GLOBAL_AD_DELAY_MS} />
 
       {/* Header */}
@@ -1164,7 +1141,7 @@ function App() {
                 aria-label={playerPaused ? 'Reproducir' : 'Pausar'}
                 title={playerPaused ? 'Reproducir' : 'Pausar'}
               >
-                <VideoPlayer src={streamUrl} onFatalError={handleStreamFatalError} />
+                <VideoPlayer src={streamUrl} />
                 <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-xl bg-black/70 border border-white/10 px-2 py-2 backdrop-blur transition-opacity duration-500 ${
                   showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 } ${
@@ -1554,7 +1531,7 @@ function App() {
         href="https://t.me/goleafutbol" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="hidden md:flex fixed bottom-6 right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 items-center justify-center group animate-bounce hover:animate-none"
+        className="flex fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 bg-[#229ED9] hover:bg-[#1d8dbf] text-white p-3 md:p-4 rounded-full shadow-2xl transition-all hover:scale-110 items-center justify-center group animate-bounce hover:animate-none"
         title="Únete a nuestro Telegram"
       >
         <MessageCircle className="w-6 h-6" />

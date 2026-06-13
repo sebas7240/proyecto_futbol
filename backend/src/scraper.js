@@ -345,54 +345,8 @@ async function getLa18hdStreamUrl(id) {
   return null;
 }
 
-const IPTV_BLOCKED_PATTERN = /(premium|\bespn\b|dsports|directv sports|movistar plus|fox sports|win sports|\bdazn\b)/i;
-
-function isAllowedIptvChannel(channel) {
-  const label = `${channel?.category || ''} ${channel?.name || ''}`;
-  return !IPTV_BLOCKED_PATTERN.test(label) &&
-    /^https?:\/\//i.test(channel?.url || '');
-}
-
-function isDirectIptvChannel(channel) {
-  return isAllowedIptvChannel(channel) &&
-    channel.url.startsWith('https://') &&
-    (!channel.headers || Object.keys(channel.headers).length === 0);
-}
-
-async function getChannelsFromIptvSv() {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = process.env.IPTV_CHANNELS_FILE || path.join(__dirname, '../../iptv_active_channels.json');
-    if (!fs.existsSync(filePath)) return [];
-
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return data.channels
-      .filter(isAllowedIptvChannel)
-      .map(ch => ({
-        id: ch.id,
-        name: ch.name,
-        category: ch.category,
-        source: 'iptv-sv',
-        url: ch.url,
-        logo: ch.logo,
-        headers: ch.headers,
-        direct: isDirectIptvChannel(ch)
-      }));
-  } catch (err) {
-    console.error("[Scraper] Error en IPTV-SV:", err.message);
-    return [];
-  }
-}
-
 async function getChannels() {
   console.log("[Scraper] Actualizando lista de canales...");
-  const sourceIptvSv = await getChannelsFromIptvSv();
-
-  if (process.env.IPTV_ONLY_MODE === 'true') {
-    return sourceIptvSv;
-  }
-
   const sourceA = await getChannelsFromPelotaLibre();
   const sourceNoveo = await getChannelsFromNoveo();
   const sourceTvTvHd = await getChannelsFromTvTvHd();
@@ -417,7 +371,7 @@ async function getChannels() {
     backups: ch.backups
   }));
 
-  return [...channels, ...sourceNoveo, ...sourceTvTvHd, ...sourceIptvSv];
+  return [...channels, ...sourceNoveo, ...sourceTvTvHd];
 }
 
 async function getStreamUrl(channelUrl) {
@@ -427,22 +381,6 @@ async function getStreamUrl(channelUrl) {
   if (channelUrl.startsWith("tvtvhd-") || channelUrl.startsWith("premium-v2-")) {
     return await getLa18hdStreamUrl(channelUrl);
   }
-
-  if (channelUrl.startsWith("iptvsv-")) {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = process.env.IPTV_CHANNELS_FILE || path.join(__dirname, '../../iptv_active_channels.json');
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    const channel = data.channels.find(c => c.id === channelUrl);
-    if (isAllowedIptvChannel(channel)) {
-      return {
-        url: channel.url,
-        headers: channel.headers,
-        direct: isDirectIptvChannel(channel)
-      };
-    }
-  }
-
   console.log("[Scraper] Obteniendo seÃ±al para: " + channelUrl);
   const browser = await getBrowser();
   const context = await browser.newContext({

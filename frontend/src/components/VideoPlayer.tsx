@@ -3,24 +3,14 @@ import Hls from 'hls.js';
 
 interface VideoPlayerProps {
   src: string;
-  onFatalError?: () => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let hls: any = null;
-    let fatalErrorHandled = false;
-    let networkErrorCount = 0;
-    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const triggerFallback = () => {
-      if (fatalErrorHandled || !onFatalError) return;
-      fatalErrorHandled = true;
-      onFatalError();
-    };
 
     if (videoRef.current) {
       const video = videoRef.current;
@@ -34,29 +24,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
 
         hls.loadSource(src);
         hls.attachMedia(video);
-        fallbackTimer = setTimeout(triggerFallback, 12000);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (fallbackTimer) clearTimeout(fallbackTimer);
           video.play().catch(e => console.error("Autoplay prevented", e));
         });
 
         hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
           console.error("HLS Error:", data);
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            networkErrorCount += 1;
-            if (networkErrorCount >= 2) {
-              triggerFallback();
-              return;
-            }
-          }
-
           if (data.fatal) {
-            if (onFatalError) {
-              triggerFallback();
-              return;
-            }
-
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 hls?.startLoad();
@@ -81,12 +56,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, onFatalError }) => {
     }
 
     return () => {
-      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (hls) {
         hls.destroy();
       }
     };
-  }, [src, onFatalError]);
+  }, [src]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-black relative">
