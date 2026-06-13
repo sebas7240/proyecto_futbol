@@ -14,6 +14,10 @@ services:
       - VIDEO_TOKEN_TTL_MS=${VIDEO_TOKEN_TTL_MS:-21600000}
       - PROXY_RATE_LIMIT_MAX=${PROXY_RATE_LIMIT_MAX:-60000}
       - EDGE_PROXY_BASE_URL=${EDGE_PROXY_BASE_URL:-}
+      - IPTV_ONLY_MODE=${IPTV_ONLY_MODE:-true}
+      - IPTV_CHANNELS_FILE=/data/iptv_active_channels.json
+    volumes:
+      - ./iptv_active_channels.json:/data/iptv_active_channels.json:ro
     restart: always
 
   microcache:

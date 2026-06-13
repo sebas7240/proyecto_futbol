@@ -73,9 +73,14 @@ const ALLOWED_PROXY_DOMAINS = [
   "pelotalibrestv.org", "skylivefu.com", "skylivehd.com", "envivoslatam.org",
   "noveopartidos.xyz", "streamhdhx.com", "ksdjugfsddeports.com",
   "la18hd.com", "fubo18.com", "vopartidos.tv", "tvtvhd.com",
-  "vopartidos.org", "fubo18.org", "la18hd.org"
+  "vopartidos.org", "fubo18.org", "la18hd.org",
+  "teleon.live", "jwplive.com", "streaminglivehd.com", "cloudfront.net",
+  "akamaized.net", "streamlock.net", "amagi.tv", "wurl.tv", "mdstrm.com",
+  "rudo.video", "jio.com", "streamhostingcdn.top", "mediatiquestream.com",
+  "immergo.tv", "voxtvhd.com.br", "dps.live", "makrodigital.com", "lhdserver.es",
+  "todostreaming.es", "gestec-video.com", "emitstream.com", "servers10.com",
+  "innovatestream.pe", "perucast.com", "janusmedia.tv", "alsolnet.com"
 ];
-
 const FULL_PROXY_DOMAINS = [
   "la14hd.com", "fubohd.com", "cvattv.com", "vproov.com",
   "televisionlibre.net", "futbollibre.net", "flow.com.ar", "directv.com.ar",
@@ -83,6 +88,29 @@ const FULL_PROXY_DOMAINS = [
   "noveopartidos.xyz", "la18hd.com", "fubo18.com", "vopartidos.tv", "tvtvhd.com",
   "vopartidos.org", "fubo18.org", "la18hd.org", "streamhdhx.com", "ksdjugfsddeports.com"
 ];
+const IPTV_PROXY_HOSTS = loadIptvProxyHosts();
+
+function loadIptvProxyHosts() {
+  const fs = require("fs");
+  const path = require("path");
+  const filePath = process.env.IPTV_CHANNELS_FILE || path.join(__dirname, "../../iptv_active_channels.json");
+  const hosts = new Set();
+
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    for (const channel of data.channels || []) {
+      try {
+        hosts.add(new URL(channel.url).hostname.toLowerCase());
+      } catch {
+        // Ignore malformed entries; the playlist generator reports the usable total.
+      }
+    }
+  } catch (error) {
+    console.warn(`[Proxy] IPTV host list unavailable: ${error.message}`);
+  }
+
+  return hosts;
+}
 
 function getClientIp(req) {
   return (req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown")
@@ -133,7 +161,8 @@ function hostnameMatches(hostname, domain) {
 
 function isAllowedProxyHost(hostname) {
   const normalized = hostname.toLowerCase();
-  return ALLOWED_PROXY_DOMAINS.some(domain => hostnameMatches(normalized, domain));
+  return IPTV_PROXY_HOSTS.has(normalized) ||
+    ALLOWED_PROXY_DOMAINS.some(domain => hostnameMatches(normalized, domain));
 }
 
 function isPrivateIp(address) {
@@ -248,6 +277,21 @@ function createProxyUrl(targetUrl, ttlMs = getProxyTtlForUrl(targetUrl)) {
   }
 
   return createLegacyProxyUrl(targetUrl, ttlMs);
+}
+
+function createStreamResponse(data) {
+  if (data.direct === true) {
+    return {
+      directUrl: data.url,
+      proxied: false
+    };
+  }
+
+  return {
+    proxyUrl: createProxyUrl(data.url),
+    proxied: true,
+    expiresInMs: TOKEN_TTL_MS
+  };
 }
 
 async function resolveProxyTarget(req) {
@@ -398,19 +442,11 @@ app.get("/api/stream-url", rateLimit({ windowMs: 60_000, max: 90 }), async (req,
 
   if (streamCache.has(id) && Date.now() - streamCache.get(id).timestamp < 600000) {
     const cached = streamCache.get(id);
-    return res.json({
-      proxyUrl: createProxyUrl(cached.url),
-      proxied: true,
-      expiresInMs: TOKEN_TTL_MS
-    });
+    return res.json(createStreamResponse(cached));
   }
   if (pendingScrapes.has(id)) {
     const data = await pendingScrapes.get(id);
-    return res.json({
-      proxyUrl: createProxyUrl(data.url),
-      proxied: true,
-      expiresInMs: TOKEN_TTL_MS
-    });
+    return res.json(createStreamResponse(data));
   }
 
   const pending = (async () => {
@@ -430,11 +466,7 @@ app.get("/api/stream-url", rateLimit({ windowMs: 60_000, max: 90 }), async (req,
 
   try {
     const data = await pending;
-    res.json({
-      proxyUrl: createProxyUrl(data.url),
-      proxied: true,
-      expiresInMs: TOKEN_TTL_MS
-    });
+    res.json(createStreamResponse(data));
   } catch (e) {
     res.status(500).send("URL error");
   }
