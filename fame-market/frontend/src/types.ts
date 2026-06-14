@@ -78,3 +78,44 @@ export interface Trade {
   realizedPnl: number;
   createdAt: string;
 }
+
+export interface Season {
+  id: string;
+  name: string;
+  startsAt: string;
+  tradingClosesAt: string;
+  endsAt: string;
+  startingBalance: number;
+  status: 'active' | 'frozen' | 'closed';
+  frozenAt: string | null;
+  closedAt: string | null;
+}
+
+export interface RankingEntry {
+  rank: number;
+  displayName: string;
+  avatarUrl: string | null;
+  portfolioValue: number;
+  returnPercent: number;
+  tradeCount: number;
+  reviewStatus: 'live' | 'pending' | 'approved' | 'flagged';
+}
+
+export interface RankingResponse {
+  season: Season | null;
+  rankings: RankingEntry[];
+}
+
+export interface SeasonHistory {
+  seasonId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: Season['status'];
+  balance: number;
+  startingBalance: number;
+  portfolioValue: number;
+  returnPercent: number;
+  rank: number | null;
+  tradeCount: number;
+}

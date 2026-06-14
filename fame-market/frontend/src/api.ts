@@ -3,6 +3,9 @@ import type {
   ArtistSummary,
   Portfolio,
   Quote,
+  RankingResponse,
+  Season,
+  SeasonHistory,
   Trade
 } from './types';
 
@@ -53,6 +56,15 @@ export const api = {
     const body = await request<{ trades: Trade[] }>('/me/trades');
     return body.trades;
   },
+  async ranking() {
+    return request<RankingResponse>('/rankings/current?limit=50');
+  },
+  async seasonHistory() {
+    const body = await request<{ seasons: SeasonHistory[] }>(
+      '/me/season-history'
+    );
+    return body.seasons;
+  },
   async setFavorite(artistId: string, favorite: boolean) {
     const body = await request<{ artistIds: string[] }>(
       `/me/favorites/${artistId}`,
@@ -94,6 +106,30 @@ export const api = {
         method: 'POST',
         headers: { 'x-admin-secret': adminSecret },
         body: JSON.stringify({ artistId })
+      }
+    );
+  },
+  async adminSeasonAction(
+    adminSecret: string,
+    seasonId: string,
+    action: 'freeze' | 'close'
+  ) {
+    return request<{ season: Season }>(
+      `/admin/seasons/${seasonId}/${action}`,
+      {
+        method: 'POST',
+        headers: { 'x-admin-secret': adminSecret },
+        body: '{}'
+      }
+    );
+  },
+  async processSeasonCycle(adminSecret: string) {
+    return request<{ actions: string[]; season: Season | null }>(
+      '/admin/seasons/cycle',
+      {
+        method: 'POST',
+        headers: { 'x-admin-secret': adminSecret },
+        body: '{}'
       }
     );
   }

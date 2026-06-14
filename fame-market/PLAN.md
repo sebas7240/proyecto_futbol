@@ -439,6 +439,7 @@ Usuario autenticado:
 - `GET /me`
 - `GET /me/portfolio`
 - `GET /me/trades`
+- `GET /me/season-history`
 - `GET /me/favorites`
 - `PUT /me/favorites/:artistId`
 - `DELETE /me/favorites/:artistId`
@@ -455,6 +456,7 @@ Admin:
 - `POST /admin/seasons`
 - `POST /admin/seasons/:id/freeze`
 - `POST /admin/seasons/:id/close`
+- `POST /admin/seasons/cycle`
 - `GET /admin/security/alerts`
 
 ## 13. Integridad y seguridad
@@ -583,11 +585,11 @@ Criterio:
 
 ### Fase 5 - Temporadas y rankings
 
-- [ ] Automatizar apertura, congelamiento y cierre.
-- [ ] Calcular valor final y rendimiento.
-- [ ] Crear ranking semanal.
+- [x] Automatizar apertura, congelamiento y cierre.
+- [x] Calcular y congelar valor final y rendimiento.
+- [x] Crear ranking semanal en vivo e historico.
 - [ ] Agregar mejor novato y descubridor temprano.
-- [ ] Reiniciar capital sin borrar el historial.
+- [x] Reiniciar capital con una wallet nueva sin borrar el historial.
 - [ ] Agregar revision anti-fraude del top.
 
 Criterio:
@@ -701,10 +703,13 @@ La primera vertical tecnica ya incluye:
 8. Marcadores personales de compra y venta en la grafica.
 9. Onboarding para la primera operacion.
 10. Prueba de concurrencia e idempotencia contra PostgreSQL real.
+11. Ciclo semanal automatico con congelamiento y cierre.
+12. Ranking en vivo, ranking final e historial personal.
+13. Controles admin para congelar, cerrar o procesar el ciclo.
 
 Siguiente bloque recomendado:
 
-1. Automatizar apertura, congelamiento y cierre de temporadas.
-2. Calcular el valor final de cada portafolio.
-3. Crear el ranking semanal.
-4. Mostrar historial de operaciones y rendimiento por temporada.
+1. Agregar revision anti-fraude y estados de aprobacion del top.
+2. Agregar insignias de mejor novato y descubridor temprano.
+3. Mostrar historial detallado de operaciones por temporada.
+4. Implementar rate limits y App Check o Turnstile.

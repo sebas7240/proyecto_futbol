@@ -1,0 +1,210 @@
+import { useState } from 'react';
+import {
+  ArrowLeft,
+  CalendarClock,
+  Medal,
+  TrendingDown,
+  TrendingUp,
+  Trophy
+} from 'lucide-react';
+import type {
+  RankingEntry,
+  Season,
+  SeasonHistory
+} from './types';
+
+const money = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+const date = new Intl.DateTimeFormat('es-CO', {
+  day: 'numeric',
+  month: 'short'
+});
+
+function timeRemaining(season: Season) {
+  if (season.status === 'closed') return 'Temporada finalizada';
+  if (season.status === 'frozen') return 'Resultados en proceso';
+  const milliseconds = Math.max(
+    0,
+    Date.parse(season.tradingClosesAt) - Date.now()
+  );
+  const days = Math.floor(milliseconds / 86_400_000);
+  const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000);
+  return days > 0 ? `${days} d ${hours} h para operar` : `${hours} h para operar`;
+}
+
+function Avatar({ entry }: { entry: RankingEntry }) {
+  const [failed, setFailed] = useState(false);
+  return entry.avatarUrl && !failed ? (
+    <img src={entry.avatarUrl} alt="" onError={() => setFailed(true)} />
+  ) : (
+    <span className="ranking-avatar">
+      {entry.displayName.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+export function RankingPanel({
+  season,
+  rankings,
+  history,
+  signedIn,
+  loading,
+  onBack
+}: {
+  season: Season | null;
+  rankings: RankingEntry[];
+  history: SeasonHistory[];
+  signedIn: boolean;
+  loading: boolean;
+  onBack: () => void;
+}) {
+  const podium = rankings.slice(0, 3);
+
+  return (
+    <main className="ranking-page">
+      <header className="ranking-header">
+        <button className="ranking-back" onClick={onBack}>
+          <ArrowLeft size={18} /> Mercado
+        </button>
+        <div>
+          <small>Competencia semanal</small>
+          <h1>Ranking de Fame Market</h1>
+          <p>
+            El rendimiento parte del mismo capital ficticio para todos los
+            jugadores.
+          </p>
+        </div>
+        {season && (
+          <div className={`season-status season-status--${season.status}`}>
+            <CalendarClock size={18} />
+            <span>
+              <strong>{season.name}</strong>
+              <small>{timeRemaining(season)}</small>
+            </span>
+          </div>
+        )}
+      </header>
+
+      {loading ? (
+        <div className="ranking-empty">Calculando posiciones...</div>
+      ) : rankings.length ? (
+        <>
+          <section className="podium" aria-label="Podio semanal">
+            {podium.map((entry) => (
+              <article
+                className={`podium-entry podium-entry--${entry.rank}`}
+                key={`${entry.rank}-${entry.displayName}`}
+              >
+                <span className="podium-entry__rank">
+                  {entry.rank === 1 ? <Trophy size={21} /> : <Medal size={21} />}
+                  #{entry.rank}
+                </span>
+                <Avatar entry={entry} />
+                <strong>{entry.displayName}</strong>
+                <span>{money.format(entry.portfolioValue)} FC</span>
+                <small className={entry.returnPercent >= 0 ? 'profit' : 'loss'}>
+                  {entry.returnPercent >= 0 ? '+' : ''}
+                  {entry.returnPercent.toFixed(2)}%
+                </small>
+              </article>
+            ))}
+          </section>
+
+          <section className="leaderboard">
+            <div className="leaderboard__heading">
+              <div>
+                <small>Clasificacion actual</small>
+                <h2>Todos los jugadores</h2>
+              </div>
+              <span>
+                {rankings.length}{' '}
+                {rankings.length === 1 ? 'participante' : 'participantes'}
+              </span>
+            </div>
+            <div className="leaderboard__labels" aria-hidden="true">
+              <span>Posicion</span>
+              <span>Portafolio</span>
+              <span>Rendimiento</span>
+              <span>Operaciones</span>
+            </div>
+            <div className="leaderboard__rows">
+              {rankings.map((entry) => (
+                <div
+                  className="leaderboard-row"
+                  key={`${entry.rank}-${entry.displayName}`}
+                >
+                  <span className="leaderboard-row__player">
+                    <b>#{entry.rank}</b>
+                    <Avatar entry={entry} />
+                    <strong>{entry.displayName}</strong>
+                  </span>
+                  <strong>{money.format(entry.portfolioValue)} FC</strong>
+                  <span
+                    className={
+                      entry.returnPercent >= 0 ? 'profit' : 'loss'
+                    }
+                  >
+                    {entry.returnPercent >= 0 ? (
+                      <TrendingUp size={16} />
+                    ) : (
+                      <TrendingDown size={16} />
+                    )}
+                    {entry.returnPercent >= 0 ? '+' : ''}
+                    {entry.returnPercent.toFixed(2)}%
+                  </span>
+                  <span>{entry.tradeCount}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : (
+        <div className="ranking-empty">
+          El ranking aparecera cuando el primer jugador abra su portafolio.
+        </div>
+      )}
+
+      <section className="season-history">
+        <div className="leaderboard__heading">
+          <div>
+            <small>Tu recorrido</small>
+            <h2>Temporadas</h2>
+          </div>
+        </div>
+        {!signedIn ? (
+          <p className="ranking-empty">
+            Inicia sesion para consultar tu posicion e historial personal.
+          </p>
+        ) : history.length ? (
+          <div className="history-grid">
+            {history.map((item) => (
+              <article className="history-entry" key={item.seasonId}>
+                <span>
+                  <small>
+                    {date.format(new Date(item.startsAt))} -{' '}
+                    {date.format(new Date(item.endsAt))}
+                  </small>
+                  <strong>{item.name}</strong>
+                </span>
+                <b>{item.rank ? `#${item.rank}` : 'Sin rango'}</b>
+                <span>
+                  <strong>{money.format(item.portfolioValue)} FC</strong>
+                  <small className={item.returnPercent >= 0 ? 'profit' : 'loss'}>
+                    {item.returnPercent >= 0 ? '+' : ''}
+                    {item.returnPercent.toFixed(2)}%
+                  </small>
+                </span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="ranking-empty">
+            Tu primera temporada aparecera al abrir el portafolio.
+          </p>
+        )}
+      </section>
+    </main>
+  );
+}

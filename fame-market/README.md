@@ -20,6 +20,9 @@ mismo frontend, API, autenticacion y portafolio.
 - Marcadores personales de compra y venta sobre la grafica.
 - Onboarding corto para la primera operacion.
 - Prueba de concurrencia e idempotencia contra PostgreSQL real.
+- Temporadas semanales con congelamiento y cierre automaticos.
+- Ranking en vivo, ranking final e historial personal.
+- Controles administrativos para procesar el ciclo de temporada.
 - PWA instalable.
 - Docker Compose preparado para produccion.
 
@@ -61,6 +64,8 @@ Variables importantes:
 - `FIREBASE_PROJECT_ID`
 - `YOUTUBE_API_KEY`
 - `ADMIN_SECRET`
+- `SEASON_AUTOMATION_ENABLED`
+- `SEASON_CYCLE_INTERVAL_MINUTES`
 - variables `VITE_FIREBASE_*`
 
 Los archivos `.env` estan ignorados por Git.

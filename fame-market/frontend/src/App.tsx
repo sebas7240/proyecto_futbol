@@ -25,6 +25,7 @@ import {
   subscribeToAuth
 } from './auth';
 import { PriceChart } from './PriceChart';
+import { RankingPanel } from './RankingPanel';
 import type { ArtistSummary, Quote } from './types';
 
 type ArtistFilter = 'trending' | 'latin' | 'favorites';
@@ -93,12 +94,20 @@ function ArtistRow({
 function App() {
   const queryClient = useQueryClient();
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
+  const rankingQuery = useQuery({
+    queryKey: ['ranking'],
+    queryFn: api.ranking,
+    refetchInterval: 60_000
+  });
   const [selectedSlug, setSelectedSlug] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [quantity, setQuantity] = useState(5);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [notice, setNotice] = useState('');
-  const [mobileTab, setMobileTab] = useState<'market' | 'portfolio'>('market');
+  const [mobileTab, setMobileTab] =
+    useState<'market' | 'portfolio' | 'ranking'>(
+      window.location.pathname.startsWith('/ranking') ? 'ranking' : 'market'
+    );
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,6 +123,7 @@ function App() {
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
+      queryClient.invalidateQueries({ queryKey: ['season-history'] });
     });
   }, [queryClient]);
 
@@ -134,6 +144,13 @@ function App() {
   const tradesQuery = useQuery({
     queryKey: ['trades', firebaseUser?.uid ?? 'local'],
     queryFn: api.trades,
+    enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
+    retry: false
+  });
+
+  const seasonHistoryQuery = useQuery({
+    queryKey: ['season-history', firebaseUser?.uid ?? 'local'],
+    queryFn: api.seasonHistory,
     enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
     retry: false
   });
@@ -179,7 +196,9 @@ function App() {
         queryClient.invalidateQueries({ queryKey: ['artists'] }),
         queryClient.invalidateQueries({ queryKey: ['artist', selectedSlug] }),
         queryClient.invalidateQueries({ queryKey: ['portfolio'] }),
-        queryClient.invalidateQueries({ queryKey: ['trades'] })
+        queryClient.invalidateQueries({ queryKey: ['trades'] }),
+        queryClient.invalidateQueries({ queryKey: ['ranking'] }),
+        queryClient.invalidateQueries({ queryKey: ['season-history'] })
       ]);
     },
     onError: (error) => {
@@ -224,6 +243,10 @@ function App() {
   const artists = artistsQuery.data ?? [];
   const artist = artistQuery.data;
   const portfolio = portfolioQuery.data;
+  const currentSeason = rankingQuery.data?.season;
+  const myCurrentSeason = seasonHistoryQuery.data?.find(
+    (season) => season.seasonId === currentSeason?.id
+  );
   const favoriteIds = favoritesQuery.data ?? [];
   const artistTrades = useMemo(
     () =>
@@ -290,6 +313,14 @@ function App() {
     setOnboardingOpen(false);
   };
 
+  const selectTab = (tab: 'market' | 'portfolio' | 'ranking') => {
+    setMobileTab(tab);
+    const path = tab === 'ranking' ? '/ranking' : '/';
+    if (window.location.pathname !== path) {
+      window.history.replaceState({}, '', path);
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -297,7 +328,17 @@ function App() {
           <span className="brand__mark"><Music2 size={21} /></span>
           <span>
             <strong>Fame Market</strong>
-            <small>Temporada Latina · 5 dias</small>
+            <small>
+              {currentSeason
+                ? `${currentSeason.name} · ${
+                    currentSeason.status === 'active'
+                      ? 'en curso'
+                      : currentSeason.status === 'frozen'
+                        ? 'congelada'
+                        : 'finalizada'
+                  }`
+                : 'Mercado musical'}
+            </small>
           </span>
         </div>
         <label className="search">
@@ -311,10 +352,16 @@ function App() {
           />
         </label>
         <div className="topbar__stats">
-          <span>
+          <button
+            className="topbar-stat-button"
+            onClick={() => selectTab('ranking')}
+            title="Abrir ranking"
+          >
             <small>Tu ranking</small>
-            <strong>#84</strong>
-          </span>
+            <strong>
+              {myCurrentSeason?.rank ? `#${myCurrentSeason.rank}` : '--'}
+            </strong>
+          </button>
           <span>
             <small>Disponible</small>
             <strong>
@@ -373,6 +420,16 @@ function App() {
         </div>
       )}
 
+      {mobileTab === 'ranking' ? (
+        <RankingPanel
+          season={rankingQuery.data?.season ?? null}
+          rankings={rankingQuery.data?.rankings ?? []}
+          history={seasonHistoryQuery.data ?? []}
+          signedIn={Boolean(firebaseUser) || !firebaseReady}
+          loading={rankingQuery.isLoading}
+          onBack={() => selectTab('market')}
+        />
+      ) : (
       <main className={`workspace workspace--${mobileTab}`}>
         <aside className="market-list">
           <div className="section-heading">
@@ -380,7 +437,20 @@ function App() {
               <small>Mercado musical</small>
               <h1>Artistas</h1>
             </div>
-            <span className="live-label"><i /> Abierto</span>
+            <span
+              className={`live-label ${
+                currentSeason?.status === 'active'
+                  ? ''
+                  : 'live-label--closed'
+              }`}
+            >
+              <i />
+              {currentSeason?.status === 'active'
+                ? 'Abierto'
+                : currentSeason?.status === 'frozen'
+                  ? 'Congelado'
+                  : 'Cerrado'}
+            </span>
           </div>
           <label className="search market-search">
             <Search size={17} />
@@ -428,7 +498,7 @@ function App() {
                 onSelect={() => {
                   setSelectedSlug(item.slug);
                   setQuote(null);
-                  setMobileTab('market');
+                  selectTab('market');
                 }}
                 onToggleFavorite={() => toggleFavorite(item.id)}
               />
@@ -578,10 +648,13 @@ function App() {
                 disabled={
                   !artist ||
                   quoteMutation.isPending ||
-                  (firebaseReady && !firebaseUser)
+                  (firebaseReady && !firebaseUser) ||
+                  currentSeason?.status !== 'active'
                 }
               >
-                {firebaseReady && !firebaseUser
+                {currentSeason?.status !== 'active'
+                  ? 'Mercado temporalmente cerrado'
+                  : firebaseReady && !firebaseUser
                   ? 'Inicia sesion para operar'
                   : quoteMutation.isPending
                     ? 'Calculando...'
@@ -626,15 +699,21 @@ function App() {
           </section>
         </aside>
       </main>
+      )}
 
       <nav className="mobile-nav" aria-label="Navegacion principal">
-        <button className={mobileTab === 'market' ? 'is-active' : ''} onClick={() => setMobileTab('market')}>
+        <button className={mobileTab === 'market' ? 'is-active' : ''} onClick={() => selectTab('market')}>
           <BarChart3 size={20} /> Mercado
         </button>
-        <button className={mobileTab === 'portfolio' ? 'is-active' : ''} onClick={() => setMobileTab('portfolio')}>
+        <button className={mobileTab === 'portfolio' ? 'is-active' : ''} onClick={() => selectTab('portfolio')}>
           <WalletCards size={20} /> Portafolio
         </button>
-        <button><Trophy size={20} /> Ranking</button>
+        <button
+          className={mobileTab === 'ranking' ? 'is-active' : ''}
+          onClick={() => selectTab('ranking')}
+        >
+          <Trophy size={20} /> Ranking
+        </button>
       </nav>
     </div>
   );

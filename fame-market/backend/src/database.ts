@@ -46,38 +46,48 @@ export async function runMigrations() {
   const filenames = (await readdir(migrationsDirectory))
     .filter((filename) => filename.endsWith('.sql'))
     .sort();
-  const db = getPool();
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  for (const filename of filenames) {
-    const applied = await db.query(
-      'SELECT 1 FROM schema_migrations WHERE name = $1',
-      [filename]
+  const client = await getPool().connect();
+  try {
+    await client.query(
+      "SELECT pg_advisory_lock(hashtext('fame-market-migrations'))"
     );
-    if (applied.rowCount) continue;
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        name TEXT PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
 
-    const sql = await readFile(path.join(migrationsDirectory, filename), 'utf8');
-    const client = await db.connect();
-    try {
+    for (const filename of filenames) {
+      const applied = await client.query(
+        'SELECT 1 FROM schema_migrations WHERE name = $1',
+        [filename]
+      );
+      if (applied.rowCount) continue;
+
+      const sql = await readFile(
+        path.join(migrationsDirectory, filename),
+        'utf8'
+      );
       await client.query('BEGIN');
-      await client.query(sql);
-      await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [
-        filename
-      ]);
-      await client.query('COMMIT');
-      console.log(`[Database] Applied migration ${filename}`);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      try {
+        await client.query(sql);
+        await client.query(
+          'INSERT INTO schema_migrations (name) VALUES ($1)',
+          [filename]
+        );
+        await client.query('COMMIT');
+        console.log(`[Database] Applied migration ${filename}`);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
     }
+  } finally {
+    await client
+      .query("SELECT pg_advisory_unlock(hashtext('fame-market-migrations'))")
+      .catch(() => undefined);
+    client.release();
   }
 }
 

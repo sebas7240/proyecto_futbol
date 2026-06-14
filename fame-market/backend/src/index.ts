@@ -11,6 +11,15 @@ import {
 } from './database.js';
 import { MarketError, MarketStore } from './market.js';
 import { PostgresMarketStore } from './postgresMarket.js';
+import {
+  closeSeason,
+  createNextSeason,
+  freezeSeason,
+  getCurrentSeason,
+  getSeasonRanking,
+  getUserSeasonHistory,
+  processSeasonCycle
+} from './seasons.js';
 import type { MarketDataStore } from './types.js';
 import {
   pruneYouTubeSnapshots,
@@ -77,6 +86,23 @@ app.get('/api/status', async (_request, response) => {
   });
 });
 
+app.get('/api/seasons/current', async (_request, response, next) => {
+  try {
+    response.json({ season: await getCurrentSeason() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/rankings/current', async (request, response, next) => {
+  try {
+    const limit = Number(request.query.limit ?? 50);
+    response.json(await getSeasonRanking(Number.isFinite(limit) ? limit : 50));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/artists', async (_request, response, next) => {
   try {
     response.json({ artists: await market.listArtists() });
@@ -112,6 +138,20 @@ app.get('/api/me/trades', requireAuth, async (request, response, next) => {
     next(error);
   }
 });
+
+app.get(
+  '/api/me/season-history',
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      response.json({
+        seasons: await getUserSeasonHistory(request.authenticatedUser!)
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.get('/api/me/favorites', requireAuth, async (request, response, next) => {
   try {
@@ -242,6 +282,58 @@ app.post(
   }
 );
 
+app.post(
+  '/api/admin/seasons/:seasonId/freeze',
+  requireAdmin,
+  async (request, response, next) => {
+    try {
+      response.json({
+        season: await freezeSeason(String(request.params.seasonId))
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/seasons/:seasonId/close',
+  requireAdmin,
+  async (request, response, next) => {
+    try {
+      response.json({
+        season: await closeSeason(String(request.params.seasonId))
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/seasons',
+  requireAdmin,
+  async (_request, response, next) => {
+    try {
+      response.status(201).json({ season: await createNextSeason() });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/seasons/cycle',
+  requireAdmin,
+  async (_request, response, next) => {
+    try {
+      response.json(await processSeasonCycle());
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.post('/api/trades', requireAuth, async (request, response, next) => {
   try {
     const input = executionSchema.parse(request.body);
@@ -324,6 +416,23 @@ async function start() {
         ),
       intervalMinutes * 60 * 1000
     );
+    timer.unref();
+  }
+
+  if (
+    databaseConfigured() &&
+    process.env.SEASON_AUTOMATION_ENABLED !== 'false'
+  ) {
+    const intervalMinutes = Math.max(
+      Number(process.env.SEASON_CYCLE_INTERVAL_MINUTES ?? 5),
+      1
+    );
+    const cycle = () =>
+      processSeasonCycle().catch((error) =>
+        console.error('[Season] Automatic cycle failed', error)
+      );
+    cycle();
+    const timer = setInterval(cycle, intervalMinutes * 60 * 1000);
     timer.unref();
   }
 }
