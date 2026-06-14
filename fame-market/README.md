@@ -27,8 +27,11 @@ mismo frontend, API, autenticacion y portafolio.
 - Revision antifraude del top con alertas y aprobacion administrativa.
 - Limite transaccional de 60 operaciones por 24 horas y pausa de 5 segundos.
 - Rate limits compartidos en PostgreSQL para trading y administracion.
+- Cloudflare Turnstile en la cotizacion previa a cada operacion.
 - Congelamiento administrativo de usuarios y artistas con auditoria.
 - Controles administrativos para procesar el ciclo de temporada.
+- Health checks, metricas Prometheus y estado operativo en administracion.
+- Backups cifrados con restauracion automatica de prueba y salida opcional a R2.
 - PWA instalable.
 - Docker Compose preparado para produccion.
 
@@ -70,11 +73,29 @@ Variables importantes:
 - `FIREBASE_PROJECT_ID`
 - `YOUTUBE_API_KEY`
 - `ADMIN_SECRET`
+- `MONITORING_SECRET`
+- `TURNSTILE_SECRET_KEY`
+- `TURNSTILE_ALLOWED_HOSTNAMES`
+- `BACKUP_ENCRYPTION_PASSWORD`
 - `SEASON_AUTOMATION_ENABLED`
 - `SEASON_CYCLE_INTERVAL_MINUTES`
+- `VITE_TURNSTILE_SITE_KEY`
 - variables `VITE_FIREBASE_*`
 
 Los archivos `.env` estan ignorados por Git.
+
+## Cloudflare Turnstile
+
+1. Crear un widget administrado en Cloudflare Turnstile.
+2. Autorizar `fama.goleafutbol.com` y `localhost` durante desarrollo.
+3. Configurar la clave publica como `VITE_TURNSTILE_SITE_KEY` en Pages.
+4. Configurar la clave secreta como `TURNSTILE_SECRET_KEY` solo en el backend.
+5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=fama.goleafutbol.com`.
+
+El frontend solicita un token al cotizar. El backend lo valida con Siteverify,
+comprueba la accion `trade_quote` y el hostname, y consume el token una sola
+vez. Si la clave secreta no esta configurada, la proteccion queda desactivada
+para no bloquear el desarrollo local.
 
 ## YouTube
 
@@ -104,12 +125,73 @@ docker compose up --build
 En produccion deben suministrarse contrasenas y secretos reales mediante
 variables de entorno.
 
+## Backups y restauracion
+
+El backup de produccion es cifrado, genera SHA-256 y solo se considera correcto
+despues de restaurarlo por completo en una base temporal:
+
+```bash
+docker compose --profile ops run --rm backup
+```
+
+`BACKUP_ENCRYPTION_PASSWORD` es obligatorio salvo que se habilite
+deliberadamente `ALLOW_UNENCRYPTED_BACKUP=true`. La retencion local se controla
+con `BACKUP_RETENTION_DAYS`.
+
+Para conservar otra copia en Cloudflare R2 o almacenamiento S3 compatible:
+
+```text
+BACKUP_S3_URI=s3://fame-market-backups/production
+AWS_ENDPOINT_URL_S3=https://ACCOUNT_ID.r2.cloudflarestorage.com
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_DEFAULT_REGION=auto
+```
+
+El ejemplo [ops/fame-market-backup.cron.example](ops/fame-market-backup.cron.example)
+programa una copia diaria. Antes de restaurar produccion, se recomienda probar
+en una base nueva:
+
+```bash
+docker compose exec postgres createdb -U fame_market fame_market_restore_test
+docker compose --profile ops run --rm \
+  --entrypoint restore-postgres \
+  -e RESTORE_FILE=/backups/fame-market-FECHA.dump.enc \
+  -e TARGET_DATABASE=fame_market_restore_test \
+  -e CONFIRM_RESTORE=RESTORE_FAME_MARKET \
+  backup
+```
+
+En Windows, `npm run backup:local` crea y restaura una copia de prueba de la
+base local. Esa copia es de desarrollo y no esta cifrada.
+
+## Monitoreo
+
+- `GET /api/health/live`: confirma que el proceso responde.
+- `GET /api/health/ready`: valida PostgreSQL, migraciones y temporada activa.
+- `GET /api/metrics`: metricas Prometheus protegidas con
+  `x-monitoring-secret`.
+- `/admin`: muestra tamano de la base y ultima ejecucion de backup, YouTube y
+  ciclo de temporada.
+
+Ejemplo de consulta protegida:
+
+```bash
+curl -H "x-monitoring-secret: $MONITORING_SECRET" \
+  https://api.goleafutbol.com/fama/api/metrics
+```
+
+Un monitor externo debe consultar `health/live` cada minuto y `health/ready`
+cada cinco minutos. Tambien debe alertar si no hay backup exitoso en 36 horas o
+si la sincronizacion de YouTube supera dos veces su intervalo configurado.
+
 ## Verificacion
 
 ```bash
 npm run build
 npm test
 npm audit
+npm run backup:local
 ```
 
 ## Seguridad competitiva

@@ -11,6 +11,13 @@ import {
   runMigrations
 } from './database.js';
 import { MarketError, MarketStore } from './market.js';
+import { incrementMetric } from './metrics.js';
+import {
+  getOperationalOverview,
+  operationsMetrics,
+  readinessStatus,
+  runMonitoredJob
+} from './operations.js';
 import { PostgresMarketStore } from './postgresMarket.js';
 import { rateLimit, requestIp } from './rateLimit.js';
 import {
@@ -30,6 +37,10 @@ import {
   processSeasonCycle
 } from './seasons.js';
 import type { MarketDataStore } from './types.js';
+import {
+  turnstileConfigured,
+  verifyTurnstileToken
+} from './turnstile.js';
 import {
   pruneYouTubeSnapshots,
   registerArtistChannel,
@@ -75,13 +86,26 @@ const executionRateLimit = rateLimit({
   windowMs: 60_000,
   key: userRateKey
 });
+const monitoringSecret =
+  process.env.MONITORING_SECRET || process.env.ADMIN_SECRET;
 
 app.disable('x-powered-by');
 app.use(
   pinoHttp({
-    redact: ['req.headers.authorization', 'req.headers.x-admin-secret']
+    redact: [
+      'req.headers.authorization',
+      'req.headers.x-admin-secret',
+      'req.headers.x-monitoring-secret'
+    ]
   })
 );
+app.use((_request, response, next) => {
+  incrementMetric('http_requests_total');
+  response.on('finish', () => {
+    if (response.statusCode >= 500) incrementMetric('http_errors_total');
+  });
+  next();
+});
 app.use(
   cors({
     origin(origin, callback) {
@@ -95,6 +119,30 @@ app.use(
   })
 );
 app.use(express.json({ limit: '32kb' }));
+
+app.get('/api/health/live', (_request, response) => {
+  response.json({
+    ok: true,
+    service: 'fame-market-backend',
+    now: new Date().toISOString()
+  });
+});
+
+app.get('/api/health/ready', async (_request, response) => {
+  const readiness = await readinessStatus();
+  response.status(readiness.ready ? 200 : 503).json(readiness);
+});
+
+app.get('/api/metrics', async (request, response) => {
+  if (
+    !monitoringSecret ||
+    request.header('x-monitoring-secret') !== monitoringSecret
+  ) {
+    response.status(403).type('text/plain').send('Forbidden\n');
+    return;
+  }
+  response.type('text/plain; version=0.0.4').send(await operationsMetrics());
+});
 
 app.get('/api/status', async (_request, response) => {
   let database = null;
@@ -112,6 +160,7 @@ app.get('/api/status', async (_request, response) => {
     databaseConnected: Boolean(database),
     authMode,
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    turnstileConfigured: turnstileConfigured(),
     now: new Date().toISOString()
   });
 });
@@ -249,7 +298,8 @@ app.delete(
 const quoteSchema = z.object({
   artistId: z.string().min(1),
   side: z.enum(['buy', 'sell']),
-  quantity: z.number().int().min(1).max(500)
+  quantity: z.number().int().min(1).max(500),
+  turnstileToken: z.string().max(2048).optional()
 });
 
 app.post(
@@ -259,6 +309,11 @@ app.post(
   async (request, response, next) => {
     try {
       const input = quoteSchema.parse(request.body);
+      await verifyTurnstileToken(
+        input.turnstileToken,
+        requestIp(request),
+        'trade_quote'
+      );
       response.json({
         quote: await market.createQuote(
           request.authenticatedUser!,
@@ -267,6 +322,7 @@ app.post(
           input.quantity
         )
       });
+      incrementMetric('trade_quotes_total');
     } catch (error) {
       next(error);
     }
@@ -329,7 +385,20 @@ app.post(
       const input = z
         .object({ artistId: z.string().uuid().optional() })
         .parse(request.body ?? {});
-      response.json({ results: await syncYouTubeChannels(input.artistId) });
+      const results = await runMonitoredJob(
+        'youtube-sync',
+        () => syncYouTubeChannels(input.artistId),
+        { source: 'admin', artistId: input.artistId ?? null },
+        (outcomes) => ({
+          channels: outcomes.length,
+          successful: outcomes.filter((outcome) => outcome.ok).length,
+          videos: outcomes.reduce(
+            (sum, outcome) => sum + ('videos' in outcome ? outcome.videos : 0),
+            0
+          )
+        })
+      );
+      response.json({ results });
     } catch (error) {
       next(error);
     }
@@ -385,7 +454,27 @@ app.post(
   adminRateLimit,
   async (_request, response, next) => {
     try {
-      response.json(await processSeasonCycle());
+      response.json(
+        await runMonitoredJob(
+          'season-cycle',
+          processSeasonCycle,
+          { source: 'admin' },
+          (result) => ({ actions: result.actions })
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/operations',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      response.json(await getOperationalOverview());
     } catch (error) {
       next(error);
     }
@@ -478,6 +567,7 @@ app.post(
           input.idempotencyKey
         )
       });
+      incrementMetric('trades_executed_total');
     } catch (error) {
       next(error);
     }
@@ -549,10 +639,26 @@ async function start() {
       30
     );
     const sync = async () => {
-      const results = await syncYouTubeChannels();
-      const removedSnapshots = await pruneYouTubeSnapshots();
+      const result = await runMonitoredJob(
+        'youtube-sync',
+        async () => {
+          const results = await syncYouTubeChannels();
+          const removedSnapshots = await pruneYouTubeSnapshots();
+          return { results, removedSnapshots };
+        },
+        { source: 'scheduler' },
+        ({ results, removedSnapshots }) => ({
+          channels: results.length,
+          successful: results.filter((outcome) => outcome.ok).length,
+          videos: results.reduce(
+            (sum, outcome) => sum + ('videos' in outcome ? outcome.videos : 0),
+            0
+          ),
+          removedSnapshots
+        })
+      );
       console.log(
-        `[YouTube] channels=${results.length} prunedSnapshots=${removedSnapshots}`
+        `[YouTube] channels=${result.results.length} prunedSnapshots=${result.removedSnapshots}`
       );
     };
     sync().catch((error) => console.error('[YouTube] Initial sync failed', error));
@@ -575,7 +681,12 @@ async function start() {
       1
     );
     const cycle = () =>
-      processSeasonCycle().catch((error) =>
+      runMonitoredJob(
+        'season-cycle',
+        processSeasonCycle,
+        { source: 'scheduler' },
+        (result) => ({ actions: result.actions })
+      ).catch((error) =>
         console.error('[Season] Automatic cycle failed', error)
       );
     cycle();

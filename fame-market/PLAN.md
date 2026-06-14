@@ -605,12 +605,12 @@ Criterio:
 ### Fase 6 - Seguridad y administracion
 
 - [x] Rate limits.
-- [ ] Turnstile o App Check.
+- [x] Turnstile o App Check.
 - [x] Alertas de operaciones sospechosas.
 - [x] Congelar usuario o artista.
 - [x] Auditoria de acciones admin.
-- [ ] Backups y restauracion probada.
-- [ ] Monitoreo de API, base de datos y sincronizacion de YouTube.
+- [x] Backups y restauracion probada.
+- [x] Monitoreo de API, base de datos y sincronizacion de YouTube.
 
 Criterio:
 
@@ -718,10 +718,14 @@ La primera vertical tecnica ya incluye:
 17. Limites atomicos de 60 operaciones diarias y 5 segundos entre operaciones.
 18. Rate limits persistentes para cotizaciones, ejecuciones y administracion.
 19. Congelamiento de usuarios y artistas con auditoria.
+20. Turnstile validado en servidor para cada cotizacion.
+21. Backups cifrados, checksum y restauracion automatica de prueba.
+22. Copia externa opcional compatible con Cloudflare R2.
+23. Health checks, metricas Prometheus y panel de estado operativo.
 
 Siguiente bloque recomendado:
 
-1. Integrar Firebase App Check o Cloudflare Turnstile en acciones sensibles.
-2. Automatizar backups cifrados y probar una restauracion.
-3. Agregar monitoreo de API, PostgreSQL y sincronizacion de YouTube.
-4. Preparar staging y reglas publicas para una beta cerrada.
+1. Preparar staging separado de produccion.
+2. Redactar reglas publicas, privacidad y tratamiento de datos.
+3. Configurar alertas externas y credenciales R2 en infraestructura.
+4. Iniciar la beta cerrada con 20 a 50 usuarios.

@@ -12,7 +12,8 @@
     "test": "npm run test -w backend",
     "start": "npm run start -w backend",
     "db:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-postgres.ps1",
-    "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-local-postgres.ps1"
+    "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-local-postgres.ps1",
+    "backup:local": "powershell -ExecutionPolicy Bypass -File scripts/backup-local-postgres.ps1"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"

@@ -26,6 +26,7 @@ import {
 } from './auth';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
+import { TurnstileWidget } from './TurnstileWidget';
 import type { ArtistSummary, Quote } from './types';
 
 type ArtistFilter = 'trending' | 'latin' | 'favorites';
@@ -114,6 +115,9 @@ function App() {
   const [artistFilter, setArtistFilter] =
     useState<ArtistFilter>('trending');
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
 
   useEffect(() => {
     setTokenProvider(currentIdToken);
@@ -179,12 +183,24 @@ function App() {
   });
 
   const quoteMutation = useMutation({
-    mutationFn: () => api.quote(artistQuery.data!.id, side, quantity),
+    mutationFn: () =>
+      api.quote(
+        artistQuery.data!.id,
+        side,
+        quantity,
+        turnstileToken ?? undefined
+      ),
     onSuccess: (nextQuote) => {
       setQuote(nextQuote);
       setNotice('');
     },
-    onError: (error) => setNotice(error.message)
+    onError: (error) => setNotice(error.message),
+    onSettled: () => {
+      if (turnstileSiteKey) {
+        setTurnstileToken(null);
+        setTurnstileReset((current) => current + 1);
+      }
+    }
   });
 
   const executeMutation = useMutation({
@@ -622,6 +638,21 @@ function App() {
               />
               <small>participaciones</small>
             </label>
+            {turnstileSiteKey &&
+              !quote &&
+              (!firebaseReady || Boolean(firebaseUser)) &&
+              currentSeason?.status === 'active' && (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  resetSignal={turnstileReset}
+                  onToken={setTurnstileToken}
+                  onError={() =>
+                    setNotice(
+                      'No se pudo cargar la verificacion de seguridad.'
+                    )
+                  }
+                />
+              )}
             {quote ? (
               <div className="quote">
                 <dl>
@@ -649,7 +680,8 @@ function App() {
                   !artist ||
                   quoteMutation.isPending ||
                   (firebaseReady && !firebaseUser) ||
-                  currentSeason?.status !== 'active'
+                  currentSeason?.status !== 'active' ||
+                  (Boolean(turnstileSiteKey) && !turnstileToken)
                 }
               >
                 {currentSeason?.status !== 'active'
@@ -658,6 +690,8 @@ function App() {
                   ? 'Inicia sesion para operar'
                   : quoteMutation.isPending
                     ? 'Calculando...'
+                    : turnstileSiteKey && !turnstileToken
+                      ? 'Verificando seguridad...'
                     : `Revisar ${side === 'buy' ? 'compra' : 'venta'}`}
               </button>
             )}

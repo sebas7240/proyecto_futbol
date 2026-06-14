@@ -4,6 +4,7 @@ import type {
   Portfolio,
   Quote,
   RankingResponse,
+  OperationsOverview,
   SecurityReview,
   Season,
   SeasonHistory,
@@ -80,10 +81,15 @@ export const api = {
     );
     return body.artistIds;
   },
-  async quote(artistId: string, side: 'buy' | 'sell', quantity: number) {
+  async quote(
+    artistId: string,
+    side: 'buy' | 'sell',
+    quantity: number,
+    turnstileToken?: string
+  ) {
     const body = await request<{ quote: Quote }>('/trades/quote', {
       method: 'POST',
-      body: JSON.stringify({ artistId, side, quantity })
+      body: JSON.stringify({ artistId, side, quantity, turnstileToken })
     });
     return body.quote;
   },
@@ -147,6 +153,11 @@ export const api = {
       { headers: { 'x-admin-secret': adminSecret } }
     );
     return body.reviews;
+  },
+  async operations(adminSecret: string) {
+    return request<OperationsOverview>('/admin/operations', {
+      headers: { 'x-admin-secret': adminSecret }
+    });
   },
   async reviewRanking(
     adminSecret: string,

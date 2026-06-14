@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  Activity,
   Ban,
   CalendarSync,
   CheckCircle2,
   CirclePlay,
+  Database,
   Flag,
+  HardDrive,
   LockKeyhole,
   RefreshCw,
   Save,
@@ -14,6 +17,19 @@ import {
   Youtube
 } from 'lucide-react';
 import { api } from './api';
+
+function ageLabel(seconds: number | null) {
+  if (seconds === null) return 'Sin ejecuciones';
+  if (seconds < 60) return 'Hace menos de 1 min';
+  if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86_400) return `Hace ${Math.floor(seconds / 3600)} h`;
+  return `Hace ${Math.floor(seconds / 86_400)} d`;
+}
+
+function bytesLabel(bytes: number) {
+  if (bytes < 1_048_576) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
 
 export function AdminPanel() {
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
@@ -34,6 +50,13 @@ export function AdminPanel() {
     queryFn: () => api.securityReviews(adminSecret),
     enabled: Boolean(adminSecret),
     retry: false
+  });
+  const operationsQuery = useQuery({
+    queryKey: ['operations', adminSecret],
+    queryFn: () => api.operations(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false,
+    refetchInterval: 30_000
   });
   const seasonStatus =
     seasonQuery.data?.season?.status === 'active'
@@ -118,6 +141,7 @@ export function AdminPanel() {
       }
       await seasonQuery.refetch();
       await securityQuery.refetch();
+      await operationsQuery.refetch();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -224,6 +248,81 @@ export function AdminPanel() {
           />
         </label>
         <p>Se guarda solamente durante esta sesion del navegador.</p>
+      </section>
+
+      <div className="admin-section-title">
+        <small>Estado operativo</small>
+        <h2>Monitoreo y recuperacion</h2>
+      </div>
+
+      <section className="operations-grid">
+        <article>
+          <Database size={20} />
+          <span>
+            <small>PostgreSQL</small>
+            <strong>
+              {operationsQuery.data
+                ? bytesLabel(operationsQuery.data.database.databaseBytes)
+                : 'Esperando acceso'}
+            </strong>
+          </span>
+          <i className={operationsQuery.data ? 'is-healthy' : ''} />
+        </article>
+        <article>
+          <HardDrive size={20} />
+          <span>
+            <small>Ultimo backup</small>
+            <strong>
+              {ageLabel(
+                operationsQuery.data?.database.lastBackupAgeSeconds ?? null
+              )}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.jobs['database-backup']?.status ===
+              'success'
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
+          <Youtube size={20} />
+          <span>
+            <small>Sincronizacion YouTube</small>
+            <strong>
+              {ageLabel(
+                operationsQuery.data?.database.lastYouTubeSyncAgeSeconds ?? null
+              )}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.jobs['youtube-sync']?.status === 'success'
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
+          <Activity size={20} />
+          <span>
+            <small>Ciclo de temporada</small>
+            <strong>
+              {ageLabel(
+                operationsQuery.data?.database.lastSeasonCycleAgeSeconds ?? null
+              )}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.jobs['season-cycle']?.status === 'success'
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
       </section>
 
       <section className="admin-season">

@@ -1,0 +1,2 @@
+# Daily at 03:15 UTC. Install with crontab -e on the VPS.
+15 3 * * * cd /opt/fame-market && /usr/bin/docker compose --profile ops run --rm backup >> /var/log/fame-market-backup.log 2>&1

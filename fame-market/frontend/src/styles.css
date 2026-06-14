@@ -118,6 +118,21 @@ button {
   color: var(--muted);
 }
 
+.turnstile-check {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+}
+
+.turnstile-check > div {
+  min-height: 65px;
+}
+
+.turnstile-check small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .brand small {
   margin-top: 2px;
 }
@@ -1331,6 +1346,59 @@ button {
   border-radius: 6px;
 }
 
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.operations-grid article {
+  position: relative;
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.operations-grid article > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.operations-grid article small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.operations-grid article strong {
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operations-grid article > i {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  background: #aaa79f;
+  border-radius: 50%;
+}
+
+.operations-grid article > i.is-healthy {
+  background: var(--green);
+}
+
 .admin-season h2,
 .admin-section-title h2 {
   margin: 3px 0 0;
@@ -1688,6 +1756,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .operations-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .admin-season__actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -1718,6 +1790,12 @@ button {
 
   .security-review__actions {
     display: grid;
+  }
+}
+
+@media (max-width: 440px) {
+  .operations-grid {
+    grid-template-columns: 1fr;
   }
 }
 

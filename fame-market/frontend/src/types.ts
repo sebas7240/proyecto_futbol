@@ -155,3 +155,34 @@ export interface SecurityReview {
   userStatus: 'active' | 'frozen';
   alerts: SecurityAlert[];
 }
+
+export interface MaintenanceRun {
+  id: string;
+  jobName: string;
+  status: 'running' | 'success' | 'failed';
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  details: Record<string, unknown>;
+  errorMessage: string | null;
+}
+
+export interface OperationsOverview {
+  database: {
+    connected: boolean;
+    users: number;
+    trades: number;
+    trades24h: number;
+    openFraudAlerts: number;
+    databaseBytes: number;
+    lastBackupAgeSeconds: number | null;
+    lastYouTubeSyncAgeSeconds: number | null;
+    lastSeasonCycleAgeSeconds: number | null;
+  };
+  jobs: {
+    'database-backup': MaintenanceRun | null;
+    'youtube-sync': MaintenanceRun | null;
+    'season-cycle': MaintenanceRun | null;
+  };
+  generatedAt: string;
+}

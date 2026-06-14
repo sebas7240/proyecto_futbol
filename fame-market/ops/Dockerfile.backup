@@ -1,0 +1,9 @@
+FROM postgres:17-alpine
+
+RUN apk add --no-cache aws-cli openssl
+
+COPY ops/backup-postgres.sh /usr/local/bin/backup-postgres
+COPY ops/restore-postgres.sh /usr/local/bin/restore-postgres
+RUN chmod +x /usr/local/bin/backup-postgres /usr/local/bin/restore-postgres
+
+ENTRYPOINT ["backup-postgres"]
