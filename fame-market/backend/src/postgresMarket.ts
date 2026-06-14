@@ -45,6 +45,9 @@ interface WalletRow {
   starting_balance: Numeric;
 }
 
+const MAX_DAILY_TRADES = 60;
+const MIN_TRADE_INTERVAL_MS = 5_000;
+
 export class PostgresMarketStore implements MarketDataStore {
   readonly persistence = 'postgresql' as const;
 
@@ -429,6 +432,41 @@ export class PostgresMarketStore implements MarketDataStore {
         return this.mapTrade(existing.rows[0], user.uid);
       }
 
+      const recentActivity = await client.query<{
+        daily_count: number;
+        latest_trade_at: Date | null;
+      }>(
+        `
+          SELECT
+            COUNT(*) FILTER (
+              WHERE created_at >= NOW() - INTERVAL '24 hours'
+            )::integer AS daily_count,
+            MAX(created_at) AS latest_trade_at
+          FROM trades
+          WHERE wallet_id = $1
+        `,
+        [wallet.id]
+      );
+      const activity = recentActivity.rows[0]!;
+      if (Number(activity.daily_count) >= MAX_DAILY_TRADES) {
+        throw new MarketError(
+          'Alcanzaste el limite de 60 operaciones en 24 horas.',
+          'DAILY_TRADE_LIMIT',
+          429
+        );
+      }
+      if (
+        activity.latest_trade_at &&
+        Date.now() - new Date(activity.latest_trade_at).getTime() <
+          MIN_TRADE_INTERVAL_MS
+      ) {
+        throw new MarketError(
+          'Espera 5 segundos entre operaciones.',
+          'TRADE_COOLDOWN',
+          429
+        );
+      }
+
       const quoteResult = await client.query<{
         id: string;
         artist_id: string;
@@ -645,7 +683,10 @@ export class PostgresMarketStore implements MarketDataStore {
     user: AuthenticatedUser,
     lockWallet = false
   ): Promise<WalletRow> {
-    const userResult = await client.query<{ id: string }>(
+    const userResult = await client.query<{
+      id: string;
+      status: 'active' | 'frozen';
+    }>(
       `
         INSERT INTO users (
           firebase_uid, email, display_name, avatar_url, last_login_at
@@ -656,10 +697,17 @@ export class PostgresMarketStore implements MarketDataStore {
           display_name = EXCLUDED.display_name,
           avatar_url = EXCLUDED.avatar_url,
           last_login_at = NOW()
-        RETURNING id
+        RETURNING id, status
       `,
       [user.uid, user.email, user.displayName, user.avatarUrl]
     );
+    if (userResult.rows[0]!.status !== 'active') {
+      throw new MarketError(
+        'Tu cuenta esta temporalmente congelada.',
+        'USER_FROZEN',
+        403
+      );
+    }
     const seasonResult = await client.query<{
       id: string;
       starting_balance: Numeric;

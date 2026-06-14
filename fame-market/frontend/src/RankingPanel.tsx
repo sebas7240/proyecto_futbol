@@ -1,8 +1,13 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  BadgeCheck,
   CalendarClock,
+  ChevronDown,
   Medal,
+  ShieldAlert,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Trophy
@@ -12,6 +17,7 @@ import type {
   Season,
   SeasonHistory
 } from './types';
+import { api } from './api';
 
 const money = new Intl.NumberFormat('es-CO', {
   minimumFractionDigits: 2,
@@ -45,6 +51,24 @@ function Avatar({ entry }: { entry: RankingEntry }) {
   );
 }
 
+function Badges({ badges }: { badges: RankingEntry['badges'] }) {
+  if (!badges.length) return null;
+  return (
+    <span className="ranking-badges">
+      {badges.includes('rookie') && (
+        <span title="Mejor participante en su primera temporada">
+          <BadgeCheck size={14} /> Mejor novato
+        </span>
+      )}
+      {badges.includes('early_discoverer') && (
+        <span title="Primero en comprar un artista que termino al alza">
+          <Sparkles size={14} /> Descubridor
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function RankingPanel({
   season,
   rankings,
@@ -61,6 +85,13 @@ export function RankingPanel({
   onBack: () => void;
 }) {
   const podium = rankings.slice(0, 3);
+  const [expandedSeasonId, setExpandedSeasonId] = useState('');
+  const seasonTradesQuery = useQuery({
+    queryKey: ['season-trades', expandedSeasonId],
+    queryFn: () => api.seasonTrades(expandedSeasonId),
+    enabled: Boolean(expandedSeasonId),
+    retry: false
+  });
 
   return (
     <main className="ranking-page">
@@ -103,6 +134,7 @@ export function RankingPanel({
                 </span>
                 <Avatar entry={entry} />
                 <strong>{entry.displayName}</strong>
+                <Badges badges={entry.badges} />
                 <span>{money.format(entry.portfolioValue)} FC</span>
                 <small className={entry.returnPercent >= 0 ? 'profit' : 'loss'}>
                   {entry.returnPercent >= 0 ? '+' : ''}
@@ -138,7 +170,10 @@ export function RankingPanel({
                   <span className="leaderboard-row__player">
                     <b>#{entry.rank}</b>
                     <Avatar entry={entry} />
-                    <strong>{entry.displayName}</strong>
+                    <span className="leaderboard-row__identity">
+                      <strong>{entry.displayName}</strong>
+                      <Badges badges={entry.badges} />
+                    </span>
                   </span>
                   <strong>{money.format(entry.portfolioValue)} FC</strong>
                   <span
@@ -155,6 +190,14 @@ export function RankingPanel({
                     {entry.returnPercent.toFixed(2)}%
                   </span>
                   <span>{entry.tradeCount}</span>
+                  {entry.reviewStatus === 'flagged' && (
+                    <span className="review-state review-state--flagged">
+                      <ShieldAlert size={13} /> En revision
+                    </span>
+                  )}
+                  {entry.reviewStatus === 'pending' && (
+                    <span className="review-state">Pendiente de revision</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -180,23 +223,71 @@ export function RankingPanel({
         ) : history.length ? (
           <div className="history-grid">
             {history.map((item) => (
-              <article className="history-entry" key={item.seasonId}>
-                <span>
-                  <small>
-                    {date.format(new Date(item.startsAt))} -{' '}
-                    {date.format(new Date(item.endsAt))}
-                  </small>
-                  <strong>{item.name}</strong>
-                </span>
-                <b>{item.rank ? `#${item.rank}` : 'Sin rango'}</b>
-                <span>
-                  <strong>{money.format(item.portfolioValue)} FC</strong>
-                  <small className={item.returnPercent >= 0 ? 'profit' : 'loss'}>
-                    {item.returnPercent >= 0 ? '+' : ''}
-                    {item.returnPercent.toFixed(2)}%
-                  </small>
-                </span>
-              </article>
+              <div className="history-item" key={item.seasonId}>
+                <button
+                  className="history-entry"
+                  onClick={() =>
+                    setExpandedSeasonId((current) =>
+                      current === item.seasonId ? '' : item.seasonId
+                    )
+                  }
+                  aria-expanded={expandedSeasonId === item.seasonId}
+                >
+                  <span>
+                    <small>
+                      {date.format(new Date(item.startsAt))} -{' '}
+                      {date.format(new Date(item.endsAt))}
+                    </small>
+                    <strong>{item.name}</strong>
+                    <Badges badges={item.badges} />
+                  </span>
+                  <b>{item.rank ? `#${item.rank}` : 'Sin rango'}</b>
+                  <span>
+                    <strong>{money.format(item.portfolioValue)} FC</strong>
+                    <small className={item.returnPercent >= 0 ? 'profit' : 'loss'}>
+                      {item.returnPercent >= 0 ? '+' : ''}
+                      {item.returnPercent.toFixed(2)}%
+                    </small>
+                  </span>
+                  <ChevronDown
+                    className={
+                      expandedSeasonId === item.seasonId ? 'is-open' : ''
+                    }
+                    size={18}
+                  />
+                </button>
+                {expandedSeasonId === item.seasonId && (
+                  <div className="season-trades">
+                    {seasonTradesQuery.isLoading ? (
+                      <p>Cargando operaciones...</p>
+                    ) : seasonTradesQuery.data?.length ? (
+                      seasonTradesQuery.data.map((trade) => (
+                        <div className="season-trade" key={trade.id}>
+                          <img src={trade.artistImageUrl} alt="" />
+                          <span>
+                            <strong>{trade.artistName}</strong>
+                            <small>
+                              {new Date(trade.createdAt).toLocaleString('es-CO')}
+                            </small>
+                          </span>
+                          <b className={trade.side === 'buy' ? 'profit' : 'loss'}>
+                            {trade.side === 'buy' ? 'Compra' : 'Venta'} x
+                            {trade.quantity}
+                          </b>
+                          <span>
+                            <strong>{money.format(trade.grossAmount)} FC</strong>
+                            <small>
+                              {money.format(trade.averagePrice)} por unidad
+                            </small>
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No hubo operaciones en esta temporada.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         ) : (

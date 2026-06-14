@@ -1,6 +1,10 @@
 import type { PoolClient } from 'pg';
 import { getPool } from './database.js';
 import { MarketError } from './market.js';
+import {
+  applySeasonBadges,
+  generateSeasonFraudReview
+} from './security.js';
 import type { AuthenticatedUser } from './types.js';
 
 type Numeric = string | number;
@@ -25,6 +29,7 @@ interface RankingRow {
   return_percent: Numeric;
   trade_count: Numeric;
   review_status: string;
+  badges: string[];
 }
 
 const number = (value: Numeric | null | undefined) => Number(value ?? 0);
@@ -59,7 +64,8 @@ function publicRanking(row: RankingRow) {
     portfolioValue: round(number(row.final_value)),
     returnPercent: round(number(row.return_percent), 4),
     tradeCount: number(row.trade_count),
-    reviewStatus: row.review_status
+    reviewStatus: row.review_status,
+    badges: row.badges ?? []
   };
 }
 
@@ -134,7 +140,8 @@ async function liveRanking(seasonId: string, limit: number) {
             / wallet_values.starting_balance * 100
           ) AS return_percent,
           wallet_values.trade_count,
-          'live'::text AS review_status
+          'live'::text AS review_status,
+          ARRAY[]::text[] AS badges
         FROM wallet_values
         JOIN users app_user ON app_user.id = wallet_values.user_id
       )
@@ -153,7 +160,7 @@ async function finalRanking(seasonId: string, limit: number) {
     `
       SELECT ranking.rank, app_user.display_name, app_user.avatar_url,
         ranking.final_value, ranking.return_percent, ranking.trade_count,
-        ranking.review_status
+        ranking.review_status, ranking.badges
       FROM rankings ranking
       JOIN users app_user ON app_user.id = ranking.user_id
       WHERE ranking.season_id = $1
@@ -189,6 +196,8 @@ export async function getUserSeasonHistory(user: AuthenticatedUser) {
     return_percent: Numeric;
     rank: number | null;
     trade_count: Numeric;
+    review_status: string | null;
+    badges: string[] | null;
   }>(
     `
       WITH wallet_values AS (
@@ -242,7 +251,9 @@ export async function getUserSeasonHistory(user: AuthenticatedUser) {
             / season.starting_balance * 100
         END AS return_percent,
         COALESCE(ranking.rank, live_ranks.rank) AS rank,
-        COALESCE(trade_value.trade_count, 0)::integer AS trade_count
+        COALESCE(trade_value.trade_count, 0)::integer AS trade_count,
+        ranking.review_status,
+        ranking.badges
       FROM users app_user
       JOIN wallets wallet ON wallet.user_id = app_user.id
       JOIN seasons season ON season.id = wallet.season_id
@@ -273,7 +284,68 @@ export async function getUserSeasonHistory(user: AuthenticatedUser) {
     portfolioValue: round(number(row.portfolio_value)),
     returnPercent: round(number(row.return_percent), 4),
     rank: row.rank === null ? null : Number(row.rank),
-    tradeCount: number(row.trade_count)
+    tradeCount: number(row.trade_count),
+    reviewStatus: row.review_status ?? (row.status === 'closed' ? 'pending' : 'live'),
+    badges: row.badges ?? []
+  }));
+}
+
+export async function getUserSeasonTrades(
+  user: AuthenticatedUser,
+  seasonId: string
+) {
+  const result = await getPool().query<{
+    id: string;
+    artist_id: string;
+    artist_name: string;
+    artist_symbol: string;
+    artist_image_url: string | null;
+    side: 'buy' | 'sell';
+    quantity: number;
+    average_price: Numeric;
+    gross_amount: Numeric;
+    fee: Numeric;
+    realized_pnl: Numeric;
+    created_at: Date;
+  }>(
+    `
+      SELECT
+        trade.id,
+        trade.artist_id,
+        artist.name AS artist_name,
+        artist.symbol AS artist_symbol,
+        artist.image_url AS artist_image_url,
+        trade.side,
+        trade.quantity,
+        trade.average_price,
+        trade.gross_amount,
+        trade.fee,
+        trade.realized_pnl,
+        trade.created_at
+      FROM users app_user
+      JOIN wallets wallet ON wallet.user_id = app_user.id
+      JOIN trades trade ON trade.wallet_id = wallet.id
+      JOIN artists artist ON artist.id = trade.artist_id
+      WHERE app_user.firebase_uid = $1
+        AND wallet.season_id = $2
+      ORDER BY trade.created_at DESC
+      LIMIT 250
+    `,
+    [user.uid, seasonId]
+  );
+  return result.rows.map((trade) => ({
+    id: trade.id,
+    artistId: trade.artist_id,
+    artistName: trade.artist_name,
+    artistSymbol: trade.artist_symbol,
+    artistImageUrl: trade.artist_image_url ?? '',
+    side: trade.side,
+    quantity: Number(trade.quantity),
+    averagePrice: number(trade.average_price),
+    grossAmount: number(trade.gross_amount),
+    fee: number(trade.fee),
+    realizedPnl: number(trade.realized_pnl),
+    createdAt: new Date(trade.created_at).toISOString()
   }));
 }
 
@@ -399,6 +471,8 @@ export async function closeSeason(seasonId: string) {
       `,
       [seasonId]
     );
+    await applySeasonBadges(client, seasonId);
+    await generateSeasonFraudReview(client, seasonId);
     await client.query(
       `
         UPDATE seasons

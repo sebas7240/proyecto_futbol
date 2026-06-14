@@ -4,8 +4,10 @@ import type {
   Portfolio,
   Quote,
   RankingResponse,
+  SecurityReview,
   Season,
   SeasonHistory,
+  SeasonTrade,
   Trade
 } from './types';
 
@@ -64,6 +66,12 @@ export const api = {
       '/me/season-history'
     );
     return body.seasons;
+  },
+  async seasonTrades(seasonId: string) {
+    const body = await request<{ trades: SeasonTrade[] }>(
+      `/me/season-history/${seasonId}/trades`
+    );
+    return body.trades;
   },
   async setFavorite(artistId: string, favorite: boolean) {
     const body = await request<{ artistIds: string[] }>(
@@ -132,5 +140,47 @@ export const api = {
         body: '{}'
       }
     );
+  },
+  async securityReviews(adminSecret: string) {
+    const body = await request<{ reviews: SecurityReview[] }>(
+      '/admin/security/reviews',
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+    return body.reviews;
+  },
+  async reviewRanking(
+    adminSecret: string,
+    seasonId: string,
+    userId: string,
+    status: 'approved' | 'flagged',
+    notes: string
+  ) {
+    return request(`/admin/rankings/${seasonId}/${userId}/review`, {
+      method: 'PATCH',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ status, notes: notes.trim() || null })
+    });
+  },
+  async setUserStatus(
+    adminSecret: string,
+    userId: string,
+    status: 'active' | 'frozen'
+  ) {
+    return request(`/admin/users/${userId}/status`, {
+      method: 'PATCH',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ status })
+    });
+  },
+  async setArtistStatus(
+    adminSecret: string,
+    artistId: string,
+    status: 'active' | 'frozen'
+  ) {
+    return request(`/admin/artists/${artistId}/status`, {
+      method: 'PATCH',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ status })
+    });
   }
 };

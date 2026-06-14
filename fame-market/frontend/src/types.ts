@@ -99,7 +99,10 @@ export interface RankingEntry {
   returnPercent: number;
   tradeCount: number;
   reviewStatus: 'live' | 'pending' | 'approved' | 'flagged';
+  badges: RankingBadge[];
 }
+
+export type RankingBadge = 'rookie' | 'early_discoverer';
 
 export interface RankingResponse {
   season: Season | null;
@@ -118,4 +121,37 @@ export interface SeasonHistory {
   returnPercent: number;
   rank: number | null;
   tradeCount: number;
+  reviewStatus: RankingEntry['reviewStatus'];
+  badges: RankingBadge[];
+}
+
+export interface SeasonTrade extends Trade {
+  artistName: string;
+  artistSymbol: string;
+  artistImageUrl: string;
+}
+
+export interface SecurityAlert {
+  id: string;
+  code: string;
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  metadata: Record<string, unknown>;
+}
+
+export interface SecurityReview {
+  seasonId: string;
+  seasonName: string;
+  userId: string;
+  displayName: string;
+  rank: number;
+  portfolioValue: number;
+  returnPercent: number;
+  tradeCount: number;
+  reviewStatus: 'pending' | 'approved' | 'flagged';
+  reviewNotes: string | null;
+  badges: RankingBadge[];
+  userStatus: 'active' | 'frozen';
+  alerts: SecurityAlert[];
 }

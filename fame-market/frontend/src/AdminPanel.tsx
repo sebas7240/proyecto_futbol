@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  Ban,
   CalendarSync,
+  CheckCircle2,
+  CirclePlay,
+  Flag,
   LockKeyhole,
   RefreshCw,
   Save,
@@ -24,6 +28,13 @@ export function AdminPanel() {
   });
   const [message, setMessage] = useState('');
   const [busyArtist, setBusyArtist] = useState('');
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const securityQuery = useQuery({
+    queryKey: ['security-reviews', adminSecret],
+    queryFn: () => api.securityReviews(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false
+  });
   const seasonStatus =
     seasonQuery.data?.season?.status === 'active'
       ? 'activa'
@@ -106,11 +117,83 @@ export function AdminPanel() {
         );
       }
       await seasonQuery.refetch();
+      await securityQuery.refetch();
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'No se pudo procesar la temporada.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const processReview = async (
+    seasonId: string,
+    userId: string,
+    status: 'approved' | 'flagged'
+  ) => {
+    const key = `${seasonId}:${userId}`;
+    setBusyArtist(`review-${key}`);
+    setMessage('');
+    try {
+      await api.reviewRanking(
+        adminSecret,
+        seasonId,
+        userId,
+        status,
+        reviewNotes[key] ?? ''
+      );
+      setMessage(
+        status === 'approved'
+          ? 'Resultado aprobado y alertas resueltas.'
+          : 'Resultado marcado para investigacion.'
+      );
+      await securityQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'No se pudo revisar.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const toggleUser = async (userId: string, frozen: boolean) => {
+    setBusyArtist(`user-${userId}`);
+    setMessage('');
+    try {
+      await api.setUserStatus(
+        adminSecret,
+        userId,
+        frozen ? 'active' : 'frozen'
+      );
+      setMessage(frozen ? 'Cuenta reactivada.' : 'Cuenta congelada.');
+      await securityQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'No se pudo actualizar.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const toggleArtist = async (artistId: string, frozen: boolean) => {
+    setBusyArtist(`artist-status-${artistId}`);
+    setMessage('');
+    try {
+      await api.setArtistStatus(
+        adminSecret,
+        artistId,
+        frozen ? 'active' : 'frozen'
+      );
+      setMessage(frozen ? 'Artista reactivado.' : 'Artista congelado.');
+      await artistsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'No se pudo actualizar.'
       );
     } finally {
       setBusyArtist('');
@@ -182,6 +265,108 @@ export function AdminPanel() {
       </section>
 
       <div className="admin-section-title">
+        <small>Integridad competitiva</small>
+        <h2>Revision antifraude</h2>
+      </div>
+
+      <section className="security-reviews">
+        {!adminSecret ? (
+          <p>Ingresa el secreto para consultar la cola.</p>
+        ) : securityQuery.isLoading ? (
+          <p>Analizando resultados...</p>
+        ) : securityQuery.data?.length ? (
+          securityQuery.data.map((review) => {
+            const key = `${review.seasonId}:${review.userId}`;
+            return (
+              <article className="security-review" key={key}>
+                <div className="security-review__summary">
+                  <span>
+                    <small>{review.seasonName}</small>
+                    <strong>
+                      #{review.rank} {review.displayName}
+                    </strong>
+                  </span>
+                  <span>
+                    <strong>{review.returnPercent.toFixed(2)}%</strong>
+                    <small>{review.tradeCount} operaciones</small>
+                  </span>
+                  <span
+                    className={`review-pill review-pill--${review.reviewStatus}`}
+                  >
+                    {review.reviewStatus === 'flagged'
+                      ? 'Alerta'
+                      : 'Pendiente'}
+                  </span>
+                </div>
+                <div className="security-alerts">
+                  {review.alerts.length ? (
+                    review.alerts.map((alert) => (
+                      <span
+                        className={`security-alert security-alert--${alert.severity}`}
+                        key={alert.id}
+                      >
+                        <Flag size={14} /> {alert.description}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="security-alert">
+                      Top semanal pendiente de validacion manual.
+                    </span>
+                  )}
+                </div>
+                <input
+                  value={reviewNotes[key] ?? review.reviewNotes ?? ''}
+                  onChange={(event) =>
+                    setReviewNotes((current) => ({
+                      ...current,
+                      [key]: event.target.value
+                    }))
+                  }
+                  placeholder="Nota interna de revision"
+                  maxLength={500}
+                />
+                <div className="security-review__actions">
+                  <button
+                    onClick={() =>
+                      processReview(review.seasonId, review.userId, 'approved')
+                    }
+                    disabled={Boolean(busyArtist)}
+                  >
+                    <CheckCircle2 size={16} /> Aprobar
+                  </button>
+                  <button
+                    onClick={() =>
+                      processReview(review.seasonId, review.userId, 'flagged')
+                    }
+                    disabled={Boolean(busyArtist)}
+                  >
+                    <Flag size={16} /> Marcar
+                  </button>
+                  <button
+                    className="danger-action"
+                    onClick={() =>
+                      toggleUser(
+                        review.userId,
+                        review.userStatus === 'frozen'
+                      )
+                    }
+                    disabled={Boolean(busyArtist)}
+                  >
+                    <Ban size={16} />{' '}
+                    {review.userStatus === 'frozen'
+                      ? 'Reactivar'
+                      : 'Congelar cuenta'}
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <p>No hay resultados pendientes de revision.</p>
+        )}
+      </section>
+
+      <div className="admin-section-title">
         <small>Datos publicos</small>
         <h2>Canales oficiales de YouTube</h2>
       </div>
@@ -207,14 +392,38 @@ export function AdminPanel() {
                 placeholder="@handle-oficial"
               />
             </label>
-            <button
-              title="Guardar canal y sincronizar"
-              onClick={() => register(artist.id)}
-              disabled={!adminSecret || Boolean(busyArtist)}
-            >
-              <Save size={18} />
-              {busyArtist === artist.id ? 'Guardando...' : 'Guardar'}
-            </button>
+            <div className="admin-artist__actions">
+              <button
+                title="Guardar canal y sincronizar"
+                onClick={() => register(artist.id)}
+                disabled={!adminSecret || Boolean(busyArtist)}
+              >
+                <Save size={18} />
+                {busyArtist === artist.id ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button
+                title={
+                  artist.status === 'frozen'
+                    ? 'Reactivar artista'
+                    : 'Congelar artista'
+                }
+                aria-label={
+                  artist.status === 'frozen'
+                    ? `Reactivar ${artist.name}`
+                    : `Congelar ${artist.name}`
+                }
+                onClick={() =>
+                  toggleArtist(artist.id, artist.status === 'frozen')
+                }
+                disabled={!adminSecret || Boolean(busyArtist)}
+              >
+                {artist.status === 'frozen' ? (
+                  <CirclePlay size={18} />
+                ) : (
+                  <Snowflake size={18} />
+                )}
+              </button>
+            </div>
           </article>
         ))}
       </section>

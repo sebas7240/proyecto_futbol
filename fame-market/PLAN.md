@@ -184,12 +184,14 @@ El valor del portafolio incluye:
 
 ### Rankings secundarios
 
-- Mejor novato.
+- Mejor novato: jugador mejor clasificado entre quienes disputan su primera
+  temporada.
 - Mejor rendimiento diario.
 - Portafolio mas constante.
 - Mayor racha de participacion.
-- Descubridor temprano: mayor rendimiento obtenido en una posicion abierta
-  antes de una subida importante del mercado interno.
+- Descubridor temprano: jugador que realizo primero una compra del artista que
+  termino la temporada por encima de su precio de apertura. Si descubre varios,
+  gana quien acumule mas descubrimientos y luego mejor posicion.
 
 ### Cierre
 
@@ -440,6 +442,7 @@ Usuario autenticado:
 - `GET /me/portfolio`
 - `GET /me/trades`
 - `GET /me/season-history`
+- `GET /me/season-history/:seasonId/trades`
 - `GET /me/favorites`
 - `PUT /me/favorites/:artistId`
 - `DELETE /me/favorites/:artistId`
@@ -458,6 +461,9 @@ Admin:
 - `POST /admin/seasons/:id/close`
 - `POST /admin/seasons/cycle`
 - `GET /admin/security/alerts`
+- `PATCH /admin/rankings/:seasonId/:userId/review`
+- `PATCH /admin/users/:userId/status`
+- `PATCH /admin/artists/:artistId/status`
 
 ## 13. Integridad y seguridad
 
@@ -466,7 +472,7 @@ Admin:
 - Cada orden utiliza una clave de idempotencia para evitar cobros duplicados.
 - Se bloquea la fila de wallet y del artista durante la operacion.
 - Firebase ID Token se verifica en el backend.
-- Rate limit por usuario e IP.
+- Rate limit persistente por usuario e IP para trading y administracion.
 - Cloudflare Turnstile o Firebase App Check en acciones sensibles.
 - Auditoria inmutable de operaciones administrativas.
 - Deteccion de multicuentas y patrones repetitivos.
@@ -588,9 +594,9 @@ Criterio:
 - [x] Automatizar apertura, congelamiento y cierre.
 - [x] Calcular y congelar valor final y rendimiento.
 - [x] Crear ranking semanal en vivo e historico.
-- [ ] Agregar mejor novato y descubridor temprano.
+- [x] Agregar mejor novato y descubridor temprano.
 - [x] Reiniciar capital con una wallet nueva sin borrar el historial.
-- [ ] Agregar revision anti-fraude del top.
+- [x] Agregar revision anti-fraude del top.
 
 Criterio:
 
@@ -598,11 +604,11 @@ Criterio:
 
 ### Fase 6 - Seguridad y administracion
 
-- [ ] Rate limits.
+- [x] Rate limits.
 - [ ] Turnstile o App Check.
-- [ ] Alertas de operaciones sospechosas.
-- [ ] Congelar usuario o artista.
-- [ ] Auditoria de acciones admin.
+- [x] Alertas de operaciones sospechosas.
+- [x] Congelar usuario o artista.
+- [x] Auditoria de acciones admin.
 - [ ] Backups y restauracion probada.
 - [ ] Monitoreo de API, base de datos y sincronizacion de YouTube.
 
@@ -706,10 +712,16 @@ La primera vertical tecnica ya incluye:
 11. Ciclo semanal automatico con congelamiento y cierre.
 12. Ranking en vivo, ranking final e historial personal.
 13. Controles admin para congelar, cerrar o procesar el ciclo.
+14. Insignias de mejor novato y descubridor temprano.
+15. Historial detallado de operaciones por temporada.
+16. Revision antifraude del top con alertas y notas administrativas.
+17. Limites atomicos de 60 operaciones diarias y 5 segundos entre operaciones.
+18. Rate limits persistentes para cotizaciones, ejecuciones y administracion.
+19. Congelamiento de usuarios y artistas con auditoria.
 
 Siguiente bloque recomendado:
 
-1. Agregar revision anti-fraude y estados de aprobacion del top.
-2. Agregar insignias de mejor novato y descubridor temprano.
-3. Mostrar historial detallado de operaciones por temporada.
-4. Implementar rate limits y App Check o Turnstile.
+1. Integrar Firebase App Check o Cloudflare Turnstile en acciones sensibles.
+2. Automatizar backups cifrados y probar una restauracion.
+3. Agregar monitoreo de API, PostgreSQL y sincronizacion de YouTube.
+4. Preparar staging y reglas publicas para una beta cerrada.

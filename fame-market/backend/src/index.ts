@@ -7,10 +7,18 @@ import { authMode, requireAdmin, requireAuth } from './auth.js';
 import {
   checkDatabase,
   databaseConfigured,
+  getPool,
   runMigrations
 } from './database.js';
 import { MarketError, MarketStore } from './market.js';
 import { PostgresMarketStore } from './postgresMarket.js';
+import { rateLimit, requestIp } from './rateLimit.js';
+import {
+  listSecurityReviews,
+  reviewRanking,
+  setArtistStatus,
+  setUserStatus
+} from './security.js';
 import {
   closeSeason,
   createNextSeason,
@@ -18,6 +26,7 @@ import {
   getCurrentSeason,
   getSeasonRanking,
   getUserSeasonHistory,
+  getUserSeasonTrades,
   processSeasonCycle
 } from './seasons.js';
 import type { MarketDataStore } from './types.js';
@@ -45,6 +54,27 @@ const allowedOrigins = [
   ])
 ];
 let market: MarketDataStore;
+
+const userRateKey = (request: express.Request) =>
+  request.authenticatedUser?.uid ?? requestIp(request);
+const adminRateLimit = rateLimit({
+  action: 'admin',
+  maxRequests: 30,
+  windowMs: 60_000,
+  key: requestIp
+});
+const quoteRateLimit = rateLimit({
+  action: 'trade-quote',
+  maxRequests: 30,
+  windowMs: 60_000,
+  key: userRateKey
+});
+const executionRateLimit = rateLimit({
+  action: 'trade-execution',
+  maxRequests: 20,
+  windowMs: 60_000,
+  key: userRateKey
+});
 
 app.disable('x-powered-by');
 app.use(
@@ -153,6 +183,23 @@ app.get(
   }
 );
 
+app.get(
+  '/api/me/season-history/:seasonId/trades',
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      response.json({
+        trades: await getUserSeasonTrades(
+          request.authenticatedUser!,
+          String(request.params.seasonId)
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.get('/api/me/favorites', requireAuth, async (request, response, next) => {
   try {
     response.json({
@@ -205,21 +252,26 @@ const quoteSchema = z.object({
   quantity: z.number().int().min(1).max(500)
 });
 
-app.post('/api/trades/quote', requireAuth, async (request, response, next) => {
-  try {
-    const input = quoteSchema.parse(request.body);
-    response.json({
-      quote: await market.createQuote(
-        request.authenticatedUser!,
-        input.artistId,
-        input.side,
-        input.quantity
-      )
-    });
-  } catch (error) {
-    next(error);
+app.post(
+  '/api/trades/quote',
+  requireAuth,
+  quoteRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = quoteSchema.parse(request.body);
+      response.json({
+        quote: await market.createQuote(
+          request.authenticatedUser!,
+          input.artistId,
+          input.side,
+          input.quantity
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 const executionSchema = z.object({
   quoteId: z.string().uuid(),
@@ -239,6 +291,7 @@ const youtubeChannelSchema = z
 app.post(
   '/api/admin/artists/:artistId/youtube-channel',
   requireAdmin,
+  adminRateLimit,
   async (request, response, next) => {
     try {
       if (!databaseConfigured()) {
@@ -263,6 +316,7 @@ app.post(
 app.post(
   '/api/admin/youtube/sync',
   requireAdmin,
+  adminRateLimit,
   async (request, response, next) => {
     try {
       if (!databaseConfigured()) {
@@ -285,6 +339,7 @@ app.post(
 app.post(
   '/api/admin/seasons/:seasonId/freeze',
   requireAdmin,
+  adminRateLimit,
   async (request, response, next) => {
     try {
       response.json({
@@ -299,6 +354,7 @@ app.post(
 app.post(
   '/api/admin/seasons/:seasonId/close',
   requireAdmin,
+  adminRateLimit,
   async (request, response, next) => {
     try {
       response.json({
@@ -313,6 +369,7 @@ app.post(
 app.post(
   '/api/admin/seasons',
   requireAdmin,
+  adminRateLimit,
   async (_request, response, next) => {
     try {
       response.status(201).json({ season: await createNextSeason() });
@@ -325,6 +382,7 @@ app.post(
 app.post(
   '/api/admin/seasons/cycle',
   requireAdmin,
+  adminRateLimit,
   async (_request, response, next) => {
     try {
       response.json(await processSeasonCycle());
@@ -334,20 +392,97 @@ app.post(
   }
 );
 
-app.post('/api/trades', requireAuth, async (request, response, next) => {
-  try {
-    const input = executionSchema.parse(request.body);
-    response.status(201).json({
-      trade: await market.executeQuote(
-        request.authenticatedUser!,
-        input.quoteId,
-        input.idempotencyKey
-      )
-    });
-  } catch (error) {
-    next(error);
+app.get(
+  '/api/admin/security/reviews',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      response.json({ reviews: await listSecurityReviews() });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
+
+app.patch(
+  '/api/admin/rankings/:seasonId/:userId/review',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = z
+        .object({
+          status: z.enum(['approved', 'flagged']),
+          notes: z.string().trim().max(500).nullable().optional()
+        })
+        .parse(request.body);
+      await reviewRanking(
+        String(request.params.seasonId),
+        String(request.params.userId),
+        input.status,
+        input.notes ?? null
+      );
+      response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/users/:userId/status',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = z
+        .object({ status: z.enum(['active', 'frozen']) })
+        .parse(request.body);
+      await setUserStatus(String(request.params.userId), input.status);
+      response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/artists/:artistId/status',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = z
+        .object({ status: z.enum(['active', 'frozen']) })
+        .parse(request.body);
+      await setArtistStatus(String(request.params.artistId), input.status);
+      response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/trades',
+  requireAuth,
+  executionRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = executionSchema.parse(request.body);
+      response.status(201).json({
+        trade: await market.executeQuote(
+          request.authenticatedUser!,
+          input.quoteId,
+          input.idempotencyKey
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.use(
   (
@@ -381,6 +516,18 @@ async function start() {
       await runMigrations();
     }
     market = new PostgresMarketStore();
+    const cleanupTimer = setInterval(
+      () =>
+        getPool()
+          .query(
+            "DELETE FROM action_rate_limits WHERE updated_at < NOW() - INTERVAL '2 days'"
+          )
+          .catch((error) =>
+            console.error('[RateLimit] Cleanup failed', error)
+          ),
+      6 * 60 * 60 * 1000
+    );
+    cleanupTimer.unref();
   } else {
     market = new MarketStore();
     console.warn(

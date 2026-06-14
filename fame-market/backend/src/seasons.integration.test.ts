@@ -7,7 +7,17 @@ import {
   getPool,
   runMigrations
 } from './database.js';
-import { closeSeason, getUserSeasonHistory } from './seasons.js';
+import { consumeRateLimit } from './rateLimit.js';
+import {
+  listSecurityReviews,
+  reviewRanking,
+  setUserStatus
+} from './security.js';
+import {
+  closeSeason,
+  getUserSeasonHistory,
+  getUserSeasonTrades
+} from './seasons.js';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
@@ -17,6 +27,9 @@ const suffix = randomUUID().slice(0, 8);
 const seasonId = randomUUID();
 const userOneId = randomUUID();
 const userTwoId = randomUUID();
+const walletOneId = randomUUID();
+const walletTwoId = randomUUID();
+const tradeId = randomUUID();
 const userOneUid = `season-winner-${suffix}`;
 const userTwoUid = `season-second-${suffix}`;
 
@@ -53,10 +66,23 @@ suite('season lifecycle', () => {
     );
     await getPool().query(
       `
-        INSERT INTO wallets (user_id, season_id, available_balance)
-        VALUES ($1, $3, 11250), ($2, $3, 9400)
+        INSERT INTO wallets (id, user_id, season_id, available_balance)
+        VALUES ($1, $3, $5, 13000), ($2, $4, $5, 9400)
       `,
-      [userOneId, userTwoId, seasonId]
+      [walletOneId, walletTwoId, userOneId, userTwoId, seasonId]
+    );
+    await getPool().query(
+      `
+        INSERT INTO trades (
+          id, wallet_id, artist_id, side, quantity, average_price,
+          gross_amount, fee, realized_pnl, idempotency_key, created_at
+        ) VALUES (
+          $1, $2, '10000000-0000-4000-8000-000000000001',
+          'buy', 2, 114, 228, 0.57, 0, $3,
+          NOW() - INTERVAL '7 days'
+        )
+      `,
+      [tradeId, walletOneId, `season-test-${suffix}`]
     );
   });
 
@@ -65,6 +91,10 @@ suite('season lifecycle', () => {
     await getPool().query('DELETE FROM rankings WHERE season_id = $1', [
       seasonId
     ]);
+    await getPool().query('DELETE FROM fraud_alerts WHERE season_id = $1', [
+      seasonId
+    ]);
+    await getPool().query('DELETE FROM trades WHERE id = $1', [tradeId]);
     await getPool().query('DELETE FROM wallets WHERE season_id = $1', [
       seasonId
     ]);
@@ -74,6 +104,10 @@ suite('season lifecycle', () => {
     await getPool().query('DELETE FROM audit_logs WHERE entity_id = $1', [
       seasonId
     ]);
+    await getPool().query(
+      "DELETE FROM audit_logs WHERE actor_id = 'vitest' OR entity_id = ANY($1::text[])",
+      [[userOneId, userTwoId]]
+    );
     await getPool().query('DELETE FROM seasons WHERE id = $1', [seasonId]);
     await closeDatabase();
   });
@@ -86,9 +120,11 @@ suite('season lifecycle', () => {
       rank: number;
       final_value: string;
       return_percent: string;
+      review_status: string;
+      badges: string[];
     }>(
       `
-        SELECT user_id, rank, final_value, return_percent
+        SELECT user_id, rank, final_value, return_percent, review_status, badges
         FROM rankings
         WHERE season_id = $1
         ORDER BY rank
@@ -101,16 +137,92 @@ suite('season lifecycle', () => {
       displayName: 'Ganador de prueba',
       avatarUrl: null
     });
+    const trades = await getUserSeasonTrades(
+      {
+        uid: userOneUid,
+        email: `${userOneUid}@example.com`,
+        displayName: 'Ganador de prueba',
+        avatarUrl: null
+      },
+      seasonId
+    );
+    const reviews = await listSecurityReviews();
+    const winnerReview = reviews.find(
+      (review) => review.seasonId === seasonId && review.userId === userOneId
+    );
 
     expect(firstClose.status).toBe('closed');
     expect(secondClose.status).toBe('closed');
     expect(ranking.rows).toHaveLength(2);
     expect(ranking.rows[0]?.user_id).toBe(userOneId);
     expect(ranking.rows[0]?.rank).toBe(1);
-    expect(Number(ranking.rows[0]?.final_value)).toBe(11250);
-    expect(Number(ranking.rows[0]?.return_percent)).toBe(12.5);
+    expect(ranking.rows[0]?.review_status).toBe('pending');
+    expect(ranking.rows[0]?.badges).toContain('rookie');
+    expect(ranking.rows[0]?.badges).toContain('early_discoverer');
+    expect(Number(ranking.rows[0]?.final_value)).toBe(13000);
+    expect(Number(ranking.rows[0]?.return_percent)).toBe(30);
     expect(ranking.rows[1]?.rank).toBe(2);
     expect(history[0]?.rank).toBe(1);
-    expect(history[0]?.portfolioValue).toBe(11250);
+    expect(history[0]?.portfolioValue).toBe(13000);
+    expect(history[0]?.badges).toContain('rookie');
+    expect(trades).toHaveLength(1);
+    expect(trades[0]?.artistSymbol).toBe('KAROL');
+    expect(trades[0]?.side).toBe('buy');
+    expect(winnerReview?.reviewStatus).toBe('pending');
+    expect(winnerReview?.alerts[0]?.code).toBe('EXCESSIVE_RETURN');
+
+    await reviewRanking(
+      seasonId,
+      userOneId,
+      'approved',
+      'Validado por prueba automatizada.',
+      'vitest'
+    );
+    const approved = await getPool().query<{
+      review_status: string;
+      review_notes: string | null;
+    }>(
+      `
+        SELECT review_status, review_notes
+        FROM rankings
+        WHERE season_id = $1 AND user_id = $2
+      `,
+      [seasonId, userOneId]
+    );
+    const resolvedAlert = await getPool().query<{ status: string }>(
+      `
+        SELECT status
+        FROM fraud_alerts
+        WHERE season_id = $1 AND user_id = $2
+      `,
+      [seasonId, userOneId]
+    );
+    expect(approved.rows[0]?.review_status).toBe('approved');
+    expect(approved.rows[0]?.review_notes).toContain('Validado');
+    expect(resolvedAlert.rows[0]?.status).toBe('resolved');
+
+    await setUserStatus(userOneId, 'frozen', 'vitest');
+    const frozenUser = await getPool().query<{ status: string }>(
+      'SELECT status FROM users WHERE id = $1',
+      [userOneId]
+    );
+    expect(frozenUser.rows[0]?.status).toBe('frozen');
+    await setUserStatus(userOneId, 'active', 'vitest');
+  });
+
+  it('applies an atomic request limit', async () => {
+    const key = `rate-test-${suffix}`;
+    const first = await consumeRateLimit(key, 'integration-test', 1, 60_000);
+    const second = await consumeRateLimit(key, 'integration-test', 1, 60_000);
+
+    expect(first.allowed).toBe(true);
+    expect(first.remaining).toBe(0);
+    expect(second.allowed).toBe(false);
+    expect(second.retryAfterSeconds).toBeGreaterThan(0);
+
+    await getPool().query(
+      'DELETE FROM action_rate_limits WHERE rate_key = $1',
+      [key]
+    );
   });
 });

@@ -22,6 +22,12 @@ mismo frontend, API, autenticacion y portafolio.
 - Prueba de concurrencia e idempotencia contra PostgreSQL real.
 - Temporadas semanales con congelamiento y cierre automaticos.
 - Ranking en vivo, ranking final e historial personal.
+- Insignias semanales de mejor novato y descubridor temprano.
+- Historial detallado de operaciones separado por temporada.
+- Revision antifraude del top con alertas y aprobacion administrativa.
+- Limite transaccional de 60 operaciones por 24 horas y pausa de 5 segundos.
+- Rate limits compartidos en PostgreSQL para trading y administracion.
+- Congelamiento administrativo de usuarios y artistas con auditoria.
 - Controles administrativos para procesar el ciclo de temporada.
 - PWA instalable.
 - Docker Compose preparado para produccion.
@@ -105,6 +111,22 @@ npm run build
 npm test
 npm audit
 ```
+
+## Seguridad competitiva
+
+Al cerrar una temporada, el top 10 queda pendiente de revision. El sistema
+genera alertas por rendimiento inusual, exceso de operaciones, actividad muy
+rapida y concentracion repetitiva en un solo artista.
+
+El panel `/admin` permite:
+
+- Aprobar o marcar un resultado.
+- Guardar una nota interna.
+- Congelar o reactivar una cuenta.
+- Congelar o reactivar un artista.
+
+Las acciones administrativas quedan registradas en `audit_logs`. Las alertas no
+eliminan operaciones ni modifican balances automaticamente.
 
 ## Importante
 

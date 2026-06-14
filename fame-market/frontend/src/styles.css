@@ -959,10 +959,46 @@ button {
 }
 
 .leaderboard-row {
+  position: relative;
   min-height: 66px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.55);
+}
+
+.ranking-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ranking-badges > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  padding: 3px 6px;
+  color: #594400;
+  background: #fff0a8;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.review-state {
+  position: absolute;
+  right: 14px;
+  bottom: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.review-state--flagged {
+  color: var(--red);
 }
 
 .leaderboard-row__player {
@@ -981,7 +1017,12 @@ button {
   font-size: 12px;
 }
 
-.leaderboard-row__player > strong {
+.leaderboard-row__identity {
+  min-width: 0;
+}
+
+.leaderboard-row__identity > strong {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1006,15 +1047,19 @@ button {
 }
 
 .history-entry {
+  width: 100%;
   min-height: 72px;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 90px minmax(150px, auto);
+  grid-template-columns: minmax(220px, 1fr) 90px minmax(150px, auto) 24px;
   align-items: center;
   gap: 20px;
   padding: 12px 16px;
   border: 1px solid var(--line);
   background: var(--paper);
   border-radius: 6px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .history-entry > span {
@@ -1028,6 +1073,61 @@ button {
 
 .history-entry small {
   margin-bottom: 3px;
+}
+
+.history-entry > svg {
+  transition: transform 160ms ease;
+}
+
+.history-entry > svg.is-open {
+  transform: rotate(180deg);
+}
+
+.season-trades {
+  padding: 4px 16px 14px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.season-trades > p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.season-trade {
+  display: grid;
+  grid-template-columns: 38px minmax(150px, 1fr) 110px 150px;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+}
+
+.season-trade:last-child {
+  border-bottom: 0;
+}
+
+.season-trade img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.season-trade > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.season-trade > span:last-child {
+  align-items: flex-end;
+}
+
+.season-trade small {
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .ranking-empty {
@@ -1267,9 +1367,129 @@ button {
   gap: 8px;
 }
 
+.security-reviews {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 32px;
+}
+
+.security-reviews > p {
+  margin: 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--paper);
+  text-align: center;
+}
+
+.security-review {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.security-review__summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.security-review__summary > span:not(.review-pill) {
+  display: flex;
+  flex-direction: column;
+}
+
+.security-review__summary small {
+  color: var(--muted);
+}
+
+.review-pill {
+  padding: 5px 8px;
+  color: #6b5000;
+  background: #fff0a8;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.review-pill--flagged {
+  color: #8d211c;
+  background: #ffe1de;
+}
+
+.security-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.security-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  color: var(--muted);
+  background: #efeee9;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.security-alert--medium {
+  color: #6b5000;
+  background: #fff0a8;
+}
+
+.security-alert--high {
+  color: #8d211c;
+  background: #ffe1de;
+}
+
+.security-review > input {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 5px;
+}
+
+.security-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.security-review__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 0;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 5px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.security-review__actions .danger-action {
+  color: #8d211c;
+  background: #ffe1de;
+}
+
+.security-review__actions button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 .admin-artist {
   display: grid;
-  grid-template-columns: 54px minmax(160px, 1fr) minmax(230px, 1.5fr) 120px;
+  grid-template-columns: 54px minmax(160px, 1fr) minmax(230px, 1.5fr) auto;
   align-items: center;
   gap: 14px;
   padding: 12px;
@@ -1292,6 +1512,17 @@ button {
 
 .admin-artist > div small {
   margin-top: 4px;
+}
+
+.admin-artist > .admin-artist__actions {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.admin-artist__actions button:last-child {
+  width: 40px;
+  padding: 0;
 }
 
 .admin-artist label {
@@ -1389,7 +1620,7 @@ button {
     overflow: hidden;
   }
 
-  .leaderboard-row__player > strong {
+  .leaderboard-row__identity > strong {
     display: block;
     max-width: calc(100vw - 100px);
     min-width: 0;
@@ -1411,12 +1642,28 @@ button {
   }
 
   .history-entry {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto 24px;
     gap: 8px 14px;
   }
 
   .history-entry > span:last-child {
     grid-column: 1 / -1;
+    align-items: flex-start;
+  }
+
+  .history-entry > svg {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .season-trade {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px 0;
+  }
+
+  .season-trade > span:last-child {
+    grid-column: 2 / -1;
     align-items: flex-start;
   }
 
@@ -1451,8 +1698,26 @@ button {
   }
 
   .admin-artist label,
-  .admin-artist button {
+  .admin-artist__actions {
     grid-column: 1 / -1;
+  }
+
+  .admin-artist > .admin-artist__actions {
+    display: grid;
+    grid-template-columns: 1fr 44px;
+  }
+
+  .security-review__summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .security-review__summary .review-pill {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+
+  .security-review__actions {
+    display: grid;
   }
 }
 
