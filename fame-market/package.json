@@ -9,11 +9,16 @@
   "scripts": {
     "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
+    "build:staging": "npm run build -w backend && npm run build:staging -w frontend",
     "test": "npm run test -w backend",
     "start": "npm run start -w backend",
     "db:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-postgres.ps1",
     "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-local-postgres.ps1",
-    "backup:local": "powershell -ExecutionPolicy Bypass -File scripts/backup-local-postgres.ps1"
+    "backup:local": "powershell -ExecutionPolicy Bypass -File scripts/backup-local-postgres.ps1",
+    "monitor:check": "npm --prefix ops/monitor-worker run check && npm --prefix ops/monitor-worker test && npm --prefix ops/monitor-worker run dry-run",
+    "staging:validate": "node scripts/validate-staging.mjs",
+    "staging:up": "npm run staging:validate && docker compose --env-file .env.staging -f docker-compose.staging.yml up --build -d",
+    "staging:down": "docker compose --env-file .env.staging -f docker-compose.staging.yml down"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"

@@ -186,3 +186,11 @@ export interface OperationsOverview {
   };
   generatedAt: string;
 }
+
+export interface ConsentStatus {
+  required: boolean;
+  accepted: boolean;
+  rulesVersion: string;
+  privacyVersion: string;
+  acceptedAt: string | null;
+}

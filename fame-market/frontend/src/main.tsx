@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { AdminPanel } from './AdminPanel';
+import { LegalPage } from './LegalPage';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -23,7 +24,15 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      {window.location.pathname.startsWith('/admin') ? <AdminPanel /> : <App />}
+      {window.location.pathname.startsWith('/admin') ? (
+        <AdminPanel />
+      ) : window.location.pathname.startsWith('/reglas') ? (
+        <LegalPage page="rules" />
+      ) : window.location.pathname.startsWith('/privacidad') ? (
+        <LegalPage page="privacy" />
+      ) : (
+        <App />
+      )}
     </QueryClientProvider>
   </React.StrictMode>
 );

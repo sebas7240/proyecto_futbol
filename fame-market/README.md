@@ -32,6 +32,9 @@ mismo frontend, API, autenticacion y portafolio.
 - Controles administrativos para procesar el ciclo de temporada.
 - Health checks, metricas Prometheus y estado operativo en administracion.
 - Backups cifrados con restauracion automatica de prueba y salida opcional a R2.
+- Staging aislado con validacion previa de dominios, Firebase y base de datos.
+- Reglas y privacidad publicas con consentimiento versionado para operar.
+- Monitor externo en Cloudflare Workers con estado en KV y alertas Telegram.
 - PWA instalable.
 - Docker Compose preparado para produccion.
 
@@ -70,12 +73,14 @@ Frontend: copiar `frontend/.env.example` a `frontend/.env`.
 Variables importantes:
 
 - `DATABASE_URL`
+- `DEPLOYMENT_ENV`
 - `FIREBASE_PROJECT_ID`
 - `YOUTUBE_API_KEY`
 - `ADMIN_SECRET`
 - `MONITORING_SECRET`
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_ALLOWED_HOSTNAMES`
+- `CONSENT_REQUIRED`
 - `BACKUP_ENCRYPTION_PASSWORD`
 - `SEASON_AUTOMATION_ENABLED`
 - `SEASON_CYCLE_INTERVAL_MINUTES`
@@ -124,6 +129,9 @@ docker compose up --build
 
 En produccion deben suministrarse contrasenas y secretos reales mediante
 variables de entorno.
+
+La guia [DEPLOYMENT.md](DEPLOYMENT.md) contiene el orden seguro para desplegar
+staging, activar consentimiento, configurar R2 y publicar el monitor externo.
 
 ## Backups y restauracion
 
@@ -181,9 +189,10 @@ curl -H "x-monitoring-secret: $MONITORING_SECRET" \
   https://api.goleafutbol.com/fama/api/metrics
 ```
 
-Un monitor externo debe consultar `health/live` cada minuto y `health/ready`
-cada cinco minutos. Tambien debe alertar si no hay backup exitoso en 36 horas o
-si la sincronizacion de YouTube supera dos veces su intervalo configurado.
+El Worker de `ops/monitor-worker` consulta ambos endpoints cada cinco minutos,
+revisa las metricas operativas y guarda el ultimo estado en KV. Avisa por
+Telegram despues de dos fallos consecutivos y tambien cuando el servicio se
+recupera.
 
 ## Verificacion
 
@@ -192,6 +201,7 @@ npm run build
 npm test
 npm audit
 npm run backup:local
+npm run monitor:check
 ```
 
 ## Seguridad competitiva

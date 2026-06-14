@@ -517,7 +517,7 @@ Estados necesarios:
 - [ ] Elegir los primeros 20 a 30 artistas.
 - [x] Activar YouTube Data API y crear una API key permitida para esa API.
 - [x] Implementar consulta de canales, playlist de subidas y estadisticas.
-- [ ] Definir reglas publicas del juego.
+- [x] Definir reglas publicas del juego.
 - [ ] Confirmar el uso permitido de datos antes de automatizar cualquier metrica
       derivada.
 
@@ -533,7 +533,8 @@ Criterio:
 - [x] Crear prototipo local de usuarios, artistas, temporadas y mercado.
 - [x] Preparar la misma interfaz para web/PWA y futura APK con Capacitor.
 - [x] Agregar pruebas y configuracion local.
-- [ ] Preparar staging y produccion.
+- [x] Preparar configuracion reproducible de staging aislado.
+- [ ] Desplegar staging y produccion con sus secretos definitivos.
 
 Criterio:
 
@@ -618,12 +619,14 @@ Criterio:
 
 ### Fase 7 - Beta cerrada
 
+- [x] Redactar reglas y politica de privacidad.
+- [x] Exigir consentimiento versionado antes de operar.
 - [ ] Probar con 20 a 50 usuarios.
 - [ ] Medir retencion diaria y semanal.
 - [ ] Medir cantidad de operaciones por jugador.
 - [ ] Ajustar liquidez, limites y comision.
 - [ ] Recoger comentarios de usabilidad movil.
-- [ ] Publicar reglas y politica de privacidad.
+- [ ] Publicar reglas y politica en los dominios definitivos.
 
 Criterio:
 
@@ -722,10 +725,14 @@ La primera vertical tecnica ya incluye:
 21. Backups cifrados, checksum y restauracion automatica de prueba.
 22. Copia externa opcional compatible con Cloudflare R2.
 23. Health checks, metricas Prometheus y panel de estado operativo.
+24. Staging aislado con validaciones que impiden reutilizar produccion.
+25. Reglas, privacidad y consentimiento versionado persistente.
+26. Monitor externo en Cloudflare Workers con KV y alertas Telegram.
+27. Guia reproducible para Pages preview, backups R2 y activacion de beta.
 
 Siguiente bloque recomendado:
 
-1. Preparar staging separado de produccion.
-2. Redactar reglas publicas, privacidad y tratamiento de datos.
-3. Configurar alertas externas y credenciales R2 en infraestructura.
-4. Iniciar la beta cerrada con 20 a 50 usuarios.
+1. Desplegar staging y ejecutar una prueba completa de compra y venta.
+2. Crear el bucket R2, cargar secretos y verificar una restauracion externa.
+3. Desplegar el Worker y provocar una alerta y recuperacion controladas.
+4. Elegir 20 a 30 artistas y abrir la beta cerrada con 20 a 50 usuarios.

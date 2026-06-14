@@ -1,6 +1,7 @@
 import type {
   ArtistDetails,
   ArtistSummary,
+  ConsentStatus,
   Portfolio,
   Quote,
   RankingResponse,
@@ -50,6 +51,15 @@ export const api = {
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');
     return body.portfolio;
+  },
+  async consent() {
+    return request<ConsentStatus>('/me/consent');
+  },
+  async acceptConsent() {
+    return request<ConsentStatus>('/me/consent', {
+      method: 'POST',
+      body: JSON.stringify({ accepted: true })
+    });
   },
   async favorites() {
     const body = await request<{ artistIds: string[] }>('/me/favorites');

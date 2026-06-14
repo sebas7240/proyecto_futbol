@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-development}
       PORT: 4020
       FRONTEND_ORIGINS: http://localhost:5174,capacitor://localhost,http://localhost
       DATABASE_URL: postgresql://fame_market:fame_market@postgres:5432/fame_market
@@ -13,6 +14,7 @@ services:
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
       TURNSTILE_ALLOWED_HOSTNAMES: ${TURNSTILE_ALLOWED_HOSTNAMES:-}
+      CONSENT_REQUIRED: ${CONSENT_REQUIRED:-false}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-me}
       MONITORING_SECRET: ${MONITORING_SECRET:-change-monitoring-secret}
       SEASON_AUTOMATION_ENABLED: ${SEASON_AUTOMATION_ENABLED:-true}

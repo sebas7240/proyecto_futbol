@@ -5,6 +5,10 @@ dist/
 frontend/vite.config.js
 frontend/vite.config.d.ts
 .env
+.env.staging
+.dev.vars*
+.wrangler/
+ops/monitor-worker/worker-configuration.d.ts
 .local-postgres/
 .screenshots/
 backups/

@@ -1,0 +1,69 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "fame-market-monitor",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "API_BASE_URL": "https://api.goleafutbol.com/fama/api",
+    "FAILURE_THRESHOLD": "2",
+    "CHECK_BACKUPS": "true",
+    "BACKUP_MAX_AGE_SECONDS": "129600",
+    "CHECK_YOUTUBE_SYNC": "true",
+    "YOUTUBE_MAX_AGE_SECONDS": "7200"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "MONITOR_STATE"
+    }
+  ],
+  "secrets": {
+    "required": [
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_CHAT_ID",
+      "MONITORING_SECRET"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    }
+  },
+  "env": {
+    "staging": {
+      "name": "fame-market-monitor-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "API_BASE_URL": "https://staging-api.goleafutbol.com/api",
+        "FAILURE_THRESHOLD": "2",
+        "CHECK_BACKUPS": "false",
+        "BACKUP_MAX_AGE_SECONDS": "129600",
+        "CHECK_YOUTUBE_SYNC": "false",
+        "YOUTUBE_MAX_AGE_SECONDS": "7200"
+      },
+      "kv_namespaces": [
+        {
+          "binding": "MONITOR_STATE"
+        }
+      ],
+      "secrets": {
+        "required": [
+          "TELEGRAM_BOT_TOKEN",
+          "TELEGRAM_CHAT_ID",
+          "MONITORING_SECRET"
+        ]
+      }
+    }
+  }
+}

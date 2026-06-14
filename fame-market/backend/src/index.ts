@@ -5,11 +5,23 @@ import { pinoHttp } from 'pino-http';
 import { z } from 'zod';
 import { authMode, requireAdmin, requireAuth } from './auth.js';
 import {
+  acceptCurrentConsent,
+  consentRequired,
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_RULES_VERSION,
+  getConsentStatus,
+  requireCurrentConsent
+} from './consent.js';
+import {
   checkDatabase,
   databaseConfigured,
   getPool,
   runMigrations
 } from './database.js';
+import {
+  deploymentEnvironment,
+  validateDeploymentEnvironment
+} from './deployment.js';
 import { MarketError, MarketStore } from './market.js';
 import { incrementMetric } from './metrics.js';
 import {
@@ -157,11 +169,20 @@ app.get('/api/status', async (_request, response) => {
     ok: true,
     service: 'fame-market-backend',
     persistence: market.persistence,
+    environment: deploymentEnvironment(),
     databaseConnected: Boolean(database),
     authMode,
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     turnstileConfigured: turnstileConfigured(),
+    consentRequired: consentRequired(),
     now: new Date().toISOString()
+  });
+});
+
+app.get('/api/legal/versions', (_request, response) => {
+  response.json({
+    rulesVersion: CURRENT_RULES_VERSION,
+    privacyVersion: CURRENT_PRIVACY_VERSION
   });
 });
 
@@ -203,6 +224,24 @@ app.get('/api/me/portfolio', requireAuth, async (request, response, next) => {
     response.json({
       portfolio: await market.getWallet(request.authenticatedUser!)
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/me/consent', requireAuth, async (request, response, next) => {
+  try {
+    response.json(await getConsentStatus(request.authenticatedUser!));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/me/consent', requireAuth, async (request, response, next) => {
+  try {
+    const input = z.object({ accepted: z.literal(true) }).parse(request.body);
+    if (!input.accepted) return;
+    response.json(await acceptCurrentConsent(request.authenticatedUser!));
   } catch (error) {
     next(error);
   }
@@ -305,6 +344,7 @@ const quoteSchema = z.object({
 app.post(
   '/api/trades/quote',
   requireAuth,
+  requireCurrentConsent,
   quoteRateLimit,
   async (request, response, next) => {
     try {
@@ -556,6 +596,7 @@ app.patch(
 app.post(
   '/api/trades',
   requireAuth,
+  requireCurrentConsent,
   executionRateLimit,
   async (request, response, next) => {
     try {
@@ -601,6 +642,7 @@ app.use(
 );
 
 async function start() {
+  validateDeploymentEnvironment();
   if (databaseConfigured()) {
     if (process.env.AUTO_MIGRATE !== 'false') {
       await runMigrations();

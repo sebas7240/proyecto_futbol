@@ -24,6 +24,7 @@ import {
   logout,
   subscribeToAuth
 } from './auth';
+import { ConsentModal } from './ConsentModal';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
 import { TurnstileWidget } from './TurnstileWidget';
@@ -118,6 +119,7 @@ function App() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReset, setTurnstileReset] = useState(0);
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
+  const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
 
   useEffect(() => {
     setTokenProvider(currentIdToken);
@@ -128,6 +130,7 @@ function App() {
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
       queryClient.invalidateQueries({ queryKey: ['trades'] });
       queryClient.invalidateQueries({ queryKey: ['season-history'] });
+      queryClient.invalidateQueries({ queryKey: ['consent'] });
     });
   }, [queryClient]);
 
@@ -155,6 +158,13 @@ function App() {
   const seasonHistoryQuery = useQuery({
     queryKey: ['season-history', firebaseUser?.uid ?? 'local'],
     queryFn: api.seasonHistory,
+    enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
+    retry: false
+  });
+
+  const consentQuery = useQuery({
+    queryKey: ['consent', firebaseUser?.uid ?? 'local'],
+    queryFn: api.consent,
     enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
     retry: false
   });
@@ -231,6 +241,18 @@ function App() {
     onError: (error) => setNotice(error.message)
   });
 
+  const consentMutation = useMutation({
+    mutationFn: api.acceptConsent,
+    onSuccess: (consent) => {
+      queryClient.setQueryData(
+        ['consent', firebaseUser?.uid ?? 'local'],
+        consent
+      );
+      setNotice('Reglas aceptadas. Ya puedes operar.');
+    },
+    onError: (error) => setNotice(error.message)
+  });
+
   const favoriteMutation = useMutation({
     mutationFn: ({
       artistId,
@@ -264,6 +286,12 @@ function App() {
     (season) => season.seasonId === currentSeason?.id
   );
   const favoriteIds = favoritesQuery.data ?? [];
+  const consentAccepted =
+    !consentQuery.data?.required || Boolean(consentQuery.data.accepted);
+  const consentReady =
+    !authReady ||
+    (firebaseReady && !firebaseUser) ||
+    consentQuery.isSuccess;
   const artistTrades = useMemo(
     () =>
       (tradesQuery.data ?? []).filter(
@@ -356,6 +384,9 @@ function App() {
                 : 'Mercado musical'}
             </small>
           </span>
+          {appEnvironment === 'staging' && (
+            <span className="environment-badge">STAGING</span>
+          )}
         </div>
         <label className="search">
           <Search size={18} />
@@ -434,6 +465,14 @@ function App() {
             </button>
           </section>
         </div>
+      )}
+
+      {consentQuery.data?.required && !consentQuery.data.accepted && (
+        <ConsentModal
+          consent={consentQuery.data}
+          pending={consentMutation.isPending}
+          onAccept={() => consentMutation.mutate()}
+        />
       )}
 
       {mobileTab === 'ranking' ? (
@@ -528,7 +567,9 @@ function App() {
             )}
           </div>
           <p className="disclaimer">
-            Precios y monedas ficticios. Este es un juego de popularidad, no una inversion.
+            Precios y monedas ficticios. Este es un juego de popularidad, no una
+            inversion. <a href="/reglas">Reglas</a> ·{' '}
+            <a href="/privacidad">Privacidad</a>
           </p>
         </aside>
 
@@ -641,6 +682,7 @@ function App() {
             {turnstileSiteKey &&
               !quote &&
               (!firebaseReady || Boolean(firebaseUser)) &&
+              consentAccepted &&
               currentSeason?.status === 'active' && (
                 <TurnstileWidget
                   siteKey={turnstileSiteKey}
@@ -680,6 +722,8 @@ function App() {
                   !artist ||
                   quoteMutation.isPending ||
                   (firebaseReady && !firebaseUser) ||
+                  !consentReady ||
+                  !consentAccepted ||
                   currentSeason?.status !== 'active' ||
                   (Boolean(turnstileSiteKey) && !turnstileToken)
                 }
@@ -688,6 +732,10 @@ function App() {
                   ? 'Mercado temporalmente cerrado'
                   : firebaseReady && !firebaseUser
                   ? 'Inicia sesion para operar'
+                  : !consentReady
+                    ? 'Cargando acceso...'
+                    : !consentAccepted
+                      ? 'Acepta las reglas para operar'
                   : quoteMutation.isPending
                     ? 'Calculando...'
                     : turnstileSiteKey && !turnstileToken

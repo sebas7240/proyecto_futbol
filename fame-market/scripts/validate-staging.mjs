@@ -1,0 +1,88 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import process from 'node:process';
+
+const root = path.resolve(import.meta.dirname, '..');
+
+function parseEnv(contents) {
+  const result = new Map();
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const separator = trimmed.indexOf('=');
+    if (separator < 1) continue;
+    result.set(
+      trimmed.slice(0, separator).trim(),
+      trimmed.slice(separator + 1).trim()
+    );
+  }
+  return result;
+}
+
+async function load(relativePath) {
+  try {
+    return parseEnv(await readFile(path.join(root, relativePath), 'utf8'));
+  } catch {
+    throw new Error(
+      `Falta ${relativePath}. Copia el archivo .example correspondiente.`
+    );
+  }
+}
+
+function requireValues(values, names, source) {
+  const missing = names.filter((name) => !values.get(name));
+  if (missing.length) {
+    throw new Error(
+      `${source} requiere valores para: ${missing.join(', ')}`
+    );
+  }
+}
+
+const backend = await load('.env.staging');
+const frontend = await load('frontend/.env.staging');
+
+requireValues(
+  backend,
+  [
+    'STAGING_FRONTEND_ORIGINS',
+    'STAGING_POSTGRES_PASSWORD',
+    'FIREBASE_PROJECT_ID',
+    'ADMIN_SECRET',
+    'MONITORING_SECRET'
+  ],
+  '.env.staging'
+);
+requireValues(
+  frontend,
+  [
+    'VITE_API_BASE',
+    'VITE_FIREBASE_API_KEY',
+    'VITE_FIREBASE_AUTH_DOMAIN',
+    'VITE_FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_APP_ID',
+    'VITE_TURNSTILE_SITE_KEY'
+  ],
+  'frontend/.env.staging'
+);
+
+const stagingOrigin = new URL(
+  backend.get('STAGING_FRONTEND_ORIGINS').split(',')[0]
+);
+const apiBase = new URL(frontend.get('VITE_API_BASE'));
+if (stagingOrigin.hostname === 'fama.goleafutbol.com') {
+  throw new Error('Staging no puede usar el dominio frontend de produccion.');
+}
+if (apiBase.hostname === 'api.goleafutbol.com') {
+  throw new Error('Staging no puede usar el API de produccion.');
+}
+if (frontend.get('VITE_APP_ENV') !== 'staging') {
+  throw new Error('VITE_APP_ENV debe ser staging.');
+}
+if (
+  frontend.get('VITE_FIREBASE_PROJECT_ID') !==
+  backend.get('FIREBASE_PROJECT_ID')
+) {
+  throw new Error('Frontend y backend deben usar el mismo proyecto Firebase.');
+}
+
+console.log('Configuracion de staging valida y aislada de produccion.');
