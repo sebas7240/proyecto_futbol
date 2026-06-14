@@ -1,0 +1,36 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PORT: 4020
+      FRONTEND_ORIGINS: http://localhost:5174,capacitor://localhost,http://localhost
+      DATABASE_URL: postgresql://fame_market:fame_market@postgres:5432/fame_market
+      AUTO_MIGRATE: "true"
+      AUTH_MODE: ${AUTH_MODE:-development}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      ADMIN_SECRET: ${ADMIN_SECRET:-change-me}
+    ports:
+      - "4020:4020"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fame_market
+      POSTGRES_USER: fame_market
+      POSTGRES_PASSWORD: fame_market
+    ports:
+      - "5434:5432"
+    volumes:
+      - fame_market_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fame_market -d fame_market"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  fame_market_postgres:

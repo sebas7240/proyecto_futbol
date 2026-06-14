@@ -1,0 +1,26 @@
+{
+  "name": "fame-market-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 5174"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.85.5",
+    "firebase": "^12.14.0",
+    "lightweight-charts": "^5.0.8",
+    "lucide-react": "^0.542.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^5.9.2",
+    "vite": "^8.0.16"
+  }
+}

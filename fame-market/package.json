@@ -1,0 +1,20 @@
+{
+  "name": "fame-market",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "test": "npm run test -w backend",
+    "start": "npm run start -w backend",
+    "db:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-postgres.ps1",
+    "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-local-postgres.ps1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
