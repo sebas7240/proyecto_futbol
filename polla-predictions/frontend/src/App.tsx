@@ -184,7 +184,7 @@ function getApiErrorMessage(error: unknown, fallback: string) {
 }
 
 function App() {
-  const isAdminRoute = window.location.pathname.replace(/\/$/, '') === '/admin';
+  const isAdminRoute = window.location.pathname.replace(/\/$/, '').endsWith('/admin');
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -528,7 +528,7 @@ function App() {
     }
   };
 
-  const syncSportsDbMatches = async () => {
+  const syncProviderMatches = async () => {
     if (!adminSecret.trim()) {
       setStatusMessage('Ingresa ADMIN_SECRET para sincronizar.');
       return;
@@ -536,8 +536,13 @@ function App() {
 
     setAdminLoading(true);
     try {
-      const response = await axios.post<{ synced: number; settled: number; matches: Match[] }>(
-        `${API_BASE}/api/matches/sync/thesportsdb`,
+      const response = await axios.post<{
+        synced: number;
+        settled: number;
+        matches: Match[];
+        providers?: Array<{ provider: string; count: number; skipped: boolean; errors: string[] }>;
+      }>(
+        `${API_BASE}/api/matches/sync/providers`,
         { settleFinished: true },
         { headers: { 'x-admin-secret': adminSecret.trim() } }
       );
@@ -548,11 +553,15 @@ function App() {
         setAdminMatchId((current) => current || response.data.matches[0]?.id || '');
       }
       await Promise.all([fetchResults(), fetchRanking(), fetchPredictions()]);
-      setStatusMessage(`TheSportsDB sincronizó ${response.data.synced} partido(s). Liquidó ${response.data.settled}.`);
+      const providerSummary = (response.data.providers || [])
+        .filter((provider) => !provider.skipped)
+        .map((provider) => `${provider.provider}: ${provider.count}`)
+        .join(' · ');
+      setStatusMessage(`Fuentes sincronizadas: ${response.data.synced} partido(s). ${providerSummary}`);
     } catch (error) {
       const message = axios.isAxiosError(error) && error.response?.data?.error
         ? error.response.data.error
-        : 'No se pudo sincronizar TheSportsDB.';
+        : 'No se pudieron sincronizar las fuentes deportivas.';
       setStatusMessage(message);
     } finally {
       setAdminLoading(false);
@@ -602,7 +611,7 @@ function App() {
             <h1>Admin interno</h1>
             <p>Sincroniza partidos, liquida marcadores y revisa la operación sin mezclarlo con la vista pública.</p>
           </div>
-          <a href="/" className="text-link">Volver a la web</a>
+          <a href="/predicciones/" className="text-link">Volver a la web</a>
         </header>
 
         {statusMessage && <div className="status-message">{statusMessage}</div>}
@@ -611,9 +620,9 @@ function App() {
           <div className="admin-header">
             <div>
               <h2>Operación deportiva</h2>
-              <p>TheSportsDB gratis + liquidación exacta.</p>
+              <p>API-Football + OpenLigaDB + TheSportsDB, con respaldo automático.</p>
             </div>
-            <button type="button" onClick={syncSportsDbMatches} disabled={adminLoading}>
+            <button type="button" onClick={syncProviderMatches} disabled={adminLoading}>
               {adminLoading ? 'Procesando...' : 'Sincronizar y liquidar'}
             </button>
           </div>

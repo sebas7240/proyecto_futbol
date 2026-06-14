@@ -82,19 +82,31 @@ El admin interno vive separado de la vista publica en:
 
 Incluye dos tareas protegidas por `ADMIN_SECRET`:
 
-- sincronizar proximos partidos desde TheSportsDB
+- sincronizar proximos partidos desde el agregador de fuentes
 - liquidar un partido con marcador final exacto
 
 La clave admin no se guarda en el navegador; se escribe solo cuando se necesita operar.
 
 ## Sincronizacion de partidos
 
-La sincronizacion usa la API v1 gratis de TheSportsDB. Por defecto:
+La agenda usa un agregador tolerante a fallos:
+
+- API-Football como fuente principal cuando `API_FOOTBALL_KEY` esta configurada.
+- OpenLigaDB como respaldo gratuito para el Mundial.
+- TheSportsDB como fuente comunitaria secundaria.
+- La web lee la base de datos propia; los visitantes no llaman a los proveedores.
+
+Configuracion recomendada:
 
 ```env
+API_FOOTBALL_KEY=
+OPENLIGADB_ENABLED=true
+OPENLIGADB_LEAGUES=wm2026:2026
+THESPORTSDB_ENABLED=true
 THESPORTSDB_API_KEY=123
 THESPORTSDB_LEAGUE_IDS=4429,4328,4335
-THESPORTSDB_SYNC_DAYS=3
+MATCH_SYNC_DAYS=3
+MATCH_SYNC_INTERVAL_MINUTES=60
 AUTO_SYNC_ENABLED=false
 AUTO_SYNC_INTERVAL_MINUTES=60
 AUTO_SETTLE_SYNCED_RESULTS=false
@@ -103,7 +115,7 @@ AUTO_SETTLE_SYNCED_RESULTS=false
 Endpoint manual:
 
 ```bash
-curl -X POST http://localhost:4000/api/matches/sync/thesportsdb \
+curl -X POST http://localhost:4000/api/matches/sync/providers \
   -H "x-admin-secret: TU_ADMIN_SECRET"
 ```
 

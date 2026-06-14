@@ -10,6 +10,7 @@ export const updateUserWallet = store.updateUserWallet;
 export const listUsers = store.listUsers;
 export const listRanking = store.listRanking;
 export const listStoredMatches = store.listStoredMatches;
+export const listStoredMatchesByDate = store.listStoredMatchesByDate;
 export const getStoredMatchById = store.getStoredMatchById;
 export const upsertMatches = store.upsertMatches;
 export const listPredictions = store.listPredictions;

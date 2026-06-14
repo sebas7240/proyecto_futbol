@@ -108,7 +108,15 @@ export async function listRanking() {
 export async function listStoredMatches(limit = 100) {
   const store = await readStore();
   return Object.values(store.matches)
-    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+    .sort((a, b) => `${b.date || ''} ${b.time || ''}`.localeCompare(`${a.date || ''} ${a.time || ''}`))
+    .slice(0, limit);
+}
+
+export async function listStoredMatchesByDate(date, limit = 500) {
+  const store = await readStore();
+  return Object.values(store.matches)
+    .filter((match) => match.date === date)
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')))
     .slice(0, limit);
 }
 

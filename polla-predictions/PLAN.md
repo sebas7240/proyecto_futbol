@@ -104,6 +104,9 @@ Criterio de terminado:
 Objetivo: sincronizar partidos y resultados sin depender de carga manual.
 
 - [x] Integrar TheSportsDB como primera fuente.
+- [x] Agregar agregador resiliente con API-Football, OpenLigaDB y TheSportsDB.
+- [x] Evitar que el fallo de un proveedor cancele toda la agenda.
+- [x] Normalizar horarios, estados y duplicados antes de persistir.
 - [x] Guardar partidos localmente desde la API externa.
 - [x] Crear vista admin interna para sincronizar partidos.
 - [x] Crear tarea programada opcional para sincronizar proximos partidos.

@@ -79,11 +79,23 @@ export async function listRanking() {
 export async function listStoredMatches(limit = 100) {
   const snapshot = await db
     .collection(MATCHES_COLLECTION)
-    .orderBy('date', 'asc')
+    .orderBy('date', 'desc')
     .limit(limit)
     .get();
 
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function listStoredMatchesByDate(date, limit = 500) {
+  const snapshot = await db
+    .collection(MATCHES_COLLECTION)
+    .where('date', '==', date)
+    .limit(limit)
+    .get();
+
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 }
 
 export async function getStoredMatchById(matchId) {
@@ -98,13 +110,16 @@ export async function upsertMatches(matches) {
     return [];
   }
 
-  const batch = db.batch();
-  matches.forEach((match) => {
-    const matchRef = db.collection(MATCHES_COLLECTION).doc(match.id);
-    batch.set(matchRef, match, { merge: true });
-  });
+  const chunkSize = 450;
+  for (let index = 0; index < matches.length; index += chunkSize) {
+    const batch = db.batch();
+    matches.slice(index, index + chunkSize).forEach((match) => {
+      const matchRef = db.collection(MATCHES_COLLECTION).doc(match.id);
+      batch.set(matchRef, match, { merge: true });
+    });
 
-  await batch.commit();
+    await batch.commit();
+  }
   return matches;
 }
 

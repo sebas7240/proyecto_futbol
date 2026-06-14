@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { matches } from './store.js';
 import { requireAdmin } from './adminMiddleware.js';
-import { listStoredMatches } from './dataStore.js';
+import { listStoredMatchesByDate } from './dataStore.js';
+import { mergeProviderMatches } from './matchUtils.js';
 import { syncSportsDbMatches } from './sportsSyncService.js';
 
 export const matchRouter = Router();
 
-const SYNC_TTL_MS = 10 * 60 * 1000;
+const SYNC_TTL_MS = Math.max(Number(process.env.MATCH_SYNC_INTERVAL_MINUTES) || 60, 15) * 60 * 1000;
 const syncStateByDate = new Map();
 
 function getTodayDate() {
@@ -53,7 +54,7 @@ function isPredictionOpen(match) {
 }
 
 function filterMatches(matches, { date, league }) {
-  return matches
+  return mergeProviderMatches(matches)
     .filter((match) => match.date === date)
     .filter(isPredictionOpen)
     .filter((match) => !league || league === 'Todas' || match.league === league)
@@ -66,7 +67,15 @@ async function syncIfNeeded(date, storedMatches, force = false) {
   const now = Date.now();
   const state = syncStateByDate.get(date);
   const hasDateMatches = storedMatches.some((match) => match.date === date);
-  const shouldSync = force || !hasDateMatches || !state || now - state.syncedAt > SYNC_TTL_MS;
+  const latestStoredUpdate = storedMatches.reduce((latest, match) => {
+    const updatedAt = new Date(match.updatedAt || 0).getTime();
+    return Number.isNaN(updatedAt) ? latest : Math.max(latest, updatedAt);
+  }, 0);
+  const storedMatchesAreStale = latestStoredUpdate === 0 || now - latestStoredUpdate > SYNC_TTL_MS;
+  const shouldSync = force ||
+    !hasDateMatches ||
+    storedMatchesAreStale ||
+    Boolean(state && now - state.syncedAt > SYNC_TTL_MS);
 
   if (!shouldSync) return storedMatches;
 
@@ -74,9 +83,9 @@ async function syncIfNeeded(date, storedMatches, force = false) {
   syncStateByDate.set(date, { syncedAt: now, pending });
 
   try {
-    const result = await pending;
+    await pending;
     syncStateByDate.set(date, { syncedAt: Date.now(), pending: null });
-    return result.matches;
+    return await listStoredMatchesByDate(date);
   } catch (error) {
     syncStateByDate.delete(date);
     throw error;
@@ -88,7 +97,7 @@ matchRouter.get('/', async (req, res) => {
     const date = normalizeDate(req.query.date);
     const league = typeof req.query.league === 'string' ? req.query.league : '';
     const forceSync = req.query.refresh === '1';
-    const storedMatches = await listStoredMatches(500);
+    const storedMatches = await listStoredMatchesByDate(date);
     const syncedMatches = await syncIfNeeded(date, storedMatches, forceSync);
     const sourceMatches = syncedMatches.length > 0 ? syncedMatches : matches;
     res.json(filterMatches(sourceMatches, { date, league }));
@@ -99,13 +108,16 @@ matchRouter.get('/', async (req, res) => {
   }
 });
 
-matchRouter.post('/sync/thesportsdb', requireAdmin, async (req, res) => {
+async function handleProviderSync(req, res) {
   try {
     const settleFinished = req.body?.settleFinished === true;
     const result = await syncSportsDbMatches({ settleFinished });
     res.json(result);
   } catch (error) {
-    console.error('[Matches] TheSportsDB sync error:', error);
-    res.status(502).json({ error: 'No se pudo sincronizar TheSportsDB.' });
+    console.error('[Matches] Provider sync error:', error);
+    res.status(502).json({ error: 'No se pudieron sincronizar las fuentes deportivas.' });
   }
-});
+}
+
+matchRouter.post('/sync/providers', requireAdmin, handleProviderSync);
+matchRouter.post('/sync/thesportsdb', requireAdmin, handleProviderSync);

@@ -31,21 +31,27 @@ function getOutcomeFromScore(homeScore, awayScore) {
 }
 
 function getKickoffDate(match) {
+  if (match?.rawTimestamp) {
+    const normalizedTimestamp = /(?:z|[+-]\d{2}:\d{2})$/i.test(match.rawTimestamp)
+      ? match.rawTimestamp
+      : `${match.rawTimestamp}Z`;
+    const timestampDate = new Date(normalizedTimestamp);
+    if (!Number.isNaN(timestampDate.getTime())) return timestampDate;
+  }
+
   if (!match?.date) return null;
 
-  const value = `${match.date}T${match.time || '00:00'}`;
+  const value = `${match.date}T${match.time || '00:00'}-05:00`;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function isPredictionOpen(match) {
   if (!match) return false;
-  if (match.status === 'SCHEDULED') return true;
+  if (match.status !== 'SCHEDULED') return false;
 
   const kickoff = getKickoffDate(match);
-  if (kickoff && kickoff.getTime() > Date.now()) return true;
-
-  return false;
+  return !kickoff || kickoff.getTime() > Date.now();
 }
 
 predictionRouter.get('/', async (req, res) => {

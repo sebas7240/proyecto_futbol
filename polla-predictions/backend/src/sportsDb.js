@@ -1,162 +1,118 @@
+import { getLocalDateTime, parseScore } from './matchUtils.js';
+
 const DEFAULT_API_KEY = '123';
 const DEFAULT_LEAGUE_IDS = ['4429', '4328', '4335'];
-const DEFAULT_SYNC_DAYS = 3;
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json';
 
 function normalizeLeagueIds(rawLeagueIds) {
-  if (!rawLeagueIds) return DEFAULT_LEAGUE_IDS;
-
-  const ids = rawLeagueIds
+  const ids = String(rawLeagueIds || '')
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);
-
   return ids.length > 0 ? ids : DEFAULT_LEAGUE_IDS;
 }
 
-function normalizeSyncDays(rawSyncDays) {
-  const days = Number(rawSyncDays);
-  if (!Number.isInteger(days) || days < 1) return DEFAULT_SYNC_DAYS;
-  return Math.min(days, 7);
-}
+function normalizeStatus(rawStatus, rawTimestamp) {
+  const status = String(rawStatus || '').trim().toUpperCase();
+  if (['NS', 'NOT STARTED', 'SCHEDULED', 'TBD'].includes(status)) return 'SCHEDULED';
+  if (['1H', 'HT', '2H', 'ET', 'P', 'LIVE', 'IN PLAY', 'IN PROGRESS'].includes(status)) return 'LIVE';
+  if (['FT', 'AET', 'PEN', 'MATCH FINISHED', 'FINISHED'].includes(status)) return 'FINISHED';
+  if (['PST', 'POSTPONED', 'SUSPENDED'].includes(status)) return 'POSTPONED';
+  if (['CANCELLED', 'CANCELED', 'ABD', 'ABANDONED'].includes(status)) return 'CANCELLED';
 
-function formatDate(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function getDateTimeParts(timestamp) {
-  if (!timestamp) return null;
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: process.env.MATCH_TIMEZONE || 'America/Bogota',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(date);
-
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return {
-    date: `${byType.year}-${byType.month}-${byType.day}`,
-    time: `${byType.hour}:${byType.minute}`
-  };
-}
-
-function parseOptionalScore(value) {
-  if (value === null || value === undefined || value === '') return null;
-
-  const score = Number(value);
-  return Number.isInteger(score) ? score : null;
+  const kickoff = rawTimestamp ? new Date(rawTimestamp) : null;
+  return kickoff && kickoff.getTime() > Date.now() ? 'SCHEDULED' : 'UNKNOWN';
 }
 
 function toInternalMatch(event) {
-  const timestamp = event.strTimestamp || null;
-  const localParts = getDateTimeParts(timestamp);
-  const date = localParts?.date || event.dateEvent || (timestamp ? timestamp.slice(0, 10) : null);
-  const time = localParts?.time || (event.strTime ? event.strTime.slice(0, 5) : '');
-  const homeScore = parseOptionalScore(event.intHomeScore);
-  const awayScore = parseOptionalScore(event.intAwayScore);
+  const normalizedTimestamp = event.strTimestamp
+    ? /(?:z|[+-]\d{2}:\d{2})$/i.test(event.strTimestamp)
+      ? event.strTimestamp
+      : `${event.strTimestamp}Z`
+    : null;
+  const local = getLocalDateTime(normalizedTimestamp);
+  const rawTimestamp = local?.rawTimestamp || (
+    event.dateEvent && event.strTime
+      ? new Date(`${event.dateEvent}T${event.strTime}Z`).toISOString()
+      : null
+  );
+  const fallbackLocal = rawTimestamp ? getLocalDateTime(rawTimestamp) : null;
+  const status = normalizeStatus(event.strStatus, rawTimestamp);
 
   return {
-    id: `tsdb-${event.idEvent}`,
-    externalId: event.idEvent,
+    externalId: String(event.idEvent),
     source: 'thesportsdb',
+    providerRefs: { thesportsdb: String(event.idEvent) },
     home: event.strHomeTeam || 'Local',
     away: event.strAwayTeam || 'Visitante',
-    date: date || '',
-    time,
+    date: local?.date || fallbackLocal?.date || event.dateEvent || '',
+    time: local?.time || fallbackLocal?.time || String(event.strTime || '').slice(0, 5),
+    rawTimestamp,
     league: event.strLeague || 'Sin liga',
-    status: Number.isInteger(homeScore) && Number.isInteger(awayScore) ? 'FINISHED' : 'SCHEDULED',
-    homeScore,
-    awayScore,
+    leagueCode: event.idLeague ? String(event.idLeague) : '',
+    country: event.strCountry || null,
+    status,
+    homeScore: parseScore(event.intHomeScore),
+    awayScore: parseScore(event.intAwayScore),
     homeBadge: event.strHomeTeamBadge || null,
     awayBadge: event.strAwayTeamBadge || null,
-    rawTimestamp: timestamp,
     updatedAt: new Date().toISOString()
   };
 }
 
-async function fetchLeagueEvents({ apiKey, leagueId }) {
-  const url = `${BASE_URL}/${apiKey}/eventsnextleague.php?id=${encodeURIComponent(leagueId)}`;
+async function fetchEvents(url, label) {
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json',
       'User-Agent': 'polla-predictions/0.1'
-    }
+    },
+    signal: AbortSignal.timeout(15_000)
   });
 
-  if (!response.ok) {
-    throw new Error(`TheSportsDB ${leagueId} responded ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`${label} responded ${response.status}`);
   const payload = await response.json();
   return Array.isArray(payload.events) ? payload.events : [];
 }
 
-async function fetchDayEvents({ apiKey, date }) {
-  const params = new URLSearchParams({
-    d: date,
-    s: 'Soccer'
-  });
-  const url = `${BASE_URL}/${apiKey}/eventsday.php?${params.toString()}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': 'polla-predictions/0.1'
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`TheSportsDB eventsday ${date} responded ${response.status}`);
+export async function fetchSportsDbMatches({ dates }) {
+  if (process.env.THESPORTSDB_ENABLED === 'false') {
+    return { provider: 'thesportsdb', skipped: true, matches: [] };
   }
 
-  const payload = await response.json();
-  return Array.isArray(payload.events) ? payload.events : [];
-}
-
-export async function fetchSportsDbMatches() {
   const apiKey = process.env.THESPORTSDB_API_KEY || DEFAULT_API_KEY;
   const leagueIds = normalizeLeagueIds(process.env.THESPORTSDB_LEAGUE_IDS);
-  const syncDays = normalizeSyncDays(process.env.THESPORTSDB_SYNC_DAYS);
-  const syncedAt = new Date().toISOString();
-  const matchesById = new Map();
+  const requests = [
+    ...leagueIds.map((leagueId) => ({
+      label: `league ${leagueId}`,
+      url: `${BASE_URL}/${apiKey}/eventsnextleague.php?id=${encodeURIComponent(leagueId)}`
+    })),
+    ...dates.map((date) => ({
+      label: `day ${date}`,
+      url: `${BASE_URL}/${apiKey}/eventsday.php?${new URLSearchParams({ d: date, s: 'Soccer' })}`
+    }))
+  ];
 
-  for (const leagueId of leagueIds) {
-    const events = await fetchLeagueEvents({ apiKey, leagueId });
-    events.forEach((event) => {
-      matchesById.set(event.idEvent, {
-        ...toInternalMatch(event),
-        leagueId,
-        syncedAt
-      });
+  const settled = await Promise.allSettled(
+    requests.map((request) => fetchEvents(request.url, request.label))
+  );
+  const errors = [];
+  const byId = new Map();
+
+  settled.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      errors.push(`${requests[index].label}: ${result.reason.message}`);
+      return;
+    }
+
+    result.value.forEach((event) => {
+      const match = toInternalMatch(event);
+      if (match.date && dates.includes(match.date)) byId.set(match.externalId, match);
     });
-  }
-
-  for (let index = 0; index < syncDays; index += 1) {
-    const date = new Date();
-    date.setUTCDate(date.getUTCDate() + index);
-    const events = await fetchDayEvents({ apiKey, date: formatDate(date) });
-
-    events.forEach((event) => {
-      if (!matchesById.has(event.idEvent)) {
-        matchesById.set(event.idEvent, {
-          ...toInternalMatch(event),
-          syncedAt
-        });
-      }
-    });
-  }
-
-  const matches = Array.from(matchesById.values());
-
-  return matches.sort((a, b) => {
-    const aDate = `${a.date || ''} ${a.time || ''}`.trim();
-    const bDate = `${b.date || ''} ${b.time || ''}`.trim();
-    return aDate.localeCompare(bDate);
   });
+
+  return {
+    provider: 'thesportsdb',
+    matches: Array.from(byId.values()),
+    errors
+  };
 }
