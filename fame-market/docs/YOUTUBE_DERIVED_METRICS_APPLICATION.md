@@ -2,6 +2,9 @@
 
 Prepared on: June 15, 2026
 
+Status: deferred until the final brand and domain are selected and publicly
+deployed. Keep this file as a draft and do not submit provisional URLs.
+
 This document prepares the YouTube Data API Services Audit and Quota Extension
 Form. It does not replace the form and must not be submitted until the public
 HTTPS site and its evidence are available.
@@ -16,8 +19,9 @@ https://developers.google.com/youtube/terms/derived-metrics-policy
 
 ## Current blockers
 
-- `fama.goleafutbol.com` does not currently resolve in public DNS.
-- Production must expose `/`, `/privacidad`, `/reglas` and `/metodologia`.
+- The final domain has not been selected or deployed.
+- Production must expose `/`, `/privacidad`, `/reglas`, `/metodologia` and
+  `/derechos`.
 - The legal owner, address, contact email and Google Cloud project number must
   be entered by the account owner.
 - Required screenshots or PDFs must be captured from the deployed production
@@ -127,11 +131,12 @@ quota.
 
 ## Public URLs after deployment
 
-- Primary URL: `https://fama.goleafutbol.com/`
-- Privacy: `https://fama.goleafutbol.com/privacidad`
-- Terms/rules: `https://fama.goleafutbol.com/reglas`
-- Methodology: `https://fama.goleafutbol.com/metodologia`
-- Login: `https://fama.goleafutbol.com/`
+- Primary URL: `https://DOMINIO-NUEVO/`
+- Privacy: `https://DOMINIO-NUEVO/privacidad`
+- Terms/rules: `https://DOMINIO-NUEVO/reglas`
+- Methodology: `https://DOMINIO-NUEVO/metodologia`
+- Rights: `https://DOMINIO-NUEVO/derechos`
+- Login: `https://DOMINIO-NUEVO/`
 - Admin evidence: provide reviewer instructions or a temporary review account.
 
 ## Required evidence checklist

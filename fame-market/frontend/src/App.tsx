@@ -25,12 +25,18 @@ import {
   subscribeToAuth
 } from './auth';
 import { ConsentModal } from './ConsentModal';
+import { EntityAvatar } from './EntityAvatar';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
 import { TurnstileWidget } from './TurnstileWidget';
-import type { ArtistSummary, Quote } from './types';
+import type {
+  ArtistSummary,
+  CategoryOverview,
+  EntityCategory,
+  Quote
+} from './types';
 
-type ArtistFilter = 'trending' | 'latin' | 'favorites';
+type ArtistFilter = 'trending' | 'favorites' | `category:${EntityCategory}`;
 
 const money = new Intl.NumberFormat('es-CO', {
   minimumFractionDigits: 2,
@@ -40,6 +46,23 @@ const compact = new Intl.NumberFormat('es-CO', {
   notation: 'compact',
   maximumFractionDigits: 1
 });
+const storedInterestsKey = 'fame-market:interests';
+
+function readStoredInterests(): EntityCategory[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storedInterestsKey) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function categoryLabel(
+  categoryId: EntityCategory,
+  categories: CategoryOverview[]
+) {
+  return categories.find((category) => category.id === categoryId)?.label ?? categoryId;
+}
 
 function Movement({ value }: { value: number }) {
   const positive = value >= 0;
@@ -67,10 +90,16 @@ function ArtistRow({
   return (
     <div className={`artist-row ${active ? 'artist-row--active' : ''}`}>
       <button className="artist-row__select" onClick={onSelect}>
-        <img src={artist.imageUrl} alt="" />
+        <EntityAvatar
+          name={artist.name}
+          symbol={artist.symbol}
+          imageUrl={artist.imageUrl}
+          imageUsageStatus={artist.imageUsageStatus}
+          imageAttribution={artist.imageAttribution}
+        />
         <span className="artist-row__identity">
           <strong>{artist.name}</strong>
-          <small>{artist.symbol} · {artist.country}</small>
+          <small>{artist.symbol} · {artist.profession || artist.country}</small>
         </span>
         <span className="artist-row__price">
           <strong>{money.format(artist.currentPrice)}</strong>
@@ -96,6 +125,10 @@ function ArtistRow({
 function App() {
   const queryClient = useQueryClient();
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
+  const categoriesQuery = useQuery({
+    queryKey: ['market-categories'],
+    queryFn: api.marketCategories
+  });
   const rankingQuery = useQuery({
     queryKey: ['ranking'],
     queryFn: api.ranking,
@@ -115,6 +148,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [artistFilter, setArtistFilter] =
     useState<ArtistFilter>('trending');
+  const [selectedInterests, setSelectedInterests] =
+    useState<EntityCategory[]>(readStoredInterests);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReset, setTurnstileReset] = useState(0);
@@ -144,6 +179,13 @@ function App() {
   const favoritesQuery = useQuery({
     queryKey: ['favorites', firebaseUser?.uid ?? 'local'],
     queryFn: api.favorites,
+    enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
+    retry: false
+  });
+
+  const interestsQuery = useQuery({
+    queryKey: ['interests', firebaseUser?.uid ?? 'local'],
+    queryFn: api.interests,
     enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
     retry: false
   });
@@ -194,6 +236,16 @@ function App() {
   const attentionQuery = useQuery({
     queryKey: ['artist-attention', selectedSlug],
     queryFn: () => api.artistAttention(selectedSlug),
+    enabled: Boolean(selectedSlug)
+  });
+  const sourcesQuery = useQuery({
+    queryKey: ['entity-sources', selectedSlug],
+    queryFn: () => api.entitySources(selectedSlug),
+    enabled: Boolean(selectedSlug)
+  });
+  const externalEventsQuery = useQuery({
+    queryKey: ['external-events', selectedSlug],
+    queryFn: () => api.externalEvents(selectedSlug),
     enabled: Boolean(selectedSlug)
   });
 
@@ -258,6 +310,19 @@ function App() {
     onError: (error) => setNotice(error.message)
   });
 
+  const interestsMutation = useMutation({
+    mutationFn: api.setInterests,
+    onSuccess: (categories) => {
+      setSelectedInterests(categories);
+      localStorage.setItem(storedInterestsKey, JSON.stringify(categories));
+      queryClient.setQueryData(
+        ['interests', firebaseUser?.uid ?? 'local'],
+        categories
+      );
+    },
+    onError: (error) => setNotice(error.message)
+  });
+
   const favoriteMutation = useMutation({
     mutationFn: ({
       artistId,
@@ -291,6 +356,7 @@ function App() {
     (season) => season.seasonId === currentSeason?.id
   );
   const favoriteIds = favoritesQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
   const consentAccepted =
     !consentQuery.data?.required || Boolean(consentQuery.data.accepted);
   const consentReady =
@@ -304,47 +370,50 @@ function App() {
       ),
     [artist?.id, tradesQuery.data]
   );
+  useEffect(() => {
+    if (interestsQuery.isSuccess) {
+      setSelectedInterests(interestsQuery.data);
+      localStorage.setItem(
+        storedInterestsKey,
+        JSON.stringify(interestsQuery.data)
+      );
+    }
+  }, [interestsQuery.data, interestsQuery.isSuccess]);
+
   const visibleArtists = useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase('es');
     const favoriteSet = new Set(favoriteIds);
-    const latinCountries = new Set([
-      'Argentina',
-      'Bolivia',
-      'Brasil',
-      'Chile',
-      'Colombia',
-      'Costa Rica',
-      'Cuba',
-      'Ecuador',
-      'El Salvador',
-      'Guatemala',
-      'Honduras',
-      'Mexico',
-      'Nicaragua',
-      'Panama',
-      'Paraguay',
-      'Peru',
-      'Puerto Rico',
-      'Republica Dominicana',
-      'Uruguay',
-      'Venezuela'
-    ]);
+    const selectedCategory =
+      artistFilter.startsWith('category:')
+        ? artistFilter.replace('category:', '') as EntityCategory
+        : null;
+    const interestSet = new Set(selectedInterests);
 
     return artists.filter((item) => {
       const matchesSearch =
         !query ||
-        [item.name, item.symbol, item.country, item.genre].some((value) =>
-          value.toLocaleLowerCase('es').includes(query)
-        );
+        [
+          item.name,
+          item.symbol,
+          item.country,
+          item.genre,
+          item.category,
+          item.subcategory,
+          item.profession,
+          ...item.themeTags
+        ].some((value) => value.toLocaleLowerCase('es').includes(query));
       const matchesFilter =
         artistFilter === 'trending' ||
         (artistFilter === 'favorites' && favoriteSet.has(item.id)) ||
-        (artistFilter === 'latin' &&
-          (item.genre.toLocaleLowerCase('es').includes('latino') ||
-            latinCountries.has(item.country)));
+        (selectedCategory !== null && item.category === selectedCategory);
       return matchesSearch && matchesFilter;
+    }).sort((left, right) => {
+      const leftInterest = interestSet.has(left.category) ? 1 : 0;
+      const rightInterest = interestSet.has(right.category) ? 1 : 0;
+      if (leftInterest !== rightInterest) return rightInterest - leftInterest;
+      return right.currentPrice - left.currentPrice;
     });
-  }, [artistFilter, artists, favoriteIds, searchTerm]);
+  }, [artistFilter, artists, favoriteIds, searchTerm, selectedInterests]);
 
   const toggleFavorite = (artistId: string) => {
     if (!authReady || (firebaseReady && !firebaseUser)) {
@@ -355,6 +424,16 @@ function App() {
       artistId,
       favorite: !favoriteIds.includes(artistId)
     });
+  };
+
+  const toggleInterest = (categoryId: EntityCategory) => {
+    const next = selectedInterests.includes(categoryId)
+      ? selectedInterests.filter((item) => item !== categoryId)
+      : [...selectedInterests, categoryId];
+    setSelectedInterests(next);
+    localStorage.setItem(storedInterestsKey, JSON.stringify(next));
+    if (!authReady || (firebaseReady && !firebaseUser)) return;
+    interestsMutation.mutate(next);
   };
 
   const finishOnboarding = () => {
@@ -386,7 +465,7 @@ function App() {
                         ? 'congelada'
                         : 'finalizada'
                   }`
-                : 'Mercado musical'}
+                : 'Mercado de atencion'}
             </small>
           </span>
           {appEnvironment === 'staging' && (
@@ -397,8 +476,8 @@ function App() {
           <Search size={18} />
           <input
             type="search"
-            placeholder="Buscar artista"
-            aria-label="Buscar artista"
+            placeholder="Buscar figura"
+            aria-label="Buscar figura"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -461,8 +540,8 @@ function App() {
             <span className="onboarding__eyebrow">Tu primera jugada</span>
             <h2 id="onboarding-title">Empieza con 10.000 FameCoins</h2>
             <ol>
-              <li><strong>1</strong><span>Elige un artista.</span></li>
-              <li><strong>2</strong><span>Revisa su tendencia y videos oficiales.</span></li>
+              <li><strong>1</strong><span>Elige una figura.</span></li>
+              <li><strong>2</strong><span>Revisa su tendencia y contenido reciente.</span></li>
               <li><strong>3</strong><span>Cotiza y confirma tu primera compra.</span></li>
             </ol>
             <button className="onboarding__action" onClick={finishOnboarding}>
@@ -494,8 +573,8 @@ function App() {
         <aside className="market-list">
           <div className="section-heading">
             <div>
-              <small>Mercado musical</small>
-              <h1>Artistas</h1>
+              <small>Mercado de atencion</small>
+              <h1>Figuras</h1>
             </div>
             <span
               className={`live-label ${
@@ -516,8 +595,8 @@ function App() {
             <Search size={17} />
             <input
               type="search"
-              placeholder="Buscar artista"
-              aria-label="Buscar artista en el mercado"
+              placeholder="Buscar figura"
+              aria-label="Buscar figura en el mercado"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
@@ -531,14 +610,20 @@ function App() {
             >
               Tendencia
             </button>
-            <button
-              className={artistFilter === 'latin' ? 'is-active' : ''}
-              onClick={() => setArtistFilter('latin')}
-              aria-selected={artistFilter === 'latin'}
-              role="tab"
-            >
-              Latinos
-            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                className={
+                  artistFilter === `category:${category.id}` ? 'is-active' : ''
+                }
+                onClick={() => setArtistFilter(`category:${category.id}`)}
+                aria-selected={artistFilter === `category:${category.id}`}
+                role="tab"
+              >
+                {category.label}
+                <span>{category.count}</span>
+              </button>
+            ))}
             <button
               className={artistFilter === 'favorites' ? 'is-active' : ''}
               onClick={() => setArtistFilter('favorites')}
@@ -547,6 +632,21 @@ function App() {
             >
               Favoritos
             </button>
+          </div>
+          <div className="interest-chips" aria-label="Intereses personales">
+            <small>Intereses</small>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                className={
+                  selectedInterests.includes(category.id) ? 'is-active' : ''
+                }
+                onClick={() => toggleInterest(category.id)}
+                type="button"
+              >
+                {category.label}
+              </button>
+            ))}
           </div>
           <div className="artist-list">
             {visibleArtists.map((item) => (
@@ -566,8 +666,8 @@ function App() {
             {!visibleArtists.length && (
               <p className="artist-list__empty">
                 {artistFilter === 'favorites'
-                  ? 'Aun no guardaste artistas favoritos.'
-                  : 'No encontramos artistas con esa busqueda.'}
+                  ? 'Aun no guardaste figuras favoritas.'
+                  : 'No encontramos figuras con esa busqueda.'}
               </p>
             )}
           </div>
@@ -576,6 +676,7 @@ function App() {
             inversion. <a href="/reglas">Reglas</a> ·{' '}
             <a href="/privacidad">Privacidad</a> ·{' '}
             <a href="/metodologia">Metodologia</a>
+            {' | '}<a href="/derechos">Derechos</a>
           </p>
         </aside>
 
@@ -583,11 +684,22 @@ function App() {
           {artist ? (
             <>
               <div className="artist-hero">
-                <img src={artist.imageUrl} alt={artist.name} />
+                <EntityAvatar
+                  name={artist.name}
+                  symbol={artist.symbol}
+                  imageUrl={artist.imageUrl}
+                  imageUsageStatus={artist.imageUsageStatus}
+                  imageAttribution={artist.imageAttribution}
+                  size="large"
+                />
                 <div>
                   <span className="symbol">{artist.symbol}</span>
                   <h2>{artist.name}</h2>
-                  <p>{artist.genre} · {artist.country} · {compact.format(artist.holders)} jugadores</p>
+                  <p>
+                    {artist.profession || artist.genre} ·{' '}
+                    {categoryLabel(artist.category, categories)} ·{' '}
+                    {artist.country} · {compact.format(artist.holders)} jugadores
+                  </p>
                 </div>
                 <div className="hero-price">
                   <small>Precio ficticio</small>
@@ -632,28 +744,115 @@ function App() {
                 </section>
               )}
 
+              {Boolean(sourcesQuery.data?.length) && (
+                <section className="source-strip">
+                  <div className="section-heading section-heading--compact">
+                    <div>
+                      <small>Transparencia</small>
+                      <h3>Fuentes verificadas</h3>
+                    </div>
+                    <span>No implican afiliacion oficial</span>
+                  </div>
+                  <div className="source-list">
+                    {sourcesQuery.data!.map((source) => (
+                      <a
+                        className="source-row"
+                        href={source.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        key={source.id}
+                      >
+                        <span>
+                          <strong>{source.displayName}</strong>
+                          <small>
+                            {source.provider} / {source.sourceType} /{' '}
+                            {source.usageMode === 'display_only'
+                              ? 'solo referencia'
+                              : source.usageMode}
+                          </small>
+                        </span>
+                        <b
+                          className={
+                            source.lastError ? 'is-warning' : 'is-healthy'
+                          }
+                        >
+                          {source.lastError
+                            ? 'revisar'
+                            : source.lastSyncedAt
+                              ? 'activa'
+                              : 'pendiente'}
+                        </b>
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {Boolean(externalEventsQuery.data?.length) && (
+                <section className="external-event-strip">
+                  <div className="section-heading section-heading--compact">
+                    <div>
+                      <small>Contexto externo</small>
+                      <h3>Eventos revisados</h3>
+                    </div>
+                    <span>No aplican precio automatico</span>
+                  </div>
+                  <div className="external-event-list">
+                    {externalEventsQuery.data!.map((event) => (
+                      <article
+                        className={`external-event external-event--${event.impactDirection}`}
+                        key={event.id}
+                      >
+                        <span>
+                          <strong>{event.title}</strong>
+                          <small>
+                            {new Date(event.occurredAt).toLocaleDateString(
+                              'es-CO'
+                            )}{' '}
+                            / {event.eventType} / propuesta{' '}
+                            {(event.proposedDeltaBps / 100).toFixed(2)}%
+                          </small>
+                        </span>
+                        {event.sourceUrl && (
+                          <a href={event.sourceUrl} target="_blank" rel="noreferrer">
+                            Fuente
+                          </a>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section className="youtube-strip">
                 <div className="section-heading section-heading--compact">
                   <div>
                     <small>Senales para tu decision</small>
-                    <h3>Ultimos videos oficiales</h3>
+                    <h3>Contenido reciente</h3>
                   </div>
-                  <span>Datos de YouTube; no afectan el precio</span>
+                  <span>Fuentes publicas; no afectan el precio</span>
                 </div>
-                {artist.videos.map((video) => (
+                {(artist.contentItems ?? artist.videos.map((video) => ({
+                  ...video,
+                  provider: 'youtube',
+                  contentType: 'video',
+                  sourceUrl: video.youtubeUrl
+                }))).map((item) => {
+                  const video = item;
+                  return (
                   <a
                     className="video-row"
-                    href={video.youtubeUrl}
+                    href={item.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    key={video.id}
+                    key={item.id}
                   >
                     <span className="video-thumb">
-                      <img src={video.thumbnailUrl} alt="" />
+                      <img src={item.thumbnailUrl} alt="" />
                       <Play size={18} fill="currentColor" />
                     </span>
                     <span className="video-copy">
-                      <strong>{video.title}</strong>
+                      <strong>{item.title}</strong>
                       <small>
                         {compact.format(video.viewCount)} vistas · {compact.format(video.likeCount)} likes ·{' '}
                         {compact.format(video.commentCount)} comentarios
@@ -661,7 +860,8 @@ function App() {
                     </span>
                     <ChevronRight size={18} />
                   </a>
-                ))}
+                  );
+                })}
               </section>
             </>
           ) : (
@@ -674,7 +874,7 @@ function App() {
             <div className="section-heading section-heading--compact">
               <div>
                 <small>Operacion</small>
-                <h3>{artist?.symbol ?? 'Artista'}</h3>
+                <h3>{artist?.symbol ?? 'Figura'}</h3>
               </div>
               {selectedPosition && <span>{selectedPosition.quantity} tuyas</span>}
             </div>
@@ -785,13 +985,20 @@ function App() {
             <Movement value={portfolio?.returnPercent ?? 0} />
             <dl className="portfolio-metrics">
               <div><dt>Disponible</dt><dd>{money.format(portfolio?.balance ?? 0)}</dd></div>
-              <div><dt>En artistas</dt><dd>{money.format(portfolio?.investedValue ?? 0)}</dd></div>
+              <div><dt>En figuras</dt><dd>{money.format(portfolio?.investedValue ?? 0)}</dd></div>
             </dl>
             <div className="positions">
               {portfolio?.positions.length ? (
                 portfolio.positions.map((position) => (
                   <div className="position-row" key={position.artistId}>
-                    <img src={position.artist.imageUrl} alt="" />
+                    <EntityAvatar
+                      name={position.artist.name}
+                      symbol={position.artist.symbol}
+                      imageUrl={position.artist.imageUrl}
+                      imageUsageStatus={position.artist.imageUsageStatus}
+                      imageAttribution={position.artist.imageAttribution}
+                      size="small"
+                    />
                     <span>
                       <strong>{position.artist.symbol}</strong>
                       <small>{position.quantity} · entrada {money.format(position.averageCost)}</small>
@@ -809,6 +1016,13 @@ function App() {
         </aside>
       </main>
       )}
+
+      <footer className="rights-notice">
+        <strong>Simulador independiente.</strong>{' '}
+        Los nombres identifican figuras publicas con fines informativos. Fame
+        Market no esta afiliado, patrocinado ni aprobado por ellas o sus marcas.{' '}
+        <a href="/derechos">Derechos y correcciones</a>
+      </footer>
 
       <nav className="mobile-nav" aria-label="Navegacion principal">
         <button className={mobileTab === 'market' ? 'is-active' : ''} onClick={() => selectTab('market')}>

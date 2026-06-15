@@ -1,11 +1,17 @@
+import { useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  BadgeInfo,
   CircleDollarSign,
   Database,
+  FileCheck2,
   Scale,
+  Send,
   ShieldCheck,
   Trophy
 } from 'lucide-react';
+import { api } from './api';
+import type { RightsRequestType } from './types';
 
 const updatedAt = '15 de junio de 2026';
 
@@ -73,6 +79,16 @@ function RulesPage() {
           La beta no promete premios. Si una temporada futura ofrece uno, sus
           condiciones se publicaran por separado. Las reglas pueden actualizarse
           y una version nueva requerira una aceptacion nueva antes de operar.
+        </p>
+      </section>
+      <section>
+        <h2>7. Figuras publicas y marcas</h2>
+        <p>
+          Los nombres se usan para identificar figuras publicas dentro de un
+          indice informativo y un juego ficticio. Esa referencia no implica
+          afiliacion, patrocinio, aprobacion ni propiedad sobre su nombre,
+          imagen, marca, obra o actividad profesional. No se permite usar el
+          servicio para suplantar a una figura o presentar productos oficiales.
         </p>
       </section>
     </>
@@ -163,10 +179,13 @@ function PrivacyPage() {
       <section>
         <h2>7. Solicitudes</h2>
         <p>
-          Puedes solicitar correccion o eliminacion mediante el canal oficial
-          de soporte publicado por Fame Market. Algunas operaciones pueden
-          anonimizarse en lugar de borrarse cuando sean necesarias para
-          integridad competitiva, seguridad o cumplimiento.
+          Puedes solicitar correccion o eliminacion mediante el formulario de
+          derechos. Para tramitarlo guardamos el nombre, correo, contenido de
+          la solicitud, evidencia aportada, estado y notas internas. La IP se
+          transforma en un hash para limitar abuso y no se guarda en texto
+          legible. Algunas operaciones pueden anonimizarse en lugar de borrarse
+          cuando sean necesarias para integridad competitiva, seguridad o
+          cumplimiento.
         </p>
       </section>
     </>
@@ -239,10 +258,275 @@ function MethodologyPage() {
   );
 }
 
+function RightsPage() {
+  const [form, setForm] = useState({
+    requesterName: '',
+    requesterEmail: '',
+    requestType: 'correction' as RightsRequestType,
+    subject: '',
+    message: '',
+    evidenceUrl: '',
+    website: ''
+  });
+  const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
+  const contactEmail =
+    import.meta.env.VITE_RIGHTS_CONTACT_EMAIL?.trim() ?? '';
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSending(true);
+    setStatus('');
+    try {
+      const result = await api.createRightsRequest(form);
+      setStatus(
+        `Solicitud recibida. Conserva esta referencia: ${result.id}.`
+      );
+      setForm({
+        requesterName: '',
+        requesterEmail: '',
+        requestType: 'correction',
+        subject: '',
+        message: '',
+        evidenceUrl: '',
+        website: ''
+      });
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo enviar la solicitud.'
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <>
+      <header className="legal-heading">
+        <span><BadgeInfo size={20} /> Derechos y correcciones</span>
+        <h1>Identificacion informativa, sin afiliacion</h1>
+        <p>
+          Fame Market es un simulador independiente. Las figuras y marcas
+          mencionadas no patrocinan, administran ni aprueban esta plataforma.
+          Esta pagina explica la politica de nombres, imagenes y reclamaciones.
+        </p>
+      </header>
+
+      <section>
+        <h2>1. Nombres y marcas</h2>
+        <p>
+          Los nombres se muestran solo para identificar a la figura sobre la
+          que se presentan hechos, fuentes y actividad publica. No usamos sus
+          nombres o simbolos como marca propia, dominio, logotipo ni indicacion
+          de respaldo oficial. Antes de adoptar el nombre definitivo de la
+          plataforma se realizara una busqueda de marcas y riesgo de confusion.
+        </p>
+      </section>
+      <section>
+        <h2>2. Imagenes</h2>
+        <p>
+          Una imagen personal solo puede publicarse si existe una base de uso
+          registrada: contenido propio, licencia comprobable o autorizacion
+          aplicable del proveedor. En los demas casos se muestra un avatar
+          abstracto de iniciales. Una caricatura o imagen generada por IA que
+          imite de forma reconocible a una persona no se considera
+          automaticamente segura.
+        </p>
+      </section>
+      <section>
+        <h2>3. Datos y hechos</h2>
+        <p>
+          Los hechos publicos y estadisticas se presentan con su fuente y bajo
+          las condiciones del proveedor correspondiente. Que un dato sea
+          publico no elimina sus terminos de API, limites de reutilizacion,
+          derechos sobre fotografias ni posibles derechos de imagen.
+        </p>
+      </section>
+      <section>
+        <h2>4. Alcance</h2>
+        <p>
+          El precio, las participaciones y los FameCoins son elementos
+          ficticios del juego. No representan acciones, contratos, regalias ni
+          propiedad sobre una persona. Este diseño reduce riesgos, pero no es
+          una garantia legal universal. Antes de lanzar premios, publicidad a
+          gran escala o nuevos paises se requiere revision profesional en las
+          jurisdicciones aplicables.
+        </p>
+      </section>
+      <section className="rights-form-section">
+        <div>
+          <h2>5. Solicitar revision</h2>
+          <p>
+            Representantes, titulares y usuarios pueden pedir correccion,
+            atribucion o retiro. Incluye suficiente detalle para localizar el
+            contenido.
+          </p>
+          {contactEmail && (
+            <p>
+              Canal alternativo:{' '}
+              <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
+            </p>
+          )}
+        </div>
+        <form className="rights-form" onSubmit={submit}>
+          <div className="rights-form__row">
+            <label>
+              Nombre
+              <input
+                required
+                minLength={2}
+                maxLength={120}
+                value={form.requesterName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    requesterName: event.target.value
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Correo
+              <input
+                required
+                type="email"
+                maxLength={254}
+                value={form.requesterEmail}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    requesterEmail: event.target.value
+                  }))
+                }
+              />
+            </label>
+          </div>
+          <label>
+            Tipo de solicitud
+            <select
+              value={form.requestType}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  requestType: event.target.value as RightsRequestType
+                }))
+              }
+            >
+              <option value="correction">Correccion</option>
+              <option value="removal">Retiro de contenido</option>
+              <option value="trademark">Marca o posible confusion</option>
+              <option value="image">Imagen, fotografia o semejanza</option>
+              <option value="other">Otro</option>
+            </select>
+          </label>
+          <label>
+            Asunto
+            <input
+              required
+              minLength={3}
+              maxLength={180}
+              value={form.subject}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  subject: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Detalle
+            <textarea
+              required
+              minLength={20}
+              maxLength={4000}
+              rows={6}
+              value={form.message}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  message: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Enlace de evidencia <span>(opcional)</span>
+            <input
+              type="url"
+              maxLength={500}
+              placeholder="https://"
+              value={form.evidenceUrl}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  evidenceUrl: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label className="rights-form__trap" aria-hidden="true">
+            Sitio web
+            <input
+              tabIndex={-1}
+              autoComplete="off"
+              value={form.website}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  website: event.target.value
+                }))
+              }
+            />
+          </label>
+          <button type="submit" disabled={sending}>
+            <Send size={17} />
+            {sending ? 'Enviando...' : 'Enviar solicitud'}
+          </button>
+          {status && <p className="rights-form__status">{status}</p>}
+        </form>
+      </section>
+      <section>
+        <h2>6. Referencias generales</h2>
+        <p>
+          La politica se apoya en la diferencia entre copyright, marcas y
+          derechos sobre nombre e imagen. Consulta la{' '}
+          <a
+            href="https://www.copyright.gov/help/faq/faq-protect.html"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Oficina de Copyright de Estados Unidos
+          </a>
+          , la{' '}
+          <a
+            href="https://www.uspto.gov/page/about-trademark-infringement"
+            target="_blank"
+            rel="noreferrer"
+          >
+            USPTO
+          </a>{' '}
+          y la jurisprudencia aplicable de la{' '}
+          <a
+            href="https://www.corteconstitucional.gov.co/relatoria/2022/t-280-22"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Corte Constitucional de Colombia
+          </a>
+          . Estas referencias no sustituyen asesoria juridica.
+        </p>
+      </section>
+    </>
+  );
+}
+
 export function LegalPage({
   page
 }: {
-  page: 'rules' | 'privacy' | 'methodology';
+  page: 'rules' | 'privacy' | 'methodology' | 'rights';
 }) {
   return (
     <main className="legal-page">
@@ -254,8 +538,10 @@ export function LegalPage({
         <RulesPage />
       ) : page === 'privacy' ? (
         <PrivacyPage />
-      ) : (
+      ) : page === 'methodology' ? (
         <MethodologyPage />
+      ) : (
+        <RightsPage />
       )}
       <footer className="legal-summary">
         <article>
@@ -269,9 +555,9 @@ export function LegalPage({
           <span>El top puede pasar por revision antifraude.</span>
         </article>
         <article>
-          <Database size={19} />
-          <strong>Datos limitados</strong>
-          <span>Guardamos lo necesario para operar la beta.</span>
+          <FileCheck2 size={19} />
+          <strong>Uso verificable</strong>
+          <span>Las imagenes necesitan una base registrada.</span>
         </article>
       </footer>
     </main>

@@ -32,7 +32,7 @@ staging-api.goleafutbol.com {
 
 Agrega el bloque sin reemplazar las rutas existentes de Golea. En Cloudflare,
 crea el registro DNS `staging-api` con proxy naranja y autoriza
-`staging-fama.goleafutbol.com` en Firebase Auth y Turnstile.
+el dominio de staging elegido en Firebase Auth y Turnstile.
 
 Para un preview de Cloudflare Pages usa una rama de staging y:
 
@@ -56,11 +56,24 @@ El despliegue debe hacerse en este orden para no bloquear clientes antiguos:
 Cada nueva version de reglas o privacidad requiere cambiar su fecha en
 `backend/src/consent.ts`. El usuario debera aceptar nuevamente antes de operar.
 
-## 3. YouTube derived metrics
+## 3. Marca, dominio y derechos
 
-Antes de enviar la solicitud:
+Antes de conectar el dominio definitivo:
 
-1. Confirmar que `fama.goleafutbol.com` resuelve por DNS y usa HTTPS.
+1. Completar la lista de `docs/BRAND_DOMAIN_AND_RIGHTS.md`.
+2. Evitar nombres de figuras, marcas o plataformas dentro del dominio.
+3. Configurar el nuevo dominio en Pages, Firebase Auth, Turnstile, CORS y
+   `PUBLIC_SITE_URL`.
+4. Configurar `VITE_RIGHTS_CONTACT_EMAIL` y un
+   `RIGHTS_IP_HASH_SALT` aleatorio en produccion.
+5. Verificar `/reglas`, `/privacidad`, `/metodologia` y `/derechos`.
+6. Mantener toda imagen en `unverified` hasta registrar su fuente y permiso.
+
+## 4. YouTube derived metrics
+
+El formulario queda aplazado. Cuando se retome:
+
+1. Confirmar que el nuevo dominio definitivo resuelve por DNS y usa HTTPS.
 2. Verificar publicamente `/`, `/reglas`, `/privacidad` y `/metodologia`.
 3. Capturar las evidencias descritas en
    `docs/YOUTUBE_DERIVED_METRICS_APPLICATION.md`.
@@ -73,10 +86,10 @@ La tarea de Wikimedia puede activarse de forma independiente:
 ```text
 ATTENTION_SYNC_ENABLED=true
 ATTENTION_SYNC_INTERVAL_MINUTES=360
-ATTENTION_USER_AGENT=FameMarket/0.1 (https://fama.goleafutbol.com; contact: SOPORTE)
+ATTENTION_USER_AGENT=FameMarket/0.1 (https://DOMINIO-NUEVO; contact: SOPORTE)
 ```
 
-## 4. Backups externos en Cloudflare R2
+## 5. Backups externos en Cloudflare R2
 
 Crear un bucket privado:
 
@@ -106,7 +119,7 @@ La ejecucion solo se marca exitosa despues de verificar checksum, restaurar en
 una base temporal y, si R2 esta configurado, subir el archivo cifrado y su
 checksum. Nunca subas la contrasena de cifrado al mismo bucket.
 
-## 5. Monitor externo
+## 6. Monitor externo
 
 El Worker de `ops/monitor-worker` corre cada cinco minutos sin usar el VPS para
 su propia supervision. Comprueba:
@@ -143,7 +156,7 @@ Wrangler aprovisiona el KV declarado en `wrangler.jsonc` al desplegarlo. El
 Worker espera dos fallos consecutivos antes de avisar y envia otro mensaje
 cuando el servicio se recupera.
 
-## 6. Lista previa a beta
+## 7. Lista previa a beta
 
 - Staging no comparte base, volumen, puerto ni dominio con produccion.
 - Login, Turnstile y consentimiento funcionan desde el dominio de staging.
@@ -156,3 +169,6 @@ cuando el servicio se recupera.
   `activationReady=false`.
 - Privacidad y metodologia separan claramente los datos de YouTube del indice
   de Wikimedia.
+- Las imagenes no verificadas se muestran como avatares abstractos.
+- El formulario de derechos crea una solicitud visible en administracion.
+- El nombre y dominio definitivos pasaron una busqueda de marcas documentada.

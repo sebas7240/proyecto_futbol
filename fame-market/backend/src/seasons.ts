@@ -6,6 +6,10 @@ import {
   generateSeasonFraudReview
 } from './security.js';
 import type { AuthenticatedUser } from './types.js';
+import {
+  publicArtistImage,
+  type ImageUsageStatus
+} from './rights.js';
 
 type Numeric = string | number;
 
@@ -300,6 +304,7 @@ export async function getUserSeasonTrades(
     artist_name: string;
     artist_symbol: string;
     artist_image_url: string | null;
+    image_usage_status: ImageUsageStatus;
     side: 'buy' | 'sell';
     quantity: number;
     average_price: Numeric;
@@ -315,6 +320,7 @@ export async function getUserSeasonTrades(
         artist.name AS artist_name,
         artist.symbol AS artist_symbol,
         artist.image_url AS artist_image_url,
+        artist.image_usage_status,
         trade.side,
         trade.quantity,
         trade.average_price,
@@ -338,7 +344,11 @@ export async function getUserSeasonTrades(
     artistId: trade.artist_id,
     artistName: trade.artist_name,
     artistSymbol: trade.artist_symbol,
-    artistImageUrl: trade.artist_image_url ?? '',
+    artistImageUrl: publicArtistImage(
+      trade.artist_image_url,
+      trade.image_usage_status
+    ),
+    artistImageUsageStatus: trade.image_usage_status,
     side: trade.side,
     quantity: Number(trade.quantity),
     averagePrice: number(trade.average_price),

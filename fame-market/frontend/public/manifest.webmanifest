@@ -1,7 +1,7 @@
 {
   "name": "Fame Market",
   "short_name": "Fame",
-  "description": "Juego de popularidad musical con monedas ficticias.",
+  "description": "Juego de cultura y atencion con monedas ficticias.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f4f3ef",

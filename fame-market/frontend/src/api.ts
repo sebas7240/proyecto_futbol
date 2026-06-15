@@ -3,7 +3,15 @@ import type {
   ArtistSummary,
   AttentionEvaluationResponse,
   AttentionSourceOverview,
+  CategoryOverview,
   ConsentStatus,
+  EntityCategory,
+  EntitySource,
+  ExternalEvent,
+  ExternalEventDirection,
+  ExternalEventReviewStatus,
+  ExternalEventType,
+  ExternalEventVisibilityStatus,
   Portfolio,
   Quote,
   RankingResponse,
@@ -12,7 +20,12 @@ import type {
   Season,
   SeasonHistory,
   SeasonTrade,
-  Trade
+  Trade,
+  ArtistRightsRecord,
+  ImageUsageStatus,
+  RightsRequest,
+  RightsRequestStatus,
+  RightsRequestType
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4020/api';
@@ -43,12 +56,30 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   async artists() {
-    const body = await request<{ artists: ArtistSummary[] }>('/artists');
-    return body.artists;
+    const body = await request<{ entities: ArtistSummary[] }>('/entities');
+    return body.entities;
   },
   async artist(slug: string) {
-    const body = await request<{ artist: ArtistDetails }>(`/artists/${slug}`);
-    return body.artist;
+    const body = await request<{ entity: ArtistDetails }>(`/entities/${slug}`);
+    return body.entity;
+  },
+  async entitySources(slug: string) {
+    const body = await request<{ sources: EntitySource[] }>(
+      `/entities/${slug}/sources`
+    );
+    return body.sources;
+  },
+  async externalEvents(slug: string) {
+    const body = await request<{ events: ExternalEvent[] }>(
+      `/entities/${slug}/external-events`
+    );
+    return body.events;
+  },
+  async marketCategories() {
+    const body = await request<{ categories: CategoryOverview[] }>(
+      '/market/categories'
+    );
+    return body.categories;
   },
   async artistAttention(slug: string) {
     const body = await request<{ attention: AttentionSourceOverview[] }>(
@@ -72,6 +103,22 @@ export const api = {
   async favorites() {
     const body = await request<{ artistIds: string[] }>('/me/favorites');
     return body.artistIds;
+  },
+  async interests() {
+    const body = await request<{ categories: EntityCategory[] }>(
+      '/me/interests'
+    );
+    return body.categories;
+  },
+  async setInterests(categories: EntityCategory[]) {
+    const body = await request<{ categories: EntityCategory[] }>(
+      '/me/interests',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ categories })
+      }
+    );
+    return body.categories;
   },
   async trades() {
     const body = await request<{ trades: Trade[] }>('/me/trades');
@@ -119,6 +166,23 @@ export const api = {
         idempotencyKey: crypto.randomUUID()
       })
     });
+  },
+  async createRightsRequest(input: {
+    requesterName: string;
+    requesterEmail: string;
+    requestType: RightsRequestType;
+    subject: string;
+    message: string;
+    evidenceUrl: string;
+    website: string;
+  }) {
+    const body = await request<{
+      request: { id: string; status: RightsRequestStatus; createdAt: string };
+    }>('/legal/rights-requests', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    return body.request;
   },
   async registerYouTubeChannel(
     adminSecret: string,
@@ -201,6 +265,65 @@ export const api = {
       headers: { 'x-admin-secret': adminSecret }
     });
   },
+  async adminExternalEvents(adminSecret: string) {
+    const body = await request<{ events: ExternalEvent[] }>(
+      '/admin/external-events',
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+    return body.events;
+  },
+  async createExternalEvent(
+    adminSecret: string,
+    artistId: string,
+    input: {
+      eventType: ExternalEventType;
+      title: string;
+      description: string;
+      sourceUrl: string;
+      occurredAt: string;
+      impactDirection: ExternalEventDirection;
+      proposedDeltaBps: number;
+      visibilityStatus: ExternalEventVisibilityStatus;
+      reviewStatus: ExternalEventReviewStatus;
+      adminNotes: string;
+    }
+  ) {
+    const body = await request<{ event: ExternalEvent }>(
+      `/admin/artists/${artistId}/external-events`,
+      {
+        method: 'POST',
+        headers: { 'x-admin-secret': adminSecret },
+        body: JSON.stringify(input)
+      }
+    );
+    return body.event;
+  },
+  async updateExternalEvent(
+    adminSecret: string,
+    eventId: string,
+    input: Partial<{
+      eventType: ExternalEventType;
+      title: string;
+      description: string;
+      sourceUrl: string;
+      occurredAt: string;
+      impactDirection: ExternalEventDirection;
+      proposedDeltaBps: number;
+      visibilityStatus: ExternalEventVisibilityStatus;
+      reviewStatus: ExternalEventReviewStatus;
+      adminNotes: string;
+    }>
+  ) {
+    const body = await request<{ event: ExternalEvent }>(
+      `/admin/external-events/${eventId}`,
+      {
+        method: 'PATCH',
+        headers: { 'x-admin-secret': adminSecret },
+        body: JSON.stringify(input)
+      }
+    );
+    return body.event;
+  },
   async reviewRanking(
     adminSecret: string,
     seasonId: string,
@@ -234,6 +357,50 @@ export const api = {
       method: 'PATCH',
       headers: { 'x-admin-secret': adminSecret },
       body: JSON.stringify({ status })
+    });
+  },
+  async artistRights(adminSecret: string) {
+    const body = await request<{ artists: ArtistRightsRecord[] }>(
+      '/admin/rights/artists',
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+    return body.artists;
+  },
+  async updateArtistRights(
+    adminSecret: string,
+    artistId: string,
+    input: {
+      imageUrl: string;
+      imageUsageStatus: ImageUsageStatus;
+      imageSourceUrl: string;
+      imageLicense: string;
+      imageAttribution: string;
+      rightsNotes: string;
+    }
+  ) {
+    return request(`/admin/rights/artists/${artistId}`, {
+      method: 'PATCH',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify(input)
+    });
+  },
+  async rightsRequests(adminSecret: string) {
+    const body = await request<{ requests: RightsRequest[] }>(
+      '/admin/rights/requests',
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+    return body.requests;
+  },
+  async updateRightsRequest(
+    adminSecret: string,
+    requestId: string,
+    status: RightsRequestStatus,
+    adminNotes: string
+  ) {
+    return request(`/admin/rights/requests/${requestId}`, {
+      method: 'PATCH',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ status, adminNotes: adminNotes.trim() || null })
     });
   }
 };

@@ -238,7 +238,9 @@ function compactDate(date: Date) {
 function wikimediaUserAgent() {
   return (
     process.env.ATTENTION_USER_AGENT ??
-    'FameMarket/0.1 (https://fama.goleafutbol.com; contact: admin@goleafutbol.com)'
+    `FameMarket/0.1 (${process.env.PUBLIC_SITE_URL ?? 'http://localhost:5174'}; contact: ${
+      process.env.RIGHTS_CONTACT_EMAIL ?? 'not-configured'
+    })`
   );
 }
 

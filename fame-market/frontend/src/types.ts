@@ -1,3 +1,23 @@
+export type ImageUsageStatus =
+  | 'none'
+  | 'unverified'
+  | 'owned'
+  | 'licensed'
+  | 'provider_authorized';
+
+export type EntityCategory =
+  | 'musica'
+  | 'creadores'
+  | 'cine-tv'
+  | 'deportes'
+  | 'otros';
+
+export interface CategoryOverview {
+  id: EntityCategory;
+  label: string;
+  count: number;
+}
+
 export interface ArtistSummary {
   id: string;
   slug: string;
@@ -5,7 +25,13 @@ export interface ArtistSummary {
   name: string;
   country: string;
   genre: string;
+  category: EntityCategory;
+  subcategory: string;
+  profession: string;
+  themeTags: string[];
   imageUrl: string;
+  imageUsageStatus: ImageUsageStatus;
+  imageAttribution: string;
   currentPrice: number;
   changePercent: number;
   holders: number;
@@ -28,9 +54,73 @@ export interface ArtistVideo {
   youtubeUrl: string;
 }
 
+export interface EntityContentItem {
+  id: string;
+  provider: string;
+  contentType: string;
+  title: string;
+  thumbnailUrl: string;
+  publishedAt: string | null;
+  durationSeconds: number | null;
+  sourceUrl: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  capturedAt: string | null;
+}
+
+export interface EntitySource {
+  id: string;
+  provider: string;
+  sourceType: string;
+  externalId: string;
+  sourceUrl: string;
+  displayName: string;
+  isPrimary: boolean;
+  usageMode: string;
+  licenseNotes: string;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
+
+export type ExternalEventType =
+  | 'correction'
+  | 'media'
+  | 'platform'
+  | 'legal'
+  | 'manual';
+
+export type ExternalEventDirection = 'positive' | 'negative' | 'neutral';
+export type ExternalEventVisibilityStatus = 'draft' | 'public' | 'archived';
+export type ExternalEventReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ExternalEvent {
+  id: string;
+  artistId: string;
+  artistName: string;
+  artistSlug: string;
+  eventType: ExternalEventType;
+  title: string;
+  description: string;
+  sourceUrl: string;
+  occurredAt: string;
+  impactDirection: ExternalEventDirection;
+  proposedDeltaBps: number;
+  appliedDeltaBps: number;
+  visibilityStatus: ExternalEventVisibilityStatus;
+  reviewStatus: ExternalEventReviewStatus;
+  createdBy: string;
+  reviewedBy: string | null;
+  adminNotes: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
+}
+
 export interface ArtistDetails extends ArtistSummary {
   history: PricePoint[];
   videos: ArtistVideo[];
+  contentItems: EntityContentItem[];
 }
 
 export interface PortfolioPosition {
@@ -129,6 +219,7 @@ export interface SeasonTrade extends Trade {
   artistName: string;
   artistSymbol: string;
   artistImageUrl: string;
+  artistImageUsageStatus: ImageUsageStatus;
 }
 
 export interface SecurityAlert {
@@ -269,4 +360,45 @@ export interface ConsentStatus {
   rulesVersion: string;
   privacyVersion: string;
   acceptedAt: string | null;
+}
+
+export type RightsRequestType =
+  | 'correction'
+  | 'removal'
+  | 'trademark'
+  | 'image'
+  | 'other';
+
+export type RightsRequestStatus =
+  | 'open'
+  | 'reviewing'
+  | 'resolved'
+  | 'rejected';
+
+export interface RightsRequest {
+  id: string;
+  requesterName: string;
+  requesterEmail: string;
+  requestType: RightsRequestType;
+  subject: string;
+  message: string;
+  evidenceUrl: string | null;
+  status: RightsRequestStatus;
+  adminNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+}
+
+export interface ArtistRightsRecord {
+  artistId: string;
+  artistName: string;
+  artistSymbol: string;
+  imageUrl: string;
+  imageUsageStatus: ImageUsageStatus;
+  imageSourceUrl: string;
+  imageLicense: string;
+  imageAttribution: string;
+  rightsReviewedAt: string | null;
+  rightsNotes: string;
 }

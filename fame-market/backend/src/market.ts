@@ -307,12 +307,34 @@ export class MarketStore implements MarketDataStore {
       name: artist.name,
       country: artist.country,
       genre: artist.genre,
+      category: artist.category,
+      subcategory: artist.subcategory,
+      profession: artist.profession,
+      themeTags: artist.themeTags,
       imageUrl: artist.imageUrl,
+      imageUsageStatus: artist.imageUsageStatus,
+      imageAttribution: artist.imageAttribution,
       currentPrice: artist.currentPrice,
       changePercent,
       holders: artist.holders,
       status: artist.status
     };
-    return includeDetails ? { ...base, history: artist.history, videos: artist.videos } : base;
+    const contentItems = artist.videos.map((video) => ({
+      id: video.id,
+      provider: 'youtube',
+      contentType: 'video',
+      title: video.title,
+      thumbnailUrl: video.thumbnailUrl,
+      publishedAt: video.publishedAt,
+      durationSeconds: null,
+      sourceUrl: video.youtubeUrl,
+      viewCount: video.viewCount,
+      likeCount: video.likeCount,
+      commentCount: video.commentCount,
+      capturedAt: video.capturedAt ?? null
+    }));
+    return includeDetails
+      ? { ...base, history: artist.history, videos: artist.videos, contentItems }
+      : base;
   }
 }

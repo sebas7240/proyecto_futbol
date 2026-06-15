@@ -38,7 +38,8 @@ Categorias iniciales recomendadas:
 
 Cada figura tendra:
 
-- Nombre, fotografia, pais, categoria y subcategoria.
+- Nombre informativo, avatar abstracto o imagen con licencia verificada, pais,
+  categoria y subcategoria.
 - Profesion o especialidad visible.
 - Uno o varios perfiles o canales oficiales.
 - Precio ficticio actual.
@@ -375,6 +376,42 @@ Los horarios se guardaran en UTC y se mostraran en la zona del usuario.
 - Si existen premios reales o patrocinados, se requiere una revision legal de
   las reglas del concurso antes del lanzamiento publico.
 
+### Identidad, imagen y marcas
+
+El uso de nombres de figuras publicas no se tratara como una autorizacion
+general. Que un nombre no este protegido por copyright no elimina los riesgos
+de marca, falsa afiliacion, derecho de imagen, competencia desleal o normas
+locales.
+
+Reglas obligatorias:
+
+- Los nombres se usan para identificacion informativa y estadistica.
+- Ninguna pantalla puede sugerir que una figura patrocina, administra o aprueba
+  Fame Market.
+- El nombre y dominio de la plataforma deben ser originales y neutrales; no
+  pueden contener el nombre, apodo, ticker o marca de una figura incluida.
+- No se usaran logos, portadas, fotografias tomadas de buscadores ni material
+  promocional sin una licencia o permiso verificable.
+- Por defecto se muestran avatares abstractos de iniciales.
+- Una caricatura o imagen de IA reconocible no se considera automaticamente
+  segura y requiere la misma revision de semejanza y autorizacion.
+- Toda imagen visible necesita estado, fuente, licencia, atribucion, fecha de
+  revision y nota interna.
+- Los datos publicos conservan los terminos y limites de su proveedor.
+- Existira un formulario publico de correccion, retiro, marca o imagen, con
+  bandeja administrativa y auditoria de la decision.
+- Antes de premios, publicidad a gran escala o expansion internacional se
+  realizara revision profesional en las jurisdicciones aplicables.
+
+El aviso visible sera:
+
+> Simulador independiente. Los nombres identifican figuras publicas con fines
+> informativos. Fame Market no esta afiliado, patrocinado ni aprobado por ellas
+> o sus marcas.
+
+Este enfoque reduce riesgo, pero el plan no afirmara que el producto es
+“100% legal” ni sustituye asesoria juridica.
+
 ### Monetizacion justa
 
 Ideas aceptadas para una fase posterior:
@@ -491,11 +528,15 @@ El proyecto vivira aislado en `fame-market/` dentro del repositorio actual.
 - Cloudflare delante de la API para WAF y rate limit.
 - Backups diarios cifrados de PostgreSQL.
 - Dominio y rutas separados de Golea y Polla Predictions.
+- Nombre y dominio definitivos sujetos a busqueda de marcas, redes sociales,
+  tiendas de aplicaciones y riesgo de confusion.
+- URLs configurables mediante variables de entorno para evitar acoplar el
+  producto al dominio provisional.
 
-Ejemplo:
+Estructura objetivo:
 
-- `fama.goleafutbol.com`
-- `api.goleafutbol.com/fama`
+- `app.DOMINIO-NUEVO`
+- `api.DOMINIO-NUEVO`
 
 No se modificara ni detendra ningun servicio existente para desarrollar este
 modulo.
@@ -873,12 +914,17 @@ Estados necesarios:
 
 ### Fase 0 - Validacion tecnica y reglas
 
-- [ ] Confirmar nombre y dominio.
+- [ ] Confirmar nombre y dominio mediante busqueda de marcas y riesgo de
+      confusion.
 - [ ] Elegir las primeras 20 a 30 figuras y su mezcla de categorias.
 - [ ] Verificar al menos una fuente util por figura.
 - [x] Activar YouTube Data API y crear una API key permitida para esa API.
 - [x] Implementar consulta de canales, playlist de subidas y estadisticas.
 - [x] Definir reglas publicas del juego.
+- [x] Publicar aviso de no afiliacion y politica de derechos.
+- [x] Ocultar por defecto imagenes sin licencia verificada.
+- [x] Crear registro administrativo de fuente, licencia y atribucion.
+- [x] Crear formulario y bandeja de correccion o retiro.
 - [ ] Confirmar el uso permitido de datos antes de automatizar cualquier metrica
       derivada.
 
@@ -982,11 +1028,14 @@ Criterio:
 
 - [ ] Migrar `artists` a `market_entities` conservando IDs e historial.
 - [ ] Migrar referencias `artist_id` a `entity_id`.
-- [ ] Crear categorias `musica`, `creadores` y `cine-tv`.
-- [ ] Generalizar textos, tipos, endpoints y panel admin.
-- [ ] Crear adaptadores `entity_sources` y contenido generico.
-- [ ] Agregar filtros por categoria, subcategoria, pais e intereses.
-- [ ] Guardar intereses personales sin afectar reglas del mercado.
+- [x] Crear categorias `musica`, `creadores`, `cine-tv`, `deportes` y
+      `otros` sobre el catalogo actual.
+- [x] Crear aliases compatibles `/entities` sin romper `/artists`.
+- [ ] Generalizar definitivamente tablas, tipos internos y panel admin.
+- [x] Crear adaptadores `entity_sources` y contenido generico compatible con
+      YouTube.
+- [x] Agregar filtros por categoria, busqueda ampliada e intereses.
+- [x] Guardar intereses personales sin afectar reglas del mercado.
 - [x] Crear tablas de fuentes, observaciones y senales de atencion.
 - [x] Implementar adaptador de Wikimedia Pageviews.
 - [x] Calcular la primera senal relativa con ventana 7 contra 21 dias.
@@ -1001,10 +1050,11 @@ Criterio:
       YouTube.
 - [ ] Desplegar el dominio publico y enviar la solicitud a YouTube.
 - [ ] Agregar adaptadores aprobados de YouTube, Twitch y GDELT.
-- [ ] Crear `external_events` solo para correcciones excepcionales.
+- [x] Crear `external_events` solo para correcciones excepcionales.
 - [ ] Aplicar automaticamente senales aprobadas respetando `+/-0,60%` diario.
 - [x] Actualizar reglas y privacidad para el indice externo en modo sombra.
 - [x] Crear la pagina publica de metodologia y aislamiento de proveedores.
+- [x] Mostrar en la ficha publica fuentes verificadas y estado de cada fuente.
 - [ ] Publicar en produccion metodologia, fuentes y estado de cada fuente.
 - [ ] Mostrar en la grafica y ficha que parte vino de operaciones y que parte de
       senales externas.
@@ -1019,6 +1069,9 @@ Criterio:
 
 - [x] Redactar reglas y politica de privacidad.
 - [x] Exigir consentimiento versionado antes de operar.
+- [x] Implementar politica de nombres, imagenes y marcas.
+- [ ] Obtener revision juridica local antes de habilitar premios o monetizacion
+      a gran escala.
 - [ ] Probar con 20 a 50 usuarios.
 - [ ] Medir retencion diaria y semanal.
 - [ ] Medir cantidad de operaciones por jugador.
@@ -1057,6 +1110,10 @@ impacto_externo = limite(0.60% * senal_compuesta, -0.60%, 0.60%)
 No se construira sobre YouTube API sin el permiso adicional aplicable, ni
 sobre Spotify como dependencia necesaria mientras el proyecto no cumpla sus
 requisitos de acceso.
+
+La solicitud de metricas derivadas de YouTube queda preparada pero aplazada.
+No es un bloqueo para la beta: Wikimedia continuara en modo sombra y YouTube
+seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 
 ### Fase 10 - Crecimiento y premios sostenibles
 
@@ -1170,13 +1227,21 @@ La primera vertical tecnica ya incluye:
 31. Reconstruccion de 30 ventanas reales con evaluacion de estabilidad.
 32. Pagina publica de metodologia y textos legales actualizados.
 33. Paquete de solicitud de metricas derivadas de YouTube.
+34. Avatares abstractos cuando una imagen no tiene uso verificado.
+35. Registro de licencia, fuente, atribucion y revision por figura.
+36. Pagina publica de derechos con formulario de correccion o retiro.
+37. Bandeja administrativa y auditoria de solicitudes de derechos.
 
 Siguiente bloque recomendado:
 
-1. Desplegar `fama.goleafutbol.com` con reglas, privacidad y metodologia.
-2. Capturar evidencias y enviar la solicitud de metricas derivadas de YouTube.
-3. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
-4. Generalizar el dominio de `artists` a `market_entities`.
-5. Agregar categorias, filtros e intereses personales.
-6. Elegir el catalogo mixto de 20 a 30 figuras con fuentes verificadas.
-7. Desplegar staging, R2 y monitor externo antes de abrir la beta.
+1. Elegir nombre y dominio neutrales y realizar busqueda de marcas.
+2. Desplegar el nuevo dominio con reglas, privacidad, metodologia y derechos.
+3. Revisar una por una las imagenes y mantener avatares abstractos mientras no
+   exista licencia verificable.
+4. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
+5. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
+   cuando el catalogo mixto este listo, manteniendo aliases temporales.
+6. Crear adaptadores de fuentes genericos para creadores y cine/TV.
+7. Elegir el catalogo mixto de 20 a 30 figuras con fuentes verificadas.
+8. Desplegar staging, R2 y monitor externo antes de abrir la beta.
+9. Retomar el formulario de metricas derivadas de YouTube mas adelante.

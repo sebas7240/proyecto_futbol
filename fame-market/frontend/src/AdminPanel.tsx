@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   CirclePlay,
   Database,
+  FileCheck2,
   Flag,
   HardDrive,
+  Inbox,
   LockKeyhole,
   Radar,
   RefreshCw,
@@ -18,6 +20,11 @@ import {
   Youtube
 } from 'lucide-react';
 import { api } from './api';
+import { EntityAvatar } from './EntityAvatar';
+import type {
+  ArtistRightsRecord,
+  RightsRequestStatus
+} from './types';
 
 function ageLabel(seconds: number | null) {
   if (seconds === null) return 'Sin ejecuciones';
@@ -46,6 +53,12 @@ export function AdminPanel() {
   const [message, setMessage] = useState('');
   const [busyArtist, setBusyArtist] = useState('');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [rightsDrafts, setRightsDrafts] = useState<
+    Record<string, ArtistRightsRecord>
+  >({});
+  const [rightsRequestNotes, setRightsRequestNotes] = useState<
+    Record<string, string>
+  >({});
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminSecret],
     queryFn: () => api.securityReviews(adminSecret),
@@ -62,6 +75,18 @@ export function AdminPanel() {
   const attentionQuery = useQuery({
     queryKey: ['attention-overview', adminSecret],
     queryFn: () => api.attentionOverview(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false
+  });
+  const artistRightsQuery = useQuery({
+    queryKey: ['artist-rights', adminSecret],
+    queryFn: () => api.artistRights(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false
+  });
+  const rightsRequestsQuery = useQuery({
+    queryKey: ['rights-requests', adminSecret],
+    queryFn: () => api.rightsRequests(adminSecret),
     enabled: Boolean(adminSecret),
     retry: false
   });
@@ -247,6 +272,83 @@ export function AdminPanel() {
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : 'No se pudo actualizar.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const rightsDraft = (record: ArtistRightsRecord) =>
+    rightsDrafts[record.artistId] ?? record;
+
+  const changeRightsDraft = (
+    record: ArtistRightsRecord,
+    field: keyof ArtistRightsRecord,
+    value: string
+  ) => {
+    setRightsDrafts((current) => ({
+      ...current,
+      [record.artistId]: {
+        ...rightsDraft(record),
+        [field]: value
+      }
+    }));
+  };
+
+  const saveArtistRights = async (record: ArtistRightsRecord) => {
+    const draft = rightsDraft(record);
+    setBusyArtist(`rights-${record.artistId}`);
+    setMessage('');
+    try {
+      await api.updateArtistRights(adminSecret, record.artistId, {
+        imageUrl: draft.imageUrl,
+        imageUsageStatus: draft.imageUsageStatus,
+        imageSourceUrl: draft.imageSourceUrl,
+        imageLicense: draft.imageLicense,
+        imageAttribution: draft.imageAttribution,
+        rightsNotes: draft.rightsNotes
+      });
+      setMessage(`Registro de derechos actualizado para ${record.artistName}.`);
+      setRightsDrafts((current) => {
+        const next = { ...current };
+        delete next[record.artistId];
+        return next;
+      });
+      await Promise.all([
+        artistRightsQuery.refetch(),
+        artistsQuery.refetch()
+      ]);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo guardar el registro de derechos.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const reviewRightsRequest = async (
+    requestId: string,
+    status: RightsRequestStatus
+  ) => {
+    setBusyArtist(`rights-request-${requestId}`);
+    setMessage('');
+    try {
+      await api.updateRightsRequest(
+        adminSecret,
+        requestId,
+        status,
+        rightsRequestNotes[requestId] ?? ''
+      );
+      setMessage('Solicitud de derechos actualizada.');
+      await rightsRequestsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar la solicitud.'
       );
     } finally {
       setBusyArtist('');
@@ -618,6 +720,234 @@ export function AdminPanel() {
       </section>
 
       <div className="admin-section-title">
+        <small>Nombre, imagen y marcas</small>
+        <h2>Solicitudes de derechos</h2>
+      </div>
+
+      <section className="rights-request-list">
+        {!adminSecret ? (
+          <p>Ingresa el secreto para consultar la bandeja.</p>
+        ) : rightsRequestsQuery.isLoading ? (
+          <p>Cargando solicitudes...</p>
+        ) : rightsRequestsQuery.data?.length ? (
+          rightsRequestsQuery.data.map((request) => (
+            <article className="rights-request-card" key={request.id}>
+              <header>
+                <Inbox size={18} />
+                <span>
+                  <strong>{request.subject}</strong>
+                  <small>
+                    {request.requesterName} · {request.requesterEmail}
+                  </small>
+                </span>
+                <b className={`review-pill review-pill--${request.status}`}>
+                  {request.status}
+                </b>
+              </header>
+              <p>{request.message}</p>
+              {request.evidenceUrl && (
+                <a
+                  href={request.evidenceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ver evidencia
+                </a>
+              )}
+              <textarea
+                rows={3}
+                maxLength={1500}
+                placeholder="Nota interna de seguimiento"
+                value={
+                  rightsRequestNotes[request.id] ??
+                  request.adminNotes ??
+                  ''
+                }
+                onChange={(event) =>
+                  setRightsRequestNotes((current) => ({
+                    ...current,
+                    [request.id]: event.target.value
+                  }))
+                }
+              />
+              <div className="rights-request-card__actions">
+                <button
+                  onClick={() =>
+                    reviewRightsRequest(request.id, 'reviewing')
+                  }
+                  disabled={Boolean(busyArtist)}
+                >
+                  Revisando
+                </button>
+                <button
+                  onClick={() =>
+                    reviewRightsRequest(request.id, 'resolved')
+                  }
+                  disabled={Boolean(busyArtist)}
+                >
+                  Resolver
+                </button>
+                <button
+                  className="danger-action"
+                  onClick={() =>
+                    reviewRightsRequest(request.id, 'rejected')
+                  }
+                  disabled={Boolean(busyArtist)}
+                >
+                  Rechazar
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p>No hay solicitudes de derechos.</p>
+        )}
+      </section>
+
+      <div className="admin-section-title">
+        <small>Publicacion controlada</small>
+        <h2>Licencias de imagen</h2>
+      </div>
+
+      <section className="artist-rights-list">
+        {!adminSecret ? (
+          <p>Ingresa el secreto para revisar las licencias.</p>
+        ) : artistRightsQuery.isLoading ? (
+          <p>Cargando registros...</p>
+        ) : artistRightsQuery.data?.length ? (
+          artistRightsQuery.data.map((record) => {
+            const draft = rightsDraft(record);
+            return (
+              <article className="artist-rights-card" key={record.artistId}>
+                <header>
+                  <EntityAvatar
+                    name={record.artistName}
+                    symbol={record.artistSymbol}
+                    imageUrl={draft.imageUrl}
+                    imageUsageStatus={draft.imageUsageStatus}
+                  />
+                  <span>
+                    <strong>{record.artistName}</strong>
+                    <small>
+                      {record.artistSymbol} ·{' '}
+                      {record.rightsReviewedAt
+                        ? `revisado ${new Date(
+                            record.rightsReviewedAt
+                          ).toLocaleDateString('es-CO')}`
+                        : 'sin revision'}
+                    </small>
+                  </span>
+                  <FileCheck2 size={19} />
+                </header>
+                <div className="artist-rights-card__fields">
+                  <label>
+                    Estado de uso
+                    <select
+                      value={draft.imageUsageStatus}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'imageUsageStatus',
+                          event.target.value
+                        )
+                      }
+                    >
+                      <option value="none">Sin imagen</option>
+                      <option value="unverified">No verificada</option>
+                      <option value="owned">Contenido propio</option>
+                      <option value="licensed">Licencia comprobada</option>
+                      <option value="provider_authorized">
+                        Autorizada por proveedor
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    URL de imagen
+                    <input
+                      type="url"
+                      value={draft.imageUrl}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'imageUrl',
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    Fuente verificable
+                    <input
+                      type="url"
+                      value={draft.imageSourceUrl}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'imageSourceUrl',
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    Licencia o permiso
+                    <input
+                      value={draft.imageLicense}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'imageLicense',
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    Atribucion
+                    <input
+                      value={draft.imageAttribution}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'imageAttribution',
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="artist-rights-card__notes">
+                    Nota interna
+                    <textarea
+                      rows={3}
+                      value={draft.rightsNotes}
+                      onChange={(event) =>
+                        changeRightsDraft(
+                          record,
+                          'rightsNotes',
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                <button
+                  onClick={() => saveArtistRights(record)}
+                  disabled={!adminSecret || Boolean(busyArtist)}
+                >
+                  <Save size={17} />
+                  {busyArtist === `rights-${record.artistId}`
+                    ? 'Guardando...'
+                    : 'Guardar registro'}
+                </button>
+              </article>
+            );
+          })
+        ) : (
+          <p>No hay figuras para revisar.</p>
+        )}
+      </section>
+
+      <div className="admin-section-title">
         <small>Datos publicos</small>
         <h2>Canales oficiales de YouTube</h2>
       </div>
@@ -625,7 +955,13 @@ export function AdminPanel() {
       <section className="admin-artists">
         {(artistsQuery.data ?? []).map((artist) => (
           <article className="admin-artist" key={artist.id}>
-            <img src={artist.imageUrl} alt="" />
+            <EntityAvatar
+              name={artist.name}
+              symbol={artist.symbol}
+              imageUrl={artist.imageUrl}
+              imageUsageStatus={artist.imageUsageStatus}
+              imageAttribution={artist.imageAttribution}
+            />
             <div>
               <strong>{artist.name}</strong>
               <small>{artist.symbol} · {artist.country}</small>

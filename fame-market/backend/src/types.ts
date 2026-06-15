@@ -21,6 +21,22 @@ export interface VideoSnapshot {
   likeCount: number;
   commentCount: number;
   youtubeUrl: string;
+  capturedAt?: string | null;
+}
+
+export interface EntityContentItem {
+  id: string;
+  provider: string;
+  contentType: string;
+  title: string;
+  thumbnailUrl: string;
+  publishedAt: string | null;
+  durationSeconds: number | null;
+  sourceUrl: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  capturedAt: string | null;
 }
 
 export interface Artist {
@@ -30,7 +46,18 @@ export interface Artist {
   name: string;
   country: string;
   genre: string;
+  category: string;
+  subcategory: string;
+  profession: string;
+  themeTags: string[];
   imageUrl: string;
+  imageUsageStatus:
+    | 'none'
+    | 'unverified'
+    | 'owned'
+    | 'licensed'
+    | 'provider_authorized';
+  imageAttribution: string;
   currentPrice: number;
   openingPrice: number;
   dailyAnchorPrice: number;
@@ -40,6 +67,7 @@ export interface Artist {
   holders: number;
   history: PricePoint[];
   videos: VideoSnapshot[];
+  contentItems?: EntityContentItem[];
 }
 
 export interface Position {

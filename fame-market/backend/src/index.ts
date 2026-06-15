@@ -20,6 +20,7 @@ import {
   getConsentStatus,
   requireCurrentConsent
 } from './consent.js';
+import { listEntitySourcesBySlug } from './content.js';
 import {
   checkDatabase,
   databaseConfigured,
@@ -30,7 +31,22 @@ import {
   deploymentEnvironment,
   validateDeploymentEnvironment
 } from './deployment.js';
+import {
+  createExternalEvent,
+  externalEventDirections,
+  externalEventReviewStatuses,
+  externalEventTypes,
+  externalEventVisibilityStatuses,
+  listAdminExternalEvents,
+  listPublicExternalEventsBySlug,
+  updateExternalEvent
+} from './externalEvents.js';
 import { MarketError, MarketStore } from './market.js';
+import {
+  getUserInterests,
+  listCategoryOverview,
+  setUserInterests
+} from './interests.js';
 import { incrementMetric } from './metrics.js';
 import {
   getOperationalOverview,
@@ -40,6 +56,14 @@ import {
 } from './operations.js';
 import { PostgresMarketStore } from './postgresMarket.js';
 import { rateLimit, requestIp } from './rateLimit.js';
+import {
+  createRightsRequest,
+  imageUsageStatuses,
+  listArtistRights,
+  listRightsRequests,
+  updateArtistRights,
+  updateRightsRequest
+} from './rights.js';
 import {
   listSecurityReviews,
   reviewRanking,
@@ -105,6 +129,12 @@ const executionRateLimit = rateLimit({
   maxRequests: 20,
   windowMs: 60_000,
   key: userRateKey
+});
+const rightsRequestRateLimit = rateLimit({
+  action: 'rights-request',
+  maxRequests: 5,
+  windowMs: 60 * 60 * 1000,
+  key: requestIp
 });
 const monitoringSecret =
   process.env.MONITORING_SECRET || process.env.ADMIN_SECRET;
@@ -199,6 +229,89 @@ app.get('/api/legal/versions', (_request, response) => {
   });
 });
 
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => !value || /^https?:\/\//i.test(value), {
+    message: 'La URL debe comenzar por http:// o https://.'
+  });
+
+const rightsRequestSchema = z.object({
+  requesterName: z.string().trim().min(2).max(120),
+  requesterEmail: z.string().trim().email().max(254),
+  requestType: z.enum([
+    'correction',
+    'removal',
+    'trademark',
+    'image',
+    'other'
+  ]),
+  subject: z.string().trim().min(3).max(180),
+  message: z.string().trim().min(20).max(4000),
+  evidenceUrl: optionalUrl.optional().default(''),
+  website: z.string().max(200).optional().default('')
+});
+
+const externalEventCreateSchema = z.object({
+  eventType: z.enum(externalEventTypes).default('manual'),
+  title: z.string().trim().min(3).max(180),
+  description: z.string().trim().max(1500).default(''),
+  sourceUrl: optionalUrl.default(''),
+  occurredAt: z
+    .string()
+    .datetime()
+    .optional()
+    .transform((value) => value ?? new Date().toISOString()),
+  impactDirection: z.enum(externalEventDirections).default('neutral'),
+  proposedDeltaBps: z.number().int().min(-60).max(60).default(0),
+  visibilityStatus: z.enum(externalEventVisibilityStatuses).default('draft'),
+  reviewStatus: z.enum(externalEventReviewStatuses).default('pending'),
+  adminNotes: z.string().trim().max(1500).default('')
+});
+
+const externalEventPatchSchema = z.object({
+  eventType: z.enum(externalEventTypes).optional(),
+  title: z.string().trim().min(3).max(180).optional(),
+  description: z.string().trim().max(1500).optional(),
+  sourceUrl: optionalUrl.optional(),
+  occurredAt: z.string().datetime().optional(),
+  impactDirection: z.enum(externalEventDirections).optional(),
+  proposedDeltaBps: z.number().int().min(-60).max(60).optional(),
+  visibilityStatus: z.enum(externalEventVisibilityStatuses).optional(),
+  reviewStatus: z.enum(externalEventReviewStatuses).optional(),
+  adminNotes: z.string().trim().max(1500).optional()
+});
+
+app.post(
+  '/api/legal/rights-requests',
+  rightsRequestRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = rightsRequestSchema.parse(request.body);
+      if (input.website) {
+        response.status(202).json({
+          request: {
+            id: 'accepted',
+            status: 'open',
+            createdAt: new Date().toISOString()
+          }
+        });
+        return;
+      }
+      const { website: _website, ...requestInput } = input;
+      response.status(201).json({
+        request: await createRightsRequest(
+          requestInput,
+          requestIp(request)
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.get('/api/seasons/current', async (_request, response, next) => {
   try {
     response.json({ season: await getCurrentSeason() });
@@ -224,9 +337,81 @@ app.get('/api/artists', async (_request, response, next) => {
   }
 });
 
+app.get('/api/entities', async (_request, response, next) => {
+  try {
+    response.json({ entities: await market.listArtists() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/artists/:slug', async (request, response, next) => {
   try {
     response.json({ artist: await market.getArtistBySlug(request.params.slug) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/entities/:slug', async (request, response, next) => {
+  try {
+    response.json({ entity: await market.getArtistBySlug(request.params.slug) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/artists/:slug/sources', async (request, response, next) => {
+  try {
+    response.json({
+      sources: await listEntitySourcesBySlug(String(request.params.slug))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/entities/:slug/sources', async (request, response, next) => {
+  try {
+    response.json({
+      sources: await listEntitySourcesBySlug(String(request.params.slug))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/artists/:slug/external-events', async (request, response, next) => {
+  try {
+    if (!databaseConfigured()) {
+      response.json({ events: [] });
+      return;
+    }
+    response.json({
+      events: await listPublicExternalEventsBySlug(String(request.params.slug))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/entities/:slug/external-events', async (request, response, next) => {
+  try {
+    if (!databaseConfigured()) {
+      response.json({ events: [] });
+      return;
+    }
+    response.json({
+      events: await listPublicExternalEventsBySlug(String(request.params.slug))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/market/categories', async (_request, response, next) => {
+  try {
+    response.json({ categories: await listCategoryOverview() });
   } catch (error) {
     next(error);
   }
@@ -319,6 +504,34 @@ app.get('/api/me/favorites', requireAuth, async (request, response, next) => {
   try {
     response.json({
       artistIds: await market.listFavorites(request.authenticatedUser!)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/me/interests', requireAuth, async (request, response, next) => {
+  try {
+    response.json({
+      categories: await getUserInterests(request.authenticatedUser!)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/me/interests', requireAuth, async (request, response, next) => {
+  try {
+    const input = z
+      .object({
+        categories: z.array(z.string().trim().max(40)).max(8)
+      })
+      .parse(request.body);
+    response.json({
+      categories: await setUserInterests(
+        request.authenticatedUser!,
+        input.categories
+      )
     });
   } catch (error) {
     next(error);
@@ -632,6 +845,157 @@ app.get(
   async (_request, response, next) => {
     try {
       response.json(await getOperationalOverview());
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/external-events',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'Los eventos externos requieren PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const limit = Number(request.query.limit ?? 100);
+      response.json({
+        events: await listAdminExternalEvents(Number.isFinite(limit) ? limit : 100)
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/artists/:artistId/external-events',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'Los eventos externos requieren PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = externalEventCreateSchema.parse(request.body);
+      response.status(201).json({
+        event: await createExternalEvent(
+          String(request.params.artistId),
+          input,
+          'admin'
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/external-events/:eventId',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'Los eventos externos requieren PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = externalEventPatchSchema.parse(request.body);
+      response.json({
+        event: await updateExternalEvent(
+          String(request.params.eventId),
+          input,
+          'admin'
+        )
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/rights/artists',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      response.json({ artists: await listArtistRights() });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/rights/artists/:artistId',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = z
+        .object({
+          imageUrl: optionalUrl.default(''),
+          imageUsageStatus: z.enum(imageUsageStatuses),
+          imageSourceUrl: optionalUrl.default(''),
+          imageLicense: z.string().trim().max(250).default(''),
+          imageAttribution: z.string().trim().max(500).default(''),
+          rightsNotes: z.string().trim().max(1500).default('')
+        })
+        .parse(request.body);
+      await updateArtistRights(String(request.params.artistId), input);
+      response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/rights/requests',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      response.json({ requests: await listRightsRequests() });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/rights/requests/:requestId',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = z
+        .object({
+          status: z.enum(['open', 'reviewing', 'resolved', 'rejected']),
+          adminNotes: z.string().trim().max(1500).nullable().optional()
+        })
+        .parse(request.body);
+      await updateRightsRequest(
+        String(request.params.requestId),
+        input.status,
+        input.adminNotes ?? null
+      );
+      response.json({ ok: true });
     } catch (error) {
       next(error);
     }

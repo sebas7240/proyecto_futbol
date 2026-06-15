@@ -176,17 +176,52 @@ export async function registerArtistChannel(
       input.isPrimary ?? true
     ]
   );
-  return result.rows[0];
+  const savedChannel = result.rows[0];
+  await getPool().query(
+    `
+      INSERT INTO entity_sources (
+        artist_id, provider, source_type, external_id, source_url,
+        display_name, is_primary, usage_mode, license_notes, metadata,
+        last_synced_at
+      ) VALUES ($1, 'youtube', 'channel', $2, $3, $4, $5, 'display_only', $6, $7, NOW())
+      ON CONFLICT (artist_id, provider, external_id)
+      DO UPDATE SET
+        source_url = EXCLUDED.source_url,
+        display_name = EXCLUDED.display_name,
+        is_primary = EXCLUDED.is_primary,
+        metadata = EXCLUDED.metadata,
+        last_synced_at = EXCLUDED.last_synced_at,
+        last_error = NULL
+    `,
+    [
+      artistId,
+      channel.youtubeChannelId,
+      `https://www.youtube.com/channel/${channel.youtubeChannelId}`,
+      channel.channelTitle,
+      input.isPrimary ?? true,
+      'Datos publicos de YouTube usados como referencia informativa.',
+      {
+        uploadsPlaylistId: channel.uploadsPlaylistId,
+        handle: channel.handle
+      }
+    ]
+  );
+  return savedChannel;
 }
 
 export async function syncArtistChannel(channelId: string) {
   const channelResult = await getPool().query<{
     id: string;
     artist_id: string;
+    youtube_channel_id: string;
     uploads_playlist_id: string;
+    channel_title: string;
+    handle: string | null;
+    is_primary: boolean;
   }>(
     `
-      SELECT id, artist_id, uploads_playlist_id
+      SELECT id, artist_id, youtube_channel_id, uploads_playlist_id,
+        channel_title, handle, is_primary
       FROM artist_channels
       WHERE id = $1
     `,
@@ -217,6 +252,16 @@ export async function syncArtistChannel(channelId: string) {
       'UPDATE artist_channels SET last_synced_at = NOW() WHERE id = $1',
       [channel.id]
     );
+    await getPool().query(
+      `
+        UPDATE entity_sources
+        SET last_synced_at = NOW(), last_error = NULL
+        WHERE artist_id = $1
+          AND provider = 'youtube'
+          AND external_id = $2
+      `,
+      [channel.artist_id, channel.youtube_channel_id]
+    );
     return { channelId: channel.id, videos: 0 };
   }
 
@@ -227,6 +272,37 @@ export async function syncArtistChannel(channelId: string) {
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
+    const sourceResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO entity_sources (
+          artist_id, provider, source_type, external_id, source_url,
+          display_name, is_primary, usage_mode, license_notes, metadata,
+          last_synced_at
+        ) VALUES ($1, 'youtube', 'channel', $2, $3, $4, $5, 'display_only', $6, $7, NOW())
+        ON CONFLICT (artist_id, provider, external_id)
+        DO UPDATE SET
+          source_url = EXCLUDED.source_url,
+          display_name = EXCLUDED.display_name,
+          is_primary = EXCLUDED.is_primary,
+          metadata = EXCLUDED.metadata,
+          last_synced_at = EXCLUDED.last_synced_at,
+          last_error = NULL
+        RETURNING id
+      `,
+      [
+        channel.artist_id,
+        channel.youtube_channel_id,
+        `https://www.youtube.com/channel/${channel.youtube_channel_id}`,
+        channel.channel_title,
+        channel.is_primary,
+        'Datos publicos de YouTube usados como referencia informativa.',
+        {
+          uploadsPlaylistId: channel.uploads_playlist_id,
+          handle: channel.handle
+        }
+      ]
+    );
+    const sourceId = sourceResult.rows[0]!.id;
     let synced = 0;
     for (const video of body.items ?? []) {
       if (
@@ -275,6 +351,52 @@ export async function syncArtistChannel(channelId: string) {
         `,
         [
           saved.rows[0]!.id,
+          Number(video.statistics?.viewCount ?? 0),
+          Number(video.statistics?.likeCount ?? 0),
+          Number(video.statistics?.commentCount ?? 0)
+        ]
+      );
+      const contentItem = await client.query<{ id: string }>(
+        `
+          INSERT INTO content_items (
+            artist_id, source_id, provider, external_id, content_type, title,
+            thumbnail_url, published_at, duration_seconds, source_url,
+            eligibility_status, metadata, last_synced_at
+          ) VALUES ($1, $2, 'youtube', $3, $4, $5, $6, $7, $8, $9, 'eligible', $10, NOW())
+          ON CONFLICT (provider, external_id)
+          DO UPDATE SET
+            artist_id = EXCLUDED.artist_id,
+            source_id = EXCLUDED.source_id,
+            content_type = EXCLUDED.content_type,
+            title = EXCLUDED.title,
+            thumbnail_url = EXCLUDED.thumbnail_url,
+            published_at = EXCLUDED.published_at,
+            duration_seconds = EXCLUDED.duration_seconds,
+            source_url = EXCLUDED.source_url,
+            last_synced_at = NOW()
+          RETURNING id
+        `,
+        [
+          channel.artist_id,
+          sourceId,
+          video.id,
+          videoType,
+          video.snippet.title ?? 'Video oficial',
+          bestThumbnail(video),
+          video.snippet.publishedAt,
+          duration,
+          `https://www.youtube.com/watch?v=${video.id}`,
+          { legacyVideoId: saved.rows[0]!.id }
+        ]
+      );
+      await client.query(
+        `
+          INSERT INTO content_snapshots (
+            content_item_id, view_count, like_count, comment_count
+          ) VALUES ($1, $2, $3, $4)
+        `,
+        [
+          contentItem.rows[0]!.id,
           Number(video.statistics?.viewCount ?? 0),
           Number(video.statistics?.likeCount ?? 0),
           Number(video.statistics?.commentCount ?? 0)

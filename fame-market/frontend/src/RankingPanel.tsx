@@ -18,6 +18,7 @@ import type {
   SeasonHistory
 } from './types';
 import { api } from './api';
+import { EntityAvatar } from './EntityAvatar';
 
 const money = new Intl.NumberFormat('es-CO', {
   minimumFractionDigits: 2,
@@ -263,7 +264,13 @@ export function RankingPanel({
                     ) : seasonTradesQuery.data?.length ? (
                       seasonTradesQuery.data.map((trade) => (
                         <div className="season-trade" key={trade.id}>
-                          <img src={trade.artistImageUrl} alt="" />
+                          <EntityAvatar
+                            name={trade.artistName}
+                            symbol={trade.artistSymbol}
+                            imageUrl={trade.artistImageUrl}
+                            imageUsageStatus={trade.artistImageUsageStatus}
+                            size="small"
+                          />
                           <span>
                             <strong>{trade.artistName}</strong>
                             <small>

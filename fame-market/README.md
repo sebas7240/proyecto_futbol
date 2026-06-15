@@ -1,6 +1,6 @@
 # Fame Market
 
-Juego independiente de popularidad musical. Web, PWA y futura APK comparten el
+Juego independiente sobre la economia de la atencion. Web, PWA y futura APK comparten el
 mismo frontend, API, autenticacion y portafolio.
 
 ## Estado actual
@@ -20,7 +20,7 @@ mismo frontend, API, autenticacion y portafolio.
 - Reconstruccion idempotente de 30 ventanas historicas reales por figura.
 - Evaluacion de cobertura, dispersion y cambios de direccion sin tocar precios.
 - Canales oficiales verificados para Shakira, Karol G y Bad Bunny.
-- Busqueda, filtro latino y favoritos persistentes por usuario.
+- Busqueda, filtros por categoria, intereses y favoritos persistentes.
 - Marcadores personales de compra y venta sobre la grafica.
 - Onboarding corto para la primera operacion.
 - Prueba de concurrencia e idempotencia contra PostgreSQL real.
@@ -38,6 +38,18 @@ mismo frontend, API, autenticacion y portafolio.
 - Backups cifrados con restauracion automatica de prueba y salida opcional a R2.
 - Staging aislado con validacion previa de dominios, Firebase y base de datos.
 - Reglas y privacidad publicas con consentimiento versionado para operar.
+- Aviso de no afiliacion, politica publica de derechos y canal de correccion.
+- Avatares abstractos para toda imagen sin licencia verificada.
+- Registro administrativo de fuente, licencia, atribucion y revision.
+- Bandeja administrativa de solicitudes de imagen, marca o retiro.
+- Alias publicos `/api/entities` y `/api/entities/:slug` para avanzar hacia
+  figuras genericas sin romper compatibilidad.
+- Categorias `musica`, `creadores`, `cine-tv`, `deportes` y `otros` con
+  intereses personales guardados por usuario.
+- Fuentes genericas `entity_sources` y contenido reciente `content_items` con
+  compatibilidad hacia los videos existentes de YouTube.
+- Eventos externos `external_events` para contexto excepcional revisado, sin
+  aplicacion automatica de precio.
 - Monitor externo en Cloudflare Workers con estado en KV y alertas Telegram.
 - PWA instalable.
 - Docker Compose preparado para produccion.
@@ -78,6 +90,7 @@ Variables importantes:
 
 - `DATABASE_URL`
 - `DEPLOYMENT_ENV`
+- `PUBLIC_SITE_URL`
 - `FIREBASE_PROJECT_ID`
 - `YOUTUBE_API_KEY`
 - `ATTENTION_SYNC_ENABLED`
@@ -88,6 +101,9 @@ Variables importantes:
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_ALLOWED_HOSTNAMES`
 - `CONSENT_REQUIRED`
+- `RIGHTS_IP_HASH_SALT`
+- `VITE_PUBLIC_SITE_URL`
+- `VITE_RIGHTS_CONTACT_EMAIL`
 - `BACKUP_ENCRYPTION_PASSWORD`
 - `SEASON_AUTOMATION_ENABLED`
 - `SEASON_CYCLE_INTERVAL_MINUTES`
@@ -99,10 +115,10 @@ Los archivos `.env` estan ignorados por Git.
 ## Cloudflare Turnstile
 
 1. Crear un widget administrado en Cloudflare Turnstile.
-2. Autorizar `fama.goleafutbol.com` y `localhost` durante desarrollo.
+2. Autorizar el dominio definitivo y `localhost` durante desarrollo.
 3. Configurar la clave publica como `VITE_TURNSTILE_SITE_KEY` en Pages.
 4. Configurar la clave secreta como `TURNSTILE_SECRET_KEY` solo en el backend.
-5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=fama.goleafutbol.com`.
+5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=DOMINIO-NUEVO`.
 
 El frontend solicita un token al cotizar. El backend lo valida con Siteverify,
 comprueba la accion `trade_quote` y el hostname, y consume el token una sola
@@ -121,6 +137,11 @@ para no bloquear el desarrollo local.
 
 La API obtiene metadatos y contadores publicos. No descarga videos ni guarda
 comentarios individuales. YouTube no se utiliza para crear el precio ficticio.
+Cada sincronizacion tambien escribe en `entity_sources`, `content_items` y
+`content_snapshots`, que son las tablas genericas para futuras fuentes como
+creadores, cine, deportes o eventos externos.
+La ficha publica consume `GET /api/entities/:slug/sources` para mostrar fuentes
+verificadas y su estado.
 
 Canales iniciales registrados:
 
@@ -160,11 +181,43 @@ Documentacion:
 
 - [Operacion del indice](docs/ATTENTION_INDEX_OPERATIONS.md)
 - [Solicitud de metricas derivadas de YouTube](docs/YOUTUBE_DERIVED_METRICS_APPLICATION.md)
+- [Marca, dominio y derechos](docs/BRAND_DOMAIN_AND_RIGHTS.md)
 - Pagina publica: `/metodologia`
+- Pagina publica: `/derechos`
 
 Los datos de YouTube visibles no afectan precios. Una futura metrica derivada
 de YouTube usara solamente YouTube API Data y permanecera separada de Wikimedia
 salvo autorizacion escrita expresa.
+
+La solicitud de metricas derivadas queda aplazada hasta que el nombre y dominio
+definitivos esten publicados. No bloquea el modo sombra de Wikimedia.
+
+## Eventos externos
+
+`external_events` permite registrar contexto excepcional con fuente, revision y
+estado publico. La API publica solo devuelve eventos `approved` y `public`.
+Aunque un evento pueda tener una propuesta de impacto en puntos base, por ahora
+`appliedDeltaBps` permanece en cero y no modifica precios.
+
+Endpoints:
+
+```text
+GET   /api/entities/:slug/external-events
+GET   /api/admin/external-events
+POST  /api/admin/artists/:artistId/external-events
+PATCH /api/admin/external-events/:eventId
+```
+
+## Derechos de imagen y marcas
+
+La API no entrega una fotografia de figura publica salvo que su registro este
+marcado como `owned`, `licensed` o `provider_authorized`. En cualquier otro
+estado el frontend muestra iniciales abstractas.
+
+`/derechos` contiene el aviso de no afiliacion y el formulario de correccion o
+retiro. `/admin` permite revisar esas solicitudes y documentar la fuente,
+licencia y atribucion de cada imagen. Esto reduce riesgo, pero no sustituye una
+revision juridica antes de premios o monetizacion a gran escala.
 
 ## Docker
 

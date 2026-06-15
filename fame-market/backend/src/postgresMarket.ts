@@ -15,6 +15,11 @@ import type {
   TradeQuote,
   TradeSide
 } from './types.js';
+import {
+  publicArtistImage,
+  type ImageUsageStatus
+} from './rights.js';
+import { contentToVideoSnapshot, listEntityContent } from './content.js';
 
 type Numeric = string | number;
 
@@ -27,7 +32,13 @@ interface DbArtist {
   name: string;
   country: string;
   genre: string;
+  category: string;
+  subcategory: string | null;
+  profession: string | null;
+  theme_tags: string[] | null;
   image_url: string | null;
+  image_usage_status: ImageUsageStatus;
+  image_attribution: string | null;
   status: 'active' | 'frozen';
   current_price: Numeric;
   opening_price: Numeric;
@@ -80,7 +91,7 @@ export class PostgresMarketStore implements MarketDataStore {
       throw new MarketError('Artista no encontrado.', 'ARTIST_NOT_FOUND', 404);
     }
 
-    const [historyResult, videosResult] = await Promise.all([
+    const [historyResult, contentItems] = await Promise.all([
       getPool().query<{ time: Date; value: Numeric }>(
         `
           SELECT created_at AS time, price AS value
@@ -91,39 +102,7 @@ export class PostgresMarketStore implements MarketDataStore {
         `,
         [artist.id]
       ),
-      getPool().query<{
-        id: string;
-        title: string;
-        thumbnail_url: string | null;
-        published_at: Date;
-        youtube_url: string;
-        view_count: Numeric;
-        like_count: Numeric;
-        comment_count: Numeric;
-        captured_at: Date | null;
-      }>(
-        `
-          SELECT video.id, video.title, video.thumbnail_url, video.published_at,
-            video.youtube_url,
-            COALESCE(snapshot.view_count, 0) AS view_count,
-            COALESCE(snapshot.like_count, 0) AS like_count,
-            COALESCE(snapshot.comment_count, 0) AS comment_count,
-            snapshot.captured_at
-          FROM videos video
-          LEFT JOIN LATERAL (
-            SELECT view_count, like_count, comment_count, captured_at
-            FROM video_snapshots
-            WHERE video_id = video.id
-            ORDER BY captured_at DESC
-            LIMIT 1
-          ) snapshot ON TRUE
-          WHERE video.artist_id = $1
-            AND video.eligibility_status = 'eligible'
-          ORDER BY video.published_at DESC
-          LIMIT 5
-        `,
-        [artist.id]
-      )
+      listEntityContent(artist.id, 8)
     ]);
 
     return {
@@ -132,19 +111,8 @@ export class PostgresMarketStore implements MarketDataStore {
         time: Math.floor(new Date(point.time).getTime() / 1000),
         value: number(point.value)
       })),
-      videos: videosResult.rows.map((video) => ({
-        id: video.id,
-        title: video.title,
-        thumbnailUrl: video.thumbnail_url ?? '',
-        publishedAt: new Date(video.published_at).toISOString(),
-        viewCount: number(video.view_count),
-        likeCount: number(video.like_count),
-        commentCount: number(video.comment_count),
-        youtubeUrl: video.youtube_url,
-        capturedAt: video.captured_at
-          ? new Date(video.captured_at).toISOString()
-          : null
-      }))
+      contentItems,
+      videos: contentItems.map(contentToVideoSnapshot)
     };
   }
 
@@ -765,7 +733,13 @@ export class PostgresMarketStore implements MarketDataStore {
       name: string;
       country: string;
       genre: string;
+      category: string;
+      subcategory: string | null;
+      profession: string | null;
+      theme_tags: string[] | null;
       image_url: string | null;
+      image_usage_status: ImageUsageStatus;
+      image_attribution: string | null;
       current_price: Numeric;
       opening_price: Numeric;
       status: 'active' | 'frozen';
@@ -778,7 +752,10 @@ export class PostgresMarketStore implements MarketDataStore {
           position.quantity * (artist.current_price - position.average_cost)
             AS unrealized_pnl,
           artist.slug, artist.symbol, artist.name, artist.country, artist.genre,
-          artist.image_url, artist.current_price, artist.opening_price,
+          artist.category, artist.subcategory, artist.profession,
+          artist.theme_tags, artist.image_url, artist.image_usage_status,
+          artist.image_attribution,
+          artist.current_price, artist.opening_price,
           artist.status,
           (
             SELECT COUNT(*) FROM positions holder
@@ -806,7 +783,16 @@ export class PostgresMarketStore implements MarketDataStore {
         name: position.name,
         country: position.country,
         genre: position.genre,
-        imageUrl: position.image_url ?? '',
+        category: position.category,
+        subcategory: position.subcategory ?? '',
+        profession: position.profession ?? '',
+        themeTags: position.theme_tags ?? [],
+        imageUrl: publicArtistImage(
+          position.image_url,
+          position.image_usage_status
+        ),
+        imageUsageStatus: position.image_usage_status,
+        imageAttribution: position.image_attribution ?? '',
         currentPrice: number(position.current_price),
         changePercent: roundMoney(
           ((number(position.current_price) - number(position.opening_price)) /
@@ -845,7 +831,16 @@ export class PostgresMarketStore implements MarketDataStore {
       name: artist.name,
       country: artist.country,
       genre: artist.genre,
-      imageUrl: artist.image_url ?? '',
+      category: artist.category,
+      subcategory: artist.subcategory ?? '',
+      profession: artist.profession ?? '',
+      themeTags: artist.theme_tags ?? [],
+      imageUrl: publicArtistImage(
+        artist.image_url,
+        artist.image_usage_status
+      ),
+      imageUsageStatus: artist.image_usage_status,
+      imageAttribution: artist.image_attribution ?? '',
       currentPrice: number(artist.current_price),
       changePercent: roundMoney(
         ((number(artist.current_price) - number(artist.opening_price)) /
