@@ -11,6 +11,7 @@ import {
   Flag,
   HardDrive,
   LockKeyhole,
+  Radar,
   RefreshCw,
   Save,
   Snowflake,
@@ -57,6 +58,12 @@ export function AdminPanel() {
     enabled: Boolean(adminSecret),
     retry: false,
     refetchInterval: 30_000
+  });
+  const attentionQuery = useQuery({
+    queryKey: ['attention-overview', adminSecret],
+    queryFn: () => api.attentionOverview(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false
   });
   const seasonStatus =
     seasonQuery.data?.season?.status === 'active'
@@ -108,6 +115,28 @@ export function AdminPanel() {
       setMessage(`${successful} canales actualizados y ${videos} videos revisados.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo sincronizar.');
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const syncAttention = async () => {
+    setBusyArtist('attention');
+    setMessage('');
+    try {
+      const result = await api.syncAttention(adminSecret);
+      const successful = result.results.filter((item) => item.ok).length;
+      setMessage(
+        `${successful} fuentes de atencion actualizadas en modo sombra.`
+      );
+      await attentionQuery.refetch();
+      await operationsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el indice de atencion.'
+      );
     } finally {
       setBusyArtist('');
     }
@@ -306,6 +335,26 @@ export function AdminPanel() {
           />
         </article>
         <article>
+          <Radar size={20} />
+          <span>
+            <small>Indice de atencion</small>
+            <strong>
+              {ageLabel(
+                operationsQuery.data?.database
+                  .lastAttentionSyncAgeSeconds ?? null
+              )}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.jobs['attention-sync']?.status ===
+              'success'
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
           <Activity size={20} />
           <span>
             <small>Ciclo de temporada</small>
@@ -323,6 +372,109 @@ export function AdminPanel() {
             }
           />
         </article>
+      </section>
+
+      <div className="admin-section-title attention-heading">
+        <div>
+          <small>Modo sombra</small>
+          <h2>Indice Automatico de Atencion</h2>
+        </div>
+        <button
+          onClick={syncAttention}
+          disabled={!adminSecret || Boolean(busyArtist)}
+        >
+          <Radar size={17} />
+          {busyArtist === 'attention' ? 'Calculando...' : 'Sincronizar indice'}
+        </button>
+      </div>
+
+      <section className="attention-grid">
+        {!adminSecret ? (
+          <p>Ingresa el secreto para consultar las senales.</p>
+        ) : attentionQuery.isLoading ? (
+          <p>Calculando el estado de las fuentes...</p>
+        ) : attentionQuery.data?.sources.length ? (
+          attentionQuery.data.sources.map((item) => {
+            const delta = item.signal?.proposedDeltaBps ?? 0;
+            const evaluation =
+              attentionQuery.data.evaluation.evaluations.find(
+                (candidate) => candidate.artistId === item.artistId
+              );
+            return (
+              <article key={item.source.id}>
+                <div className="attention-card__header">
+                  <span>
+                    <strong>{item.artistName}</strong>
+                    <small>{item.source.provider}</small>
+                  </span>
+                  <b
+                    className={
+                      delta > 0
+                        ? 'is-positive'
+                        : delta < 0
+                          ? 'is-negative'
+                          : ''
+                    }
+                  >
+                    {delta > 0 ? '+' : ''}
+                    {(delta / 100).toFixed(2)}%
+                  </b>
+                </div>
+                {item.signal ? (
+                  <>
+                    <dl>
+                      <div>
+                        <dt>7 dias</dt>
+                        <dd>
+                          {Math.round(
+                            item.signal.breakdown.recentAverage ?? 0
+                          ).toLocaleString()}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>21 dias previos</dt>
+                        <dd>
+                          {Math.round(
+                            item.signal.breakdown.baselineAverage ?? 0
+                          ).toLocaleString()}
+                        </dd>
+                      </div>
+                    </dl>
+                    <small>
+                      Ventana hasta {item.signal.windowEndsOn} · Sin impacto
+                      aplicado
+                    </small>
+                    {evaluation && (
+                      <div className="attention-progress">
+                        <span>
+                          <i
+                            style={{
+                              width: `${evaluation.statistics.coveragePercent}%`
+                            }}
+                          />
+                        </span>
+                        <small>
+                          {evaluation.statistics.observedDays}/
+                          {evaluation.statistics.targetDays} ventanas · maximo{' '}
+                          {(
+                            evaluation.statistics.maximumAbsoluteDeltaBps / 100
+                          ).toFixed(2)}
+                          %
+                        </small>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <small>
+                    {item.source.lastError ?? 'Pendiente de sincronizacion.'}
+                  </small>
+                )}
+              </article>
+            );
+          })
+        ) : (
+          <p>No hay fuentes de atencion configuradas.</p>
+        )}
       </section>
 
       <section className="admin-season">

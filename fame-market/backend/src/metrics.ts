@@ -37,7 +37,11 @@ export function prometheusMetrics(database: {
   trades24h: number;
   openFraudAlerts: number;
   databaseBytes: number;
+  attentionSources: number;
+  attentionShadowSignals: number;
+  attentionReadyArtists: number;
   lastBackupAgeSeconds: number | null;
+  lastAttentionSyncAgeSeconds: number | null;
   lastYouTubeSyncAgeSeconds: number | null;
   lastSeasonCycleAgeSeconds: number | null;
 }) {
@@ -77,6 +81,24 @@ export function prometheusMetrics(database: {
       database.databaseBytes
     ),
     metric(
+      'fame_market_attention_sources',
+      'Enabled external attention sources.',
+      'gauge',
+      database.attentionSources
+    ),
+    metric(
+      'fame_market_attention_shadow_signals',
+      'Persisted attention signals running in shadow mode.',
+      'gauge',
+      database.attentionShadowSignals
+    ),
+    metric(
+      'fame_market_attention_ready_artists',
+      'Artists with at least 30 shadow windows.',
+      'gauge',
+      database.attentionReadyArtists
+    ),
+    metric(
       'fame_market_last_backup_age_seconds',
       'Age of the last successful backup.',
       'gauge',
@@ -87,6 +109,12 @@ export function prometheusMetrics(database: {
       'Age of the last successful YouTube sync.',
       'gauge',
       database.lastYouTubeSyncAgeSeconds ?? -1
+    ),
+    metric(
+      'fame_market_last_attention_sync_age_seconds',
+      'Age of the last successful attention index sync.',
+      'gauge',
+      database.lastAttentionSyncAgeSeconds ?? -1
     ),
     metric(
       'fame_market_last_season_cycle_age_seconds',

@@ -191,6 +191,11 @@ function App() {
     queryFn: () => api.artist(selectedSlug),
     enabled: Boolean(selectedSlug)
   });
+  const attentionQuery = useQuery({
+    queryKey: ['artist-attention', selectedSlug],
+    queryFn: () => api.artistAttention(selectedSlug),
+    enabled: Boolean(selectedSlug)
+  });
 
   const quoteMutation = useMutation({
     mutationFn: () =>
@@ -569,7 +574,8 @@ function App() {
           <p className="disclaimer">
             Precios y monedas ficticios. Este es un juego de popularidad, no una
             inversion. <a href="/reglas">Reglas</a> ·{' '}
-            <a href="/privacidad">Privacidad</a>
+            <a href="/privacidad">Privacidad</a> ·{' '}
+            <a href="/metodologia">Metodologia</a>
           </p>
         </aside>
 
@@ -605,13 +611,34 @@ function App() {
                 trades={artistTrades}
               />
 
+              {attentionQuery.data?.[0]?.signal && (
+                <section className="attention-public">
+                  <div>
+                    <small>Indice independiente de Fame Market</small>
+                    <strong>Observacion de atencion en modo sombra</strong>
+                    <p>
+                      Wikimedia propone{' '}
+                      {attentionQuery.data[0].signal.proposedDeltaBps > 0
+                        ? '+'
+                        : ''}
+                      {(
+                        attentionQuery.data[0].signal.proposedDeltaBps / 100
+                      ).toFixed(2)}
+                      %. Este resultado no modifica el precio durante la
+                      evaluacion.
+                    </p>
+                  </div>
+                  <a href="/metodologia">Ver metodologia</a>
+                </section>
+              )}
+
               <section className="youtube-strip">
                 <div className="section-heading section-heading--compact">
                   <div>
                     <small>Senales para tu decision</small>
                     <h3>Ultimos videos oficiales</h3>
                   </div>
-                  <span>Datos publicos de YouTube</span>
+                  <span>Datos de YouTube; no afectan el precio</span>
                 </div>
                 {artist.videos.map((video) => (
                   <a

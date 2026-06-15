@@ -14,7 +14,12 @@ interface MaintenanceRow {
   error_message: string | null;
 }
 
-const monitoredJobs = ['database-backup', 'youtube-sync', 'season-cycle'] as const;
+const monitoredJobs = [
+  'attention-sync',
+  'database-backup',
+  'youtube-sync',
+  'season-cycle'
+] as const;
 
 function publicRun(row: MaintenanceRow | undefined) {
   if (!row) return null;
@@ -109,6 +114,9 @@ export async function getOperationalOverview() {
       trades_24h: string;
       open_fraud_alerts: string;
       database_bytes: string;
+      attention_sources: string;
+      attention_shadow_signals: string;
+      attention_ready_artists: string;
     }>(`
       SELECT
         (SELECT COUNT(*) FROM users) AS users,
@@ -123,6 +131,26 @@ export async function getOperationalOverview() {
           FROM fraud_alerts
           WHERE status = 'open'
         ) AS open_fraud_alerts,
+        (
+          SELECT COUNT(*)
+          FROM attention_sources
+          WHERE enabled = TRUE
+        ) AS attention_sources,
+        (
+          SELECT COUNT(*)
+          FROM attention_signals
+          WHERE mode = 'shadow'
+        ) AS attention_shadow_signals,
+        (
+          SELECT COUNT(*)
+          FROM (
+            SELECT artist_id
+            FROM attention_signals
+            WHERE algorithm_version = 'wikimedia-7d-vs-21d-v1'
+            GROUP BY artist_id
+            HAVING COUNT(DISTINCT window_ends_on) >= 30
+          ) ready
+        ) AS attention_ready_artists,
         pg_database_size(current_database()) AS database_bytes
     `),
     getPool().query<MaintenanceRow>(
@@ -173,7 +201,11 @@ export async function getOperationalOverview() {
       trades24h: Number(row.trades_24h),
       openFraudAlerts: Number(row.open_fraud_alerts),
       databaseBytes: Number(row.database_bytes),
+      attentionSources: Number(row.attention_sources),
+      attentionShadowSignals: Number(row.attention_shadow_signals),
+      attentionReadyArtists: Number(row.attention_ready_artists),
       lastBackupAgeSeconds: age('database-backup'),
+      lastAttentionSyncAgeSeconds: age('attention-sync'),
       lastYouTubeSyncAgeSeconds: age('youtube-sync'),
       lastSeasonCycleAgeSeconds: age('season-cycle')
     },
@@ -225,7 +257,11 @@ export async function operationsMetrics() {
       trades24h: 0,
       openFraudAlerts: 0,
       databaseBytes: 0,
+      attentionSources: 0,
+      attentionShadowSignals: 0,
+      attentionReadyArtists: 0,
       lastBackupAgeSeconds: null,
+      lastAttentionSyncAgeSeconds: null,
       lastYouTubeSyncAgeSeconds: null,
       lastSeasonCycleAgeSeconds: null
     });

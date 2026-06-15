@@ -15,6 +15,10 @@ mismo frontend, API, autenticacion y portafolio.
 - Proteccion por idempotencia.
 - Panel admin para canales oficiales de YouTube.
 - Sincronizacion de playlist, videos y estadisticas publicas.
+- Indice Automatico de Atencion basado inicialmente en Wikimedia Pageviews.
+- Senales relativas de 7 dias contra 21 dias en modo sombra.
+- Reconstruccion idempotente de 30 ventanas historicas reales por figura.
+- Evaluacion de cobertura, dispersion y cambios de direccion sin tocar precios.
 - Canales oficiales verificados para Shakira, Karol G y Bad Bunny.
 - Busqueda, filtro latino y favoritos persistentes por usuario.
 - Marcadores personales de compra y venta sobre la grafica.
@@ -76,6 +80,9 @@ Variables importantes:
 - `DEPLOYMENT_ENV`
 - `FIREBASE_PROJECT_ID`
 - `YOUTUBE_API_KEY`
+- `ATTENTION_SYNC_ENABLED`
+- `ATTENTION_SYNC_INTERVAL_MINUTES`
+- `ATTENTION_USER_AGENT`
 - `ADMIN_SECRET`
 - `MONITORING_SECRET`
 - `TURNSTILE_SECRET_KEY`
@@ -120,6 +127,44 @@ Canales iniciales registrados:
 - `@Shakira`
 - `@KarolG`
 - `@BadBunnyPR`
+
+## Indice Automatico de Atencion
+
+La primera fuente es Wikimedia Analytics. Para cada figura se consultan 28 dias
+de pageviews y se compara el promedio de los 7 dias recientes contra los 21
+anteriores. El resultado se normaliza, aplica una zona neutral y propone como
+maximo `+/-0,15%` con una sola fuente.
+
+La implementacion actual siempre trabaja en modo `shadow`: guarda
+observaciones, senales y el ajuste propuesto, pero `applied_delta_bps` permanece
+en cero y el precio no cambia.
+
+Cada sincronizacion recupera suficiente historial para reconstruir hasta 30
+ventanas diarias completas. El panel marca `evaluationReady` cuando existen 30
+ventanas y la fuente esta sana, pero `activationReady` permanece siempre en
+`false` hasta completar revision humana y permisos.
+
+Para ejecutar una sincronizacion desde administracion:
+
+```text
+POST /api/admin/attention/sync
+GET  /api/admin/attention
+GET  /api/artists/:slug/attention
+```
+
+La tarea automatica se habilita con `ATTENTION_SYNC_ENABLED=true`. El intervalo
+predeterminado es de seis horas, aunque Wikimedia solo generara una nueva
+ventana util cuando aparezca un nuevo dia de datos.
+
+Documentacion:
+
+- [Operacion del indice](docs/ATTENTION_INDEX_OPERATIONS.md)
+- [Solicitud de metricas derivadas de YouTube](docs/YOUTUBE_DERIVED_METRICS_APPLICATION.md)
+- Pagina publica: `/metodologia`
+
+Los datos de YouTube visibles no afectan precios. Una futura metrica derivada
+de YouTube usara solamente YouTube API Data y permanecera separada de Wikimedia
+salvo autorizacion escrita expresa.
 
 ## Docker
 

@@ -5,6 +5,14 @@ import { pinoHttp } from 'pino-http';
 import { z } from 'zod';
 import { authMode, requireAdmin, requireAuth } from './auth.js';
 import {
+  attentionMode,
+  getArtistAttentionBySlug,
+  getAttentionEvaluation,
+  getAttentionOverview,
+  registerWikimediaSource,
+  syncAttentionSources
+} from './attention.js';
+import {
   acceptCurrentConsent,
   consentRequired,
   CURRENT_PRIVACY_VERSION,
@@ -172,6 +180,11 @@ app.get('/api/status', async (_request, response) => {
     environment: deploymentEnvironment(),
     databaseConnected: Boolean(database),
     authMode,
+    attentionIndex: {
+      configured: databaseConfigured(),
+      enabled: process.env.ATTENTION_SYNC_ENABLED === 'true',
+      mode: attentionMode()
+    },
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     turnstileConfigured: turnstileConfigured(),
     consentRequired: consentRequired(),
@@ -214,6 +227,20 @@ app.get('/api/artists', async (_request, response, next) => {
 app.get('/api/artists/:slug', async (request, response, next) => {
   try {
     response.json({ artist: await market.getArtistBySlug(request.params.slug) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/artists/:slug/attention', async (request, response, next) => {
+  try {
+    if (!databaseConfigured()) {
+      response.json({ attention: [] });
+      return;
+    }
+    response.json({
+      attention: await getArtistAttentionBySlug(String(request.params.slug))
+    });
   } catch (error) {
     next(error);
   }
@@ -383,6 +410,96 @@ const youtubeChannelSchema = z
   .refine((input) => input.channelId || input.handle, {
     message: 'Envia channelId o handle.'
   });
+
+const wikimediaSourceSchema = z.object({
+  project: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]+\.wikipedia\.org$/i)
+    .max(100),
+  articleTitle: z.string().trim().min(1).max(250),
+  enabled: z.boolean().optional()
+});
+
+app.post(
+  '/api/admin/artists/:artistId/attention-sources/wikimedia',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'El indice de atencion requiere PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = wikimediaSourceSchema.parse(request.body);
+      const source = await registerWikimediaSource(
+        String(request.params.artistId),
+        input
+      );
+      response.status(201).json({ source });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/attention',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      response.json({
+        mode: attentionMode(),
+        sources: await getAttentionOverview(),
+        evaluation: await getAttentionEvaluation()
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/attention/sync',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'El indice de atencion requiere PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = z
+        .object({ artistId: z.string().uuid().optional() })
+        .parse(request.body ?? {});
+      const results = await runMonitoredJob(
+        'attention-sync',
+        () => syncAttentionSources(input.artistId),
+        { source: 'admin', artistId: input.artistId ?? null, mode: attentionMode() },
+        (outcomes) => ({
+          sources: outcomes.length,
+          successful: outcomes.filter((outcome) => outcome.ok).length,
+          signals: outcomes.reduce(
+            (sum, outcome) =>
+              sum + (outcome.ok ? Number(outcome.signals ?? 0) : 0),
+            0
+          ),
+          mode: attentionMode()
+        })
+      );
+      response.json({ mode: attentionMode(), results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.post(
   '/api/admin/artists/:artistId/youtube-channel',
@@ -708,6 +825,47 @@ async function start() {
       () =>
         sync().catch((error) =>
           console.error('[YouTube] Scheduled sync failed', error)
+        ),
+      intervalMinutes * 60 * 1000
+    );
+    timer.unref();
+  }
+
+  if (
+    databaseConfigured() &&
+    process.env.ATTENTION_SYNC_ENABLED === 'true'
+  ) {
+    const intervalMinutes = Math.max(
+      Number(process.env.ATTENTION_SYNC_INTERVAL_MINUTES ?? 360),
+      60
+    );
+    const sync = async () => {
+      const results = await runMonitoredJob(
+        'attention-sync',
+        syncAttentionSources,
+        { source: 'scheduler', mode: attentionMode() },
+        (outcomes) => ({
+          sources: outcomes.length,
+          successful: outcomes.filter((outcome) => outcome.ok).length,
+          signals: outcomes.reduce(
+            (sum, outcome) =>
+              sum + (outcome.ok ? Number(outcome.signals ?? 0) : 0),
+            0
+          ),
+          mode: attentionMode()
+        })
+      );
+      console.log(
+        `[Attention] mode=${attentionMode()} sources=${results.length} successful=${results.filter((outcome) => outcome.ok).length}`
+      );
+    };
+    sync().catch((error) =>
+      console.error('[Attention] Initial sync failed', error)
+    );
+    const timer = setInterval(
+      () =>
+        sync().catch((error) =>
+          console.error('[Attention] Scheduled sync failed', error)
         ),
       intervalMinutes * 60 * 1000
     );

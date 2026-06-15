@@ -1,6 +1,8 @@
 import type {
   ArtistDetails,
   ArtistSummary,
+  AttentionEvaluationResponse,
+  AttentionSourceOverview,
   ConsentStatus,
   Portfolio,
   Quote,
@@ -47,6 +49,12 @@ export const api = {
   async artist(slug: string) {
     const body = await request<{ artist: ArtistDetails }>(`/artists/${slug}`);
     return body.artist;
+  },
+  async artistAttention(slug: string) {
+    const body = await request<{ attention: AttentionSourceOverview[] }>(
+      `/artists/${slug}/attention`
+    );
+    return body.attention;
   },
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');
@@ -132,6 +140,30 @@ export const api = {
         body: JSON.stringify({ artistId })
       }
     );
+  },
+  async attentionOverview(adminSecret: string) {
+    return request<{
+      mode: 'shadow';
+      sources: AttentionSourceOverview[];
+      evaluation: AttentionEvaluationResponse;
+    }>('/admin/attention', {
+      headers: { 'x-admin-secret': adminSecret }
+    });
+  },
+  async syncAttention(adminSecret: string, artistId?: string) {
+    return request<{
+      mode: 'shadow';
+      results: Array<{
+        ok: boolean;
+        artistName: string;
+        proposedDeltaBps?: number;
+        error?: string;
+      }>;
+    }>('/admin/attention/sync', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ artistId })
+    });
   },
   async adminSeasonAction(
     adminSecret: string,

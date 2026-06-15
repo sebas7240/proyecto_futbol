@@ -3,8 +3,8 @@ import { databaseConfigured, getPool } from './database.js';
 import { MarketError } from './market.js';
 import type { AuthenticatedUser } from './types.js';
 
-export const CURRENT_RULES_VERSION = '2026-06-14';
-export const CURRENT_PRIVACY_VERSION = '2026-06-14';
+export const CURRENT_RULES_VERSION = '2026-06-15';
+export const CURRENT_PRIVACY_VERSION = '2026-06-15';
 
 const memoryConsents = new Set<string>();
 

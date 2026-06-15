@@ -30,6 +30,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <LegalPage page="rules" />
       ) : window.location.pathname.startsWith('/privacidad') ? (
         <LegalPage page="privacy" />
+      ) : window.location.pathname.startsWith('/metodologia') ? (
+        <LegalPage page="methodology" />
       ) : (
         <App />
       )}

@@ -175,16 +175,92 @@ export interface OperationsOverview {
     trades24h: number;
     openFraudAlerts: number;
     databaseBytes: number;
+    attentionSources: number;
+    attentionShadowSignals: number;
+    attentionReadyArtists: number;
     lastBackupAgeSeconds: number | null;
+    lastAttentionSyncAgeSeconds: number | null;
     lastYouTubeSyncAgeSeconds: number | null;
     lastSeasonCycleAgeSeconds: number | null;
   };
   jobs: {
+    'attention-sync': MaintenanceRun | null;
     'database-backup': MaintenanceRun | null;
     'youtube-sync': MaintenanceRun | null;
     'season-cycle': MaintenanceRun | null;
   };
   generatedAt: string;
+}
+
+export interface AttentionSignal {
+  windowEndsOn: string;
+  normalizedScore: number;
+  proposedDeltaBps: number;
+  appliedDeltaBps: number;
+  confidence: number;
+  mode: 'shadow' | 'applied' | 'skipped' | 'halted';
+  breakdown: {
+    recentAverage?: number;
+    baselineAverage?: number;
+    recentDays?: number;
+    baselineDays?: number;
+    metric?: string;
+  };
+  createdAt: string | null;
+}
+
+export interface AttentionSourceOverview {
+  artistId: string;
+  artistName: string;
+  artistSlug: string;
+  source: {
+    id: string;
+    provider: string;
+    externalId: string;
+    url: string;
+    enabled: boolean;
+    lastSyncedAt: string | null;
+    lastError: string | null;
+  };
+  signal: AttentionSignal | null;
+}
+
+export interface AttentionEvaluationStatistics {
+  observedDays: number;
+  targetDays: number;
+  coveragePercent: number;
+  firstWindowEndsOn: string | null;
+  lastWindowEndsOn: string | null;
+  positiveDays: number;
+  negativeDays: number;
+  neutralDays: number;
+  averageAbsoluteDeltaBps: number;
+  maximumAbsoluteDeltaBps: number;
+  standardDeviationBps: number;
+  directionChanges: number;
+  cumulativeProposedDeltaBps: number;
+  dataReady: boolean;
+}
+
+export interface AttentionEvaluationResponse {
+  algorithmVersion: string;
+  mode: 'shadow';
+  targetDays: number;
+  evaluationReady: boolean;
+  activationReady: false;
+  humanReviewRequired: true;
+  evaluations: Array<{
+    artistId: string;
+    artistName: string;
+    sourceId: string;
+    provider: string;
+    sourceHealthy: boolean;
+    syncAgeHours: number | null;
+    evaluationReady: boolean;
+    activationReady: false;
+    blockers: string[];
+    statistics: AttentionEvaluationStatistics;
+  }>;
 }
 
 export interface ConsentStatus {

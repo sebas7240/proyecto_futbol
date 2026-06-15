@@ -48,14 +48,35 @@ Los preview deployments de Pages no modifican el dominio de produccion.
 El despliegue debe hacerse en este orden para no bloquear clientes antiguos:
 
 1. Desplegar backend y ejecutar la migracion `006_beta_consent.sql`.
-2. Desplegar el frontend con las paginas `/reglas` y `/privacidad`.
+2. Desplegar el frontend con las paginas `/reglas`, `/privacidad` y
+   `/metodologia`.
 3. Comprobar login, lectura de portafolio y aceptacion.
 4. Activar `CONSENT_REQUIRED=true` en backend.
 
 Cada nueva version de reglas o privacidad requiere cambiar su fecha en
 `backend/src/consent.ts`. El usuario debera aceptar nuevamente antes de operar.
 
-## 3. Backups externos en Cloudflare R2
+## 3. YouTube derived metrics
+
+Antes de enviar la solicitud:
+
+1. Confirmar que `fama.goleafutbol.com` resuelve por DNS y usa HTTPS.
+2. Verificar publicamente `/`, `/reglas`, `/privacidad` y `/metodologia`.
+3. Capturar las evidencias descritas en
+   `docs/YOUTUBE_DERIVED_METRICS_APPLICATION.md`.
+4. Completar los datos legales y el numero del proyecto de Google Cloud.
+5. Mantener cualquier senal de YouTube fuera del precio hasta recibir
+   aprobacion escrita.
+
+La tarea de Wikimedia puede activarse de forma independiente:
+
+```text
+ATTENTION_SYNC_ENABLED=true
+ATTENTION_SYNC_INTERVAL_MINUTES=360
+ATTENTION_USER_AGENT=FameMarket/0.1 (https://fama.goleafutbol.com; contact: SOPORTE)
+```
+
+## 4. Backups externos en Cloudflare R2
 
 Crear un bucket privado:
 
@@ -85,7 +106,7 @@ La ejecucion solo se marca exitosa despues de verificar checksum, restaurar en
 una base temporal y, si R2 esta configurado, subir el archivo cifrado y su
 checksum. Nunca subas la contrasena de cifrado al mismo bucket.
 
-## 4. Monitor externo
+## 5. Monitor externo
 
 El Worker de `ops/monitor-worker` corre cada cinco minutos sin usar el VPS para
 su propia supervision. Comprueba:
@@ -122,7 +143,7 @@ Wrangler aprovisiona el KV declarado en `wrangler.jsonc` al desplegarlo. El
 Worker espera dos fallos consecutivos antes de avisar y envia otro mensaje
 cuando el servicio se recupera.
 
-## 5. Lista previa a beta
+## 6. Lista previa a beta
 
 - Staging no comparte base, volumen, puerto ni dominio con produccion.
 - Login, Turnstile y consentimiento funcionan desde el dominio de staging.
@@ -131,3 +152,7 @@ cuando el servicio se recupera.
 - Los secretos no aparecen en Git ni en logs.
 - Produccion conserva `CONSENT_REQUIRED=false` hasta publicar frontend y
   migracion.
+- El indice de atencion tiene 30 ventanas por figura, pero
+  `activationReady=false`.
+- Privacidad y metodologia separan claramente los datos de YouTube del indice
+  de Wikimedia.

@@ -7,14 +7,14 @@ import {
   Trophy
 } from 'lucide-react';
 
-const updatedAt = '14 de junio de 2026';
+const updatedAt = '15 de junio de 2026';
 
 function RulesPage() {
   return (
     <>
       <header className="legal-heading">
         <span><Scale size={20} /> Reglas de la beta</span>
-        <h1>Un juego de intuicion musical</h1>
+        <h1>Un juego sobre la economia de la atencion</h1>
         <p>
           Fame Market usa monedas, precios y participaciones completamente
           ficticios. Participar no constituye una inversion ni genera derechos
@@ -36,7 +36,8 @@ function RulesPage() {
           Cada temporada comienza con el mismo saldo ficticio. Los FameCoins no
           se compran, venden, retiran, convierten ni transfieren. Los precios se
           mueven por la actividad interna del juego y no representan el valor
-          economico de ningun artista.
+          economico de ninguna figura publica. Durante el modo sombra, las
+          senales externas se calculan y muestran, pero no modifican precios.
         </p>
       </section>
       <section>
@@ -57,11 +58,13 @@ function RulesPage() {
         </p>
       </section>
       <section>
-        <h2>5. Datos musicales</h2>
+        <h2>5. Datos y metodologia</h2>
         <p>
           Las estadisticas de YouTube se muestran como informacion publica para
-          ayudar a tomar decisiones. Fame Market no descarga videos ni afirma
-          representar a YouTube o a los artistas mostrados.
+          ayudar a tomar decisiones y actualmente no afectan el precio. El
+          Indice de Atencion es una metrica independiente de Fame Market, no
+          una metrica publicada o aprobada por YouTube. Su metodologia y sus
+          fuentes se publican en una pagina separada.
         </p>
       </section>
       <section>
@@ -111,7 +114,8 @@ function PrivacyPage() {
         <p>
           La operacion puede involucrar Firebase para autenticacion, Cloudflare
           para entrega y seguridad, Hetzner para infraestructura, PostgreSQL
-          para persistencia y YouTube para datos publicos. Cada proveedor trata
+          para persistencia, Wikimedia para pageviews agregadas y YouTube API
+          Services para metadatos y estadisticas publicas. Cada proveedor trata
           informacion bajo sus propios terminos y medidas de seguridad.
         </p>
       </section>
@@ -122,6 +126,13 @@ function PrivacyPage() {
           activas y durante el tiempo razonable necesario para auditoria. Las
           copias operativas se rotan normalmente a los 14 dias. Los registros
           de temporadas pueden conservarse para mantener rankings historicos.
+        </p>
+        <p>
+          Los metadatos obtenidos de YouTube se actualizan o eliminan conforme
+          a las YouTube API Services Developer Policies. Mientras no exista una
+          autorizacion adicional, las estadisticas almacenadas se eliminan al
+          superar 30 dias. Si YouTube aprueba el uso de metricas derivadas, las
+          estadisticas y metricas autorizadas podran conservarse hasta 36 meses.
         </p>
       </section>
       <section>
@@ -134,7 +145,23 @@ function PrivacyPage() {
         </p>
       </section>
       <section>
-        <h2>6. Solicitudes</h2>
+        <h2>6. YouTube API Services</h2>
+        <p>
+          Fame Market usa YouTube API Services para mostrar canales y videos
+          oficiales. Al usar Fame Market tambien aplican los{' '}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">
+            Terminos de Servicio de YouTube
+          </a>
+          . Puedes consultar la{' '}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
+            Politica de Privacidad de Google
+          </a>
+          . Fame Market no solicita permisos para administrar tu cuenta de
+          YouTube ni descarga comentarios individuales.
+        </p>
+      </section>
+      <section>
+        <h2>7. Solicitudes</h2>
         <p>
           Puedes solicitar correccion o eliminacion mediante el canal oficial
           de soporte publicado por Fame Market. Algunas operaciones pueden
@@ -146,14 +173,90 @@ function PrivacyPage() {
   );
 }
 
-export function LegalPage({ page }: { page: 'rules' | 'privacy' }) {
+function MethodologyPage() {
+  return (
+    <>
+      <header className="legal-heading">
+        <span><Database size={20} /> Metodologia publica</span>
+        <h1>Indice Automatico de Atencion</h1>
+        <p>
+          Es una metrica calculada independientemente por Fame Market para
+          observar cambios relativos de atencion. No es una estadistica
+          publicada, respaldada ni aprobada por YouTube, Wikimedia o Google.
+        </p>
+      </header>
+
+      <section>
+        <h2>1. Estado actual</h2>
+        <p>
+          El indice se encuentra en modo sombra. Las senales se guardan y
+          evaluan durante 30 ventanas diarias, pero el ajuste aplicado al precio
+          permanece siempre en cero hasta completar revision tecnica, humana y
+          de permisos.
+        </p>
+      </section>
+      <section>
+        <h2>2. Fuente activa</h2>
+        <p>
+          La primera fuente es Wikimedia Pageviews. Se utilizan visitas diarias
+          agregadas de usuarios y se compara cada figura solamente contra su
+          propio historial. Los totales de figuras distintas nunca se comparan
+          directamente.
+        </p>
+      </section>
+      <section>
+        <h2>3. Calculo</h2>
+        <p>
+          Se compara el promedio de los siete dias recientes contra los 21 dias
+          anteriores. El crecimiento logaritmico se suaviza con una funcion
+          acotada, incorpora una zona neutral y propone como maximo 15 puntos
+          basicos, equivalentes a 0,15%, cuando existe una sola fuente.
+        </p>
+      </section>
+      <section>
+        <h2>4. Protecciones</h2>
+        <p>
+          Solo se aceptan ventanas completas y consecutivas. Una fuente ausente
+          o atrasada no produce una caida artificial. Cada algoritmo tiene
+          version, las ventanas son idempotentes y toda activacion futura
+          requerira auditoria, limites diarios y posibilidad de detener una
+          fuente sin detener el mercado.
+        </p>
+      </section>
+      <section>
+        <h2>5. YouTube</h2>
+        <p>
+          Los datos publicos de YouTube actualmente se muestran por separado y
+          no forman parte del indice. Solo se incorporaran despues de recibir
+          autorizacion para metricas derivadas. Si se aprueba, cualquier score
+          se identificara expresamente como calculado por Fame Market y no como
+          un dato originado directamente en YouTube. La senal de YouTube se
+          mantendra separada de Wikimedia u otras fuentes, salvo autorizacion
+          escrita que permita combinarlas.
+        </p>
+      </section>
+    </>
+  );
+}
+
+export function LegalPage({
+  page
+}: {
+  page: 'rules' | 'privacy' | 'methodology';
+}) {
   return (
     <main className="legal-page">
       <nav>
         <a href="/"><ArrowLeft size={17} /> Volver al mercado</a>
         <span>Actualizado: {updatedAt}</span>
       </nav>
-      {page === 'rules' ? <RulesPage /> : <PrivacyPage />}
+      {page === 'rules' ? (
+        <RulesPage />
+      ) : page === 'privacy' ? (
+        <PrivacyPage />
+      ) : (
+        <MethodologyPage />
+      )}
       <footer className="legal-summary">
         <article>
           <CircleDollarSign size={19} />
