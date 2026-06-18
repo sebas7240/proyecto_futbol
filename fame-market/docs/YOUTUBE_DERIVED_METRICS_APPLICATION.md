@@ -2,8 +2,9 @@
 
 Prepared on: June 15, 2026
 
-Status: deferred until the final brand and domain are selected and publicly
-deployed. Keep this file as a draft and do not submit provisional URLs.
+Status: production domain selected and deployed. Keep this file as a draft
+until the owner-provided legal fields, screenshots and Google Cloud project
+number are complete.
 
 This document prepares the YouTube Data API Services Audit and Quota Extension
 Form. It does not replace the form and must not be submitted until the public
@@ -19,13 +20,14 @@ https://developers.google.com/youtube/terms/derived-metrics-policy
 
 ## Current blockers
 
-- The final domain has not been selected or deployed.
-- Production must expose `/`, `/privacidad`, `/reglas`, `/metodologia` and
-  `/derechos`.
 - The legal owner, address, contact email and Google Cloud project number must
   be entered by the account owner.
 - Required screenshots or PDFs must be captured from the deployed production
   application.
+- The production API must show the current catalog and the public methodology
+  status after the latest deployment.
+- The 30-day shadow evaluation should be kept as evidence that no YouTube
+  derived metric is affecting price.
 
 Do not claim approval and do not use YouTube data in the price index before a
 positive written response is received.
@@ -119,7 +121,7 @@ Controls:
 
 Initial production target:
 
-- 20 to 30 configured public figures.
+- 29 configured public figures in the initial mixed catalog.
 - One primary official channel per eligible figure.
 - Playlist refresh every six hours.
 - Batched video statistics refresh every hour when enabled.
@@ -136,6 +138,8 @@ quota.
 - Terms/rules: `https://fameplays.com/reglas`
 - Methodology: `https://fameplays.com/metodologia`
 - Rights: `https://fameplays.com/derechos`
+- API status: `https://api.fameplays.com/api/status`
+- Public attention status: `https://api.fameplays.com/api/attention/status`
 - Login: `https://fameplays.com/`
 - Admin evidence: provide reviewer instructions or a temporary review account.
 
@@ -168,6 +172,17 @@ Suggested evidence filenames:
 - `04-methodology.png`
 - `05-admin-shadow-dashboard.png`
 - `06-google-login-no-youtube-scopes.png`
+
+## Technical evidence already prepared
+
+- Public legal routes exist in the frontend.
+- `GET /api/attention/status` publishes provider status without admin secrets.
+- YouTube content snapshots are stored separately from Wikimedia attention
+  signals.
+- Wikimedia attention remains in `shadow` mode and `appliedDeltaBps` stays `0`.
+- The catalog source list is documented in `docs/CATALOG_SOURCES.md`.
+- Brand and rights launch checks are documented in
+  `docs/LEGAL_LAUNCH_REVIEW.md`.
 
 ## Final owner-provided fields
 

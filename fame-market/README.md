@@ -46,6 +46,8 @@ mismo frontend, API, autenticacion y portafolio.
   figuras genericas sin romper compatibilidad.
 - Categorias `musica`, `creadores`, `cine-tv`, `deportes` y `otros` con
   intereses personales guardados por usuario.
+- Catalogo mixto inicial de 29 figuras con una fuente Wikimedia validada por
+  figura para el indice de atencion en modo sombra.
 - Perfiles estrategicos visibles (`stable`, `balanced`, `volatile`,
   `underdog`) con nivel de riesgo y nota explicativa.
 - Chat social por figura en Cloudflare Durable Objects, con emojis, reportes,
@@ -230,6 +232,8 @@ Documentacion:
 
 - [Operacion del indice](docs/ATTENTION_INDEX_OPERATIONS.md)
 - [Solicitud de metricas derivadas de YouTube](docs/YOUTUBE_DERIVED_METRICS_APPLICATION.md)
+- [Catalogo inicial y fuentes](docs/CATALOG_SOURCES.md)
+- [Revision marca/legal de lanzamiento](docs/LEGAL_LAUNCH_REVIEW.md)
 - [Marca, dominio y derechos](docs/BRAND_DOMAIN_AND_RIGHTS.md)
 - Pagina publica: `/metodologia`
 - Pagina publica: `/derechos`
@@ -297,7 +301,11 @@ docker compose --profile ops run --rm backup
 deliberadamente `ALLOW_UNENCRYPTED_BACKUP=true`. La retencion local se controla
 con `BACKUP_RETENTION_DAYS`.
 
-Para conservar otra copia en Cloudflare R2 o almacenamiento S3 compatible:
+Para conservar otra copia en Cloudflare R2 o almacenamiento S3 compatible,
+primero activa R2 en el dashboard de Cloudflare. Si `wrangler r2 bucket list`
+responde `Please enable R2`, el bucket aun no puede crearse por CLI.
+
+Luego configura:
 
 ```text
 BACKUP_S3_URI=s3://fame-plays-backups/production
@@ -342,8 +350,9 @@ curl -H "x-monitoring-secret: $MONITORING_SECRET" \
 
 El Worker de `ops/monitor-worker` consulta ambos endpoints cada cinco minutos,
 revisa las metricas operativas y guarda el ultimo estado en KV. Avisa por
-Telegram despues de dos fallos consecutivos y tambien cuando el servicio se
-recupera.
+Telegram despues de dos fallos consecutivos si `TELEGRAM_BOT_TOKEN` y
+`TELEGRAM_CHAT_ID` estan configurados; si faltan, el monitor sigue guardando
+estado y registra que omitio la notificacion.
 
 ## Verificacion
 

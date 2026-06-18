@@ -12,20 +12,21 @@
     "ENVIRONMENT": "production",
     "API_BASE_URL": "https://api.fameplays.com/api",
     "FAILURE_THRESHOLD": "2",
-    "CHECK_BACKUPS": "true",
+    "CHECK_BACKUPS": "false",
     "BACKUP_MAX_AGE_SECONDS": "129600",
-    "CHECK_YOUTUBE_SYNC": "true",
-    "YOUTUBE_MAX_AGE_SECONDS": "7200"
+    "CHECK_YOUTUBE_SYNC": "false",
+    "YOUTUBE_MAX_AGE_SECONDS": "7200",
+    "CHECK_ATTENTION_SYNC": "true",
+    "ATTENTION_MAX_AGE_SECONDS": "43200"
   },
   "kv_namespaces": [
     {
-      "binding": "MONITOR_STATE"
+      "binding": "MONITOR_STATE",
+      "id": "a6854fb9ede14bd9983822061ac8010a"
     }
   ],
   "secrets": {
     "required": [
-      "TELEGRAM_BOT_TOKEN",
-      "TELEGRAM_CHAT_ID",
       "MONITORING_SECRET"
     ]
   },
@@ -50,7 +51,9 @@
         "CHECK_BACKUPS": "false",
         "BACKUP_MAX_AGE_SECONDS": "129600",
         "CHECK_YOUTUBE_SYNC": "false",
-        "YOUTUBE_MAX_AGE_SECONDS": "7200"
+        "YOUTUBE_MAX_AGE_SECONDS": "7200",
+        "CHECK_ATTENTION_SYNC": "false",
+        "ATTENTION_MAX_AGE_SECONDS": "43200"
       },
       "kv_namespaces": [
         {
@@ -59,8 +62,6 @@
       ],
       "secrets": {
         "required": [
-          "TELEGRAM_BOT_TOKEN",
-          "TELEGRAM_CHAT_ID",
           "MONITORING_SECRET"
         ]
       }

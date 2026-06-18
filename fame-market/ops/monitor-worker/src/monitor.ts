@@ -148,6 +148,22 @@ async function checkMaintenance(env: Env): Promise<EndpointCheck> {
       }
     }
 
+    if (env.CHECK_ATTENTION_SYNC === 'true') {
+      const age = metricValue(
+        metrics,
+        'fame_market_last_attention_sync_age_seconds'
+      );
+      const maximum = Math.max(
+        60,
+        Number(env.ATTENTION_MAX_AGE_SECONDS) || 43_200
+      );
+      if (age === null || age < 0) {
+        problems.push('sin sincronizacion exitosa de atencion');
+      } else if (age > maximum) {
+        problems.push(`atencion atrasada (${Math.floor(age / 3600)}h)`);
+      }
+    }
+
     return {
       name: 'maintenance',
       ok: problems.length === 0,
@@ -190,6 +206,15 @@ function alertText(
 }
 
 async function sendTelegram(env: Env, text: string) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    console.warn(
+      JSON.stringify({
+        event: 'telegram_alert_skipped',
+        reason: 'telegram_not_configured'
+      })
+    );
+    return;
+  }
   const response = await fetch(
     `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
     {
@@ -222,13 +247,23 @@ export async function runMonitor(env: Env) {
   const threshold = Math.max(1, Number(env.FAILURE_THRESHOLD) || 2);
   const result = evaluateState(previous, checks, threshold);
 
-  if (result.event) {
-    await sendTelegram(
-      env,
-      alertText(env.ENVIRONMENT, result.event, result.state)
-    );
-  }
   await env.MONITOR_STATE.put(STATE_KEY, JSON.stringify(result.state));
+  if (result.event) {
+    try {
+      await sendTelegram(
+        env,
+        alertText(env.ENVIRONMENT, result.event, result.state)
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'telegram_alert_failed',
+          environment: env.ENVIRONMENT,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
+  }
   console.log(
     JSON.stringify({
       event: 'health_check',

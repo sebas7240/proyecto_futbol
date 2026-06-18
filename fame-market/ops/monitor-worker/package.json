@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "types": "wrangler types",
-    "check": "wrangler types && tsc --noEmit",
+    "check": "tsc --noEmit",
     "test": "vitest run",
     "dev": "wrangler dev --test-scheduled",
-    "deploy": "wrangler deploy --env \"\" --minify",
+    "deploy": "wrangler deploy --minify",
     "deploy:staging": "wrangler deploy --env staging --minify",
-    "dry-run": "wrangler deploy --env \"\" --dry-run --outdir dist"
+    "dry-run": "wrangler deploy --dry-run --outdir dist"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

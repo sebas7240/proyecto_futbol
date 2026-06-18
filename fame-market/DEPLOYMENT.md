@@ -140,6 +140,9 @@ Crear un bucket privado:
 npx wrangler r2 bucket create fame-plays-backups --location wnam
 ```
 
+Si Wrangler responde `Please enable R2 through the Cloudflare Dashboard`, entra
+al dashboard de Cloudflare, activa R2 para la cuenta y repite el comando.
+
 En Cloudflare crea un token R2 limitado a lectura y escritura de objetos en
 ese bucket. Configura en el servidor:
 
@@ -170,8 +173,11 @@ su propia supervision. Comprueba:
 - `/health/live`
 - `/health/ready`
 - conexion de PostgreSQL mediante `/metrics`
-- backup exitoso en las ultimas 36 horas
-- sincronizacion de YouTube dentro de las ultimas 2 horas
+- backup exitoso en las ultimas 36 horas, cuando `CHECK_BACKUPS=true`
+- sincronizacion de YouTube dentro de las ultimas 2 horas, cuando
+  `CHECK_YOUTUBE_SYNC=true`
+- sincronizacion del indice de atencion dentro de las ultimas 12 horas, cuando
+  `CHECK_ATTENTION_SYNC=true`
 
 Instalacion y verificacion:
 
@@ -186,14 +192,15 @@ npm run dry-run
 Configura los secretos de produccion:
 
 ```bash
-npx wrangler secret put TELEGRAM_BOT_TOKEN --env=""
-npx wrangler secret put TELEGRAM_CHAT_ID --env=""
-npx wrangler secret put MONITORING_SECRET --env=""
+npx wrangler secret put MONITORING_SECRET
 npm run deploy
 ```
 
-`MONITORING_SECRET` debe ser exactamente el del backend. Para staging repite
-los tres comandos con `--env staging` y ejecuta `npm run deploy:staging`.
+`MONITORING_SECRET` debe ser exactamente el del backend. Telegram es opcional:
+si quieres alertas por chat, configura tambien `TELEGRAM_BOT_TOKEN` y
+`TELEGRAM_CHAT_ID`; si no existen, el monitor no falla y solo guarda estado.
+Para staging repite los secretos necesarios con `--env staging` y ejecuta
+`npm run deploy:staging`.
 
 Wrangler aprovisiona el KV declarado en `wrangler.jsonc` al desplegarlo. El
 Worker espera dos fallos consecutivos antes de avisar y envia otro mensaje

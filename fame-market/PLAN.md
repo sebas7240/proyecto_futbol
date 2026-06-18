@@ -935,8 +935,8 @@ Estados necesarios:
       `fameplays.com`.
 - [ ] Completar busqueda de marcas y riesgo de confusion con evidencia
       fechada.
-- [ ] Elegir las primeras 20 a 30 figuras y su mezcla de categorias.
-- [ ] Verificar al menos una fuente util por figura.
+- [x] Elegir las primeras 20 a 30 figuras y su mezcla de categorias.
+- [x] Verificar al menos una fuente util por figura.
 - [x] Activar YouTube Data API y crear una API key permitida para esa API.
 - [x] Implementar consulta de canales, playlist de subidas y estadisticas.
 - [x] Definir reglas publicas del juego.
@@ -963,6 +963,8 @@ Criterio:
 - [x] Desplegar produccion en `fameplays.com` con backend aislado y Firebase
       propio.
 - [ ] Desplegar staging con sus secretos definitivos.
+      Estado: configuracion lista; falta crear `.env.staging`,
+      `frontend/.env.staging`, DNS `staging-api` y secretos reales.
 
 Criterio:
 
@@ -1266,6 +1268,12 @@ La primera vertical tecnica ya incluye:
     `api.fameplays.com` y Firebase propio.
 39. Estado publico del Indice Automatico de Atencion publicado en
     `/metodologia` desde `/api/attention/status`.
+40. Catalogo mixto inicial de 29 figuras con categorias, perfiles de riesgo,
+    avatares abstractos y fuentes Wikimedia verificadas tecnicamente.
+41. Checklist de revision marca/legal para `fameplays.com` y documento de
+    fuentes del catalogo.
+42. Monitor externo ajustado para produccion sin depender de Telegram mientras
+    no esten configurados sus secretos.
 
 Siguiente bloque recomendado:
 
@@ -1276,6 +1284,8 @@ Siguiente bloque recomendado:
 4. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
    cuando el catalogo mixto este listo, manteniendo aliases temporales.
 5. Crear adaptadores de fuentes genericos para creadores y cine/TV.
-6. Elegir el catalogo mixto de 20 a 30 figuras con fuentes verificadas.
-7. Desplegar staging, R2 y monitor externo antes de abrir la beta.
-8. Retomar el formulario de metricas derivadas de YouTube mas adelante.
+6. Activar R2 en Cloudflare Dashboard, crear `fame-plays-backups` y generar
+   credenciales S3 limitadas para backup externo.
+7. Completar secretos de staging y desplegar `staging-api.fameplays.com`.
+8. Configurar Telegram opcional para alertas del monitor externo.
+9. Retomar el formulario de metricas derivadas de YouTube mas adelante.

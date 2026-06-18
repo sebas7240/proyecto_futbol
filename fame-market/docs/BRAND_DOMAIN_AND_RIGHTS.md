@@ -2,11 +2,13 @@
 
 ## Decision de dominio
 
-El dominio definitivo debe describir el producto, no apropiarse de la identidad
-de una figura incluida. El dominio provisional de Golea no se usara como marca
-final.
+Dominio elegido para beta: `fameplays.com`.
 
-Antes de comprar:
+El dominio describe el producto de forma general y no toma el nombre de una
+figura incluida. El dominio de Golea queda separado y no debe usarse como marca
+de este juego.
+
+Antes de abrir beta publica o invertir en publicidad:
 
 1. Elegir un nombre inventado o una combinacion descriptiva propia.
 2. Evitar nombres, apodos, letras estilizadas y tickers asociados a artistas,
@@ -16,14 +18,17 @@ Antes de comprar:
 4. Revisar dominio, redes sociales y nombres en Google Play y App Store.
 5. Buscar riesgo de confusion con juegos, bolsas, casas de apuestas y productos
    financieros.
-6. Comprar dominio solo despues de la revision y conservar evidencia fechada.
+6. Conservar evidencia fechada de las busquedas.
 
-La disponibilidad de un dominio no significa que la marca sea utilizable.
+La compra del dominio no significa que la marca sea utilizable en todos los
+paises o categorias. El checklist operativo vive en
+`docs/LEGAL_LAUNCH_REVIEW.md`.
 
 ## Direccion de naming
 
 El nombre debe comunicar cultura, atencion o tendencia, sin presentarse como
-una bolsa real. Son direcciones creativas, no dominios verificados:
+una bolsa real. Estas fueron direcciones creativas previas, no dominios
+verificados:
 
 - pulso cultural
 - radar de atencion
@@ -31,9 +36,8 @@ una bolsa real. Son direcciones creativas, no dominios verificados:
 - liga de popularidad
 - indice de fama
 
-La palabra `market` puede conservarse si toda la interfaz mantiene visibles los
-conceptos `juego`, `ficticio` y `sin dinero real`. Un nombre menos financiero
-reduciria confusion y seria mas flexible para musica, creadores y cine.
+`Fame Plays` evita presentarse como bolsa real y debe mantener visibles los
+conceptos `juego`, `ficticio` y `sin dinero real`.
 
 ## Politica de imagen
 
