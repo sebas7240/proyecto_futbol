@@ -14,6 +14,7 @@ import type {
   ExternalEventType,
   ExternalEventVisibilityStatus,
   Portfolio,
+  PublicAttentionStatus,
   Quote,
   RankingResponse,
   OperationsOverview,
@@ -87,6 +88,9 @@ export const api = {
       `/artists/${slug}/attention`
     );
     return body.attention;
+  },
+  async publicAttentionStatus() {
+    return request<PublicAttentionStatus>('/attention/status');
   },
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');

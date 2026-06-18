@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BadgeInfo,
@@ -14,6 +15,20 @@ import { api } from './api';
 import type { RightsRequestType } from './types';
 
 const updatedAt = '15 de junio de 2026';
+
+function formatDate(value: string | null) {
+  if (!value) return 'Pendiente';
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+}
+
+function statusLabel(status: string) {
+  if (status === 'shadow-ready') return 'Sombra completa';
+  if (status === 'collecting-shadow') return 'Recolectando sombra';
+  return 'Pendiente de sincronizacion';
+}
 
 function RulesPage() {
   return (
@@ -193,6 +208,13 @@ function PrivacyPage() {
 }
 
 function MethodologyPage() {
+  const statusQuery = useQuery({
+    queryKey: ['public-attention-status'],
+    queryFn: api.publicAttentionStatus,
+    staleTime: 60_000
+  });
+  const status = statusQuery.data;
+
   return (
     <>
       <header className="legal-heading">
@@ -253,6 +275,79 @@ function MethodologyPage() {
           mantendra separada de Wikimedia u otras fuentes, salvo autorizacion
           escrita que permita combinarlas.
         </p>
+      </section>
+      <section className="methodology-status">
+        <div className="methodology-status__heading">
+          <div>
+            <h2>6. Estado vivo del indice</h2>
+            <p>
+              Esta vista se alimenta de la API publica y confirma que las
+              fuentes externas siguen en modo sombra.
+            </p>
+          </div>
+          <span>{status?.mode ?? 'shadow'}</span>
+        </div>
+
+        {statusQuery.isLoading ? (
+          <p>Consultando estado del indice...</p>
+        ) : statusQuery.isError ? (
+          <p>No se pudo consultar el estado publico del indice.</p>
+        ) : status ? (
+          <>
+            <div className="methodology-status__metrics">
+              <article>
+                <strong>{status.summary.totalSources}</strong>
+                <span>Fuentes activas</span>
+              </article>
+              <article>
+                <strong>{status.summary.readySources}</strong>
+                <span>Con 30 ventanas</span>
+              </article>
+              <article>
+                <strong>{status.summary.averageCoveragePercent}%</strong>
+                <span>Cobertura promedio</span>
+              </article>
+              <article>
+                <strong>0 bps</strong>
+                <span>Impacto aplicado</span>
+              </article>
+            </div>
+            <p className="methodology-status__note">
+              Ultima sincronizacion:{' '}
+              {formatDate(status.summary.lastSyncedAt)}. Activacion de precios:
+              detenida hasta completar revision humana.
+            </p>
+            <div className="methodology-source-list">
+              {status.sources.map((source) => (
+                <article key={`${source.artistSlug}-${source.provider}`}>
+                  <header>
+                    <div>
+                      <strong>{source.artistName}</strong>
+                      <span>{source.provider}</span>
+                    </div>
+                    <b className={`methodology-source-list__status ${source.status}`}>
+                      {statusLabel(source.status)}
+                    </b>
+                  </header>
+                  <div className="methodology-source-list__bar">
+                    <i style={{ width: `${source.coveragePercent}%` }} />
+                  </div>
+                  <p>
+                    {source.observedDays}/{source.targetDays} ventanas ·
+                    propuesta ultima:{' '}
+                    {source.proposedDeltaBps === null
+                      ? 'pendiente'
+                      : `${source.proposedDeltaBps} bps`}{' '}
+                    · aplicado: {source.appliedDeltaBps ?? 0} bps
+                  </p>
+                  <a href={source.sourceUrl} target="_blank" rel="noreferrer">
+                    Ver fuente
+                  </a>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
     </>
   );

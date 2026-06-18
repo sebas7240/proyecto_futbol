@@ -363,6 +363,37 @@ export interface AttentionEvaluationResponse {
   }>;
 }
 
+export interface PublicAttentionStatus {
+  mode: 'shadow';
+  algorithmVersion: string | null;
+  targetDays: number;
+  activationReady: false;
+  humanReviewRequired: true;
+  generatedAt: string;
+  summary: {
+    totalSources: number;
+    healthySources: number;
+    readySources: number;
+    averageCoveragePercent: number;
+    lastSyncedAt: string | null;
+  };
+  sources: Array<{
+    artistName: string;
+    artistSlug: string;
+    provider: string;
+    sourceUrl: string;
+    enabled: boolean;
+    lastSyncedAt: string | null;
+    status: 'shadow-ready' | 'collecting-shadow' | 'sync-pending';
+    coveragePercent: number;
+    observedDays: number;
+    targetDays: number;
+    latestWindowEndsOn: string | null;
+    proposedDeltaBps: number | null;
+    appliedDeltaBps: number | null;
+  }>;
+}
+
 export interface ConsentStatus {
   required: boolean;
   accepted: boolean;

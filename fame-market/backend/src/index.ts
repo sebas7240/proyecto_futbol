@@ -9,6 +9,7 @@ import {
   getArtistAttentionBySlug,
   getAttentionEvaluation,
   getAttentionOverview,
+  getPublicAttentionStatus,
   registerWikimediaSource,
   syncAttentionSources
 } from './attention.js';
@@ -227,6 +228,33 @@ app.get('/api/legal/versions', (_request, response) => {
     rulesVersion: CURRENT_RULES_VERSION,
     privacyVersion: CURRENT_PRIVACY_VERSION
   });
+});
+
+app.get('/api/attention/status', async (_request, response, next) => {
+  try {
+    if (!databaseConfigured()) {
+      response.json({
+        mode: attentionMode(),
+        algorithmVersion: null,
+        targetDays: 30,
+        activationReady: false,
+        humanReviewRequired: true,
+        generatedAt: new Date().toISOString(),
+        summary: {
+          totalSources: 0,
+          healthySources: 0,
+          readySources: 0,
+          averageCoveragePercent: 0,
+          lastSyncedAt: null
+        },
+        sources: []
+      });
+      return;
+    }
+    response.json(await getPublicAttentionStatus());
+  } catch (error) {
+    next(error);
+  }
 });
 
 const optionalUrl = z

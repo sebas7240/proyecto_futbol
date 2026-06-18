@@ -931,8 +931,10 @@ Estados necesarios:
 
 ### Fase 0 - Validacion tecnica y reglas
 
-- [ ] Confirmar nombre y dominio mediante busqueda de marcas y riesgo de
-      confusion.
+- [x] Elegir nombre y dominio neutrales para beta: `Fame Plays` y
+      `fameplays.com`.
+- [ ] Completar busqueda de marcas y riesgo de confusion con evidencia
+      fechada.
 - [ ] Elegir las primeras 20 a 30 figuras y su mezcla de categorias.
 - [ ] Verificar al menos una fuente util por figura.
 - [x] Activar YouTube Data API y crear una API key permitida para esa API.
@@ -958,7 +960,9 @@ Criterio:
 - [x] Preparar la misma interfaz para web/PWA y futura APK con Capacitor.
 - [x] Agregar pruebas y configuracion local.
 - [x] Preparar configuracion reproducible de staging aislado.
-- [ ] Desplegar staging y produccion con sus secretos definitivos.
+- [x] Desplegar produccion en `fameplays.com` con backend aislado y Firebase
+      propio.
+- [ ] Desplegar staging con sus secretos definitivos.
 
 Criterio:
 
@@ -1070,14 +1074,15 @@ Criterio:
 - [ ] Completar revision humana de falsos positivos y umbrales.
 - [x] Preparar formulario, metodologia, privacidad y evidencias requeridas por
       YouTube.
-- [ ] Desplegar el dominio publico y enviar la solicitud a YouTube.
+- [x] Desplegar el dominio publico con HTTPS.
+- [ ] Enviar la solicitud de metricas derivadas a YouTube.
 - [ ] Agregar adaptadores aprobados de YouTube, Twitch y GDELT.
 - [x] Crear `external_events` solo para correcciones excepcionales.
 - [ ] Aplicar automaticamente senales aprobadas respetando `+/-0,60%` diario.
 - [x] Actualizar reglas y privacidad para el indice externo en modo sombra.
 - [x] Crear la pagina publica de metodologia y aislamiento de proveedores.
 - [x] Mostrar en la ficha publica fuentes verificadas y estado de cada fuente.
-- [ ] Publicar en produccion metodologia, fuentes y estado de cada fuente.
+- [x] Publicar en produccion metodologia, fuentes y estado de cada fuente.
 - [ ] Mostrar en la grafica y ficha que parte vino de operaciones y que parte de
       senales externas.
 - [ ] Mantener aliases temporales para clientes que aun consuman `/artists`.
@@ -1103,7 +1108,7 @@ Criterio:
 - [ ] Ajustar liquidez, limites, comision e impacto externo.
 - [ ] Comprobar que los usuarios entienden los dos origenes del precio.
 - [ ] Recoger comentarios de usabilidad movil.
-- [ ] Publicar reglas y politica en los dominios definitivos.
+- [x] Publicar reglas y politica en los dominios definitivos.
 
 Criterio:
 
@@ -1257,17 +1262,20 @@ La primera vertical tecnica ya incluye:
 35. Registro de licencia, fuente, atribucion y revision por figura.
 36. Pagina publica de derechos con formulario de correccion o retiro.
 37. Bandeja administrativa y auditoria de solicitudes de derechos.
+38. Produccion desplegada en `fameplays.com` con backend aislado,
+    `api.fameplays.com` y Firebase propio.
+39. Estado publico del Indice Automatico de Atencion publicado en
+    `/metodologia` desde `/api/attention/status`.
 
 Siguiente bloque recomendado:
 
-1. Elegir nombre y dominio neutrales y realizar busqueda de marcas.
-2. Desplegar el nuevo dominio con reglas, privacidad, metodologia y derechos.
-3. Revisar una por una las imagenes y mantener avatares abstractos mientras no
+1. Completar busqueda de marcas y riesgo de confusion con evidencia fechada.
+2. Revisar una por una las imagenes y mantener avatares abstractos mientras no
    exista licencia verificable.
-4. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
-5. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
+3. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
+4. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
    cuando el catalogo mixto este listo, manteniendo aliases temporales.
-6. Crear adaptadores de fuentes genericos para creadores y cine/TV.
-7. Elegir el catalogo mixto de 20 a 30 figuras con fuentes verificadas.
-8. Desplegar staging, R2 y monitor externo antes de abrir la beta.
-9. Retomar el formulario de metricas derivadas de YouTube mas adelante.
+5. Crear adaptadores de fuentes genericos para creadores y cine/TV.
+6. Elegir el catalogo mixto de 20 a 30 figuras con fuentes verificadas.
+7. Desplegar staging, R2 y monitor externo antes de abrir la beta.
+8. Retomar el formulario de metricas derivadas de YouTube mas adelante.

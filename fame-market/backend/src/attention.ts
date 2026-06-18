@@ -712,3 +712,68 @@ export async function getArtistAttentionBySlug(slug: string) {
   }
   return getAttentionOverview(artist.rows[0]!.id);
 }
+
+export async function getPublicAttentionStatus() {
+  const [sources, evaluation] = await Promise.all([
+    getAttentionOverview(),
+    getAttentionEvaluation()
+  ]);
+  const evaluationsBySource = new Map(
+    evaluation.evaluations.map((item) => [item.sourceId, item])
+  );
+  const publicSources = sources.map((item) => {
+    const sourceEvaluation = evaluationsBySource.get(item.source.id);
+    const sourceHealthy = Boolean(sourceEvaluation?.sourceHealthy);
+    const dataReady = Boolean(sourceEvaluation?.statistics.dataReady);
+    const status = sourceHealthy
+      ? dataReady
+        ? 'shadow-ready'
+        : 'collecting-shadow'
+      : 'sync-pending';
+    return {
+      artistName: item.artistName,
+      artistSlug: item.artistSlug,
+      provider: item.source.provider,
+      sourceUrl: item.source.url,
+      enabled: item.source.enabled,
+      lastSyncedAt: item.source.lastSyncedAt,
+      status,
+      coveragePercent: sourceEvaluation?.statistics.coveragePercent ?? 0,
+      observedDays: sourceEvaluation?.statistics.observedDays ?? 0,
+      targetDays: sourceEvaluation?.statistics.targetDays ?? ATTENTION_SHADOW_TARGET_DAYS,
+      latestWindowEndsOn: item.signal?.windowEndsOn ?? null,
+      proposedDeltaBps: item.signal?.proposedDeltaBps ?? null,
+      appliedDeltaBps: item.signal?.appliedDeltaBps ?? null
+    };
+  });
+  const coverageValues = publicSources.map((source) => source.coveragePercent);
+  const lastSyncedAt = publicSources
+    .map((source) => source.lastSyncedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
+
+  return {
+    mode: attentionMode(),
+    algorithmVersion: evaluation.algorithmVersion,
+    targetDays: evaluation.targetDays,
+    activationReady: false,
+    humanReviewRequired: evaluation.humanReviewRequired,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalSources: publicSources.length,
+      healthySources: evaluation.evaluations.filter(
+        (item) => item.sourceHealthy
+      ).length,
+      readySources: evaluation.evaluations.filter(
+        (item) => item.evaluationReady
+      ).length,
+      averageCoveragePercent: round(
+        coverageValues.length ? average(coverageValues) : 0,
+        1
+      ),
+      lastSyncedAt
+    },
+    sources: publicSources
+  };
+}
