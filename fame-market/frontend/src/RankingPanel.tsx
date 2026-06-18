@@ -102,7 +102,7 @@ export function RankingPanel({
         </button>
         <div>
           <small>Competencia semanal</small>
-          <h1>Ranking de Fame Market</h1>
+          <h1>Ranking de Fame Plays</h1>
           <p>
             El rendimiento parte del mismo capital ficticio para todos los
             jugadores.

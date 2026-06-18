@@ -1,4 +1,4 @@
-# Fame Market - Plan de producto y desarrollo
+# Fame Plays - Plan de producto y desarrollo
 
 ## 1. Vision refinada
 
@@ -23,7 +23,7 @@ Propuesta de valor:
 
 > No inviertes dinero. Inviertes intuicion sobre quien capturara la atencion.
 
-Nombre provisional: `Fame Market`.
+Nombre definitivo para web y app: `Fame Plays`.
 
 ## 2. Enfoque inicial
 
@@ -35,12 +35,28 @@ Categorias iniciales recomendadas:
 - `musica`: cantantes, grupos y productores con actividad publica verificable.
 - `creadores`: influencers, youtubers y streamers.
 - `cine-tv`: actores, actrices, presentadores y otras figuras audiovisuales.
+- `deportes`: deportistas y figuras competitivas con eventos verificables.
+- `otros`: categoria temporal para pruebas antes de crear una vertical propia.
+
+Perfiles estrategicos visibles:
+
+- `stable`: figuras consolidadas, movimientos esperados mas defensivos.
+- `balanced`: figuras con actividad frecuente y riesgo medio.
+- `volatile`: figuras con gran sensibilidad a lanzamientos, memes o noticias
+  verificadas.
+- `underdog`: figuras en crecimiento que pueden ser interesantes para
+  jugadores que buscan descubrir temprano.
+
+Estos perfiles ayudan a jugar y comparar, pero no otorgan ventaja matematica
+por si mismos. La formula de precio seguira dependiendo de operaciones y
+senales aprobadas, no de etiquetas subjetivas.
 
 Cada figura tendra:
 
 - Nombre informativo, avatar abstracto o imagen con licencia verificada, pais,
   categoria y subcategoria.
 - Profesion o especialidad visible.
+- Perfil estrategico, nivel de riesgo y nota corta para orientar al usuario.
 - Uno o varios perfiles o canales oficiales.
 - Precio ficticio actual.
 - Cambio de precio de 24 horas y de la temporada.
@@ -74,7 +90,7 @@ requisito universal del mercado.
 Las politicas de YouTube limitan la creacion de metricas derivadas. Desde el 1
 de junio de 2026 existen permisos adicionales para desarrolladores auditados
 que los soliciten expresamente, pero no deben asumirse por defecto. Por esa
-razon, Fame Market no usara automaticamente vistas, likes o comentarios para
+razon, Fame Plays no usara automaticamente vistas, likes o comentarios para
 mover precios sin contar antes con permiso documentado.
 
 Modelo recomendado para el MVP:
@@ -387,7 +403,7 @@ Reglas obligatorias:
 
 - Los nombres se usan para identificacion informativa y estadistica.
 - Ninguna pantalla puede sugerir que una figura patrocina, administra o aprueba
-  Fame Market.
+  Fame Plays.
 - El nombre y dominio de la plataforma deben ser originales y neutrales; no
   pueden contener el nombre, apodo, ticker o marca de una figura incluida.
 - No se usaran logos, portadas, fotografias tomadas de buscadores ni material
@@ -406,7 +422,7 @@ Reglas obligatorias:
 El aviso visible sera:
 
 > Simulador independiente. Los nombres identifican figuras publicas con fines
-> informativos. Fame Market no esta afiliado, patrocinado ni aprobado por ellas
+> informativos. Fame Plays no esta afiliado, patrocinado ni aprobado por ellas
 > o sus marcas.
 
 Este enfoque reduce riesgo, pero el plan no afirmara que el producto es
@@ -526,6 +542,7 @@ El proyecto vivira aislado en `fame-market/` dentro del repositorio actual.
 - PostgreSQL en contenedor privado con volumen persistente.
 - Caddy como proxy HTTPS.
 - Cloudflare delante de la API para WAF y rate limit.
+- Chat social en Cloudflare Durable Objects con WebSockets, aislado del VPS.
 - Backups diarios cifrados de PostgreSQL.
 - Dominio y rutas separados de Golea y Polla Predictions.
 - Nombre y dominio definitivos sujetos a busqueda de marcas, redes sociales,
@@ -535,8 +552,8 @@ El proyecto vivira aislado en `fame-market/` dentro del repositorio actual.
 
 Estructura objetivo:
 
-- `app.DOMINIO-NUEVO`
-- `api.DOMINIO-NUEVO`
+- `app.fameplays.com`
+- `api.fameplays.com`
 
 No se modificara ni detendra ningun servicio existente para desarrollar este
 modulo.
@@ -985,17 +1002,22 @@ Criterio:
 
 - [x] Construir primera vista responsive del mercado.
 - [x] Construir primera ficha de figura sobre el modelo inicial de artistas.
+- [x] Mostrar perfil estrategico y riesgo para diferenciar estilos de juego.
 - [x] Construir primer resumen de portafolio.
 - [x] Construir flujo inicial de cotizacion, compra y venta.
 - [x] Agregar favoritos persistentes, filtros y busqueda responsive.
 - [x] Agregar grafica de precio inicial.
 - [x] Agregar marcadores personales de compra y venta en la grafica.
 - [x] Crear onboarding corto.
+- [x] Agregar chat de texto por figura con WebSockets y Durable Objects.
+- [x] Agregar emojis rapidos, reportes y moderacion admin del chat.
+- [x] Agregar notas de voz de 5 a 10 segundos sin cargar el VPS.
+- [x] Mantener audio en vivo como beta cerrada sin activarlo por defecto.
 
 Criterio:
 
 - Un usuario nuevo entiende y completa su primera compra en menos de dos
-  minutos.
+  minutos y puede comentar una figura sin afectar el motor de trading.
 
 ### Fase 5 - Temporadas y rankings
 
@@ -1075,6 +1097,8 @@ Criterio:
 - [ ] Probar con 20 a 50 usuarios.
 - [ ] Medir retencion diaria y semanal.
 - [ ] Medir cantidad de operaciones por jugador.
+- [ ] Medir uso del chat por figura y su impacto en retencion.
+- [ ] Medir uso de notas de voz y reportes para ajustar limites.
 - [ ] Medir uso y retencion por categoria.
 - [ ] Ajustar liquidez, limites, comision e impacto externo.
 - [ ] Comprobar que los usuarios entienden los dos origenes del precio.
@@ -1128,6 +1152,8 @@ seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 - [ ] Evaluar publicidad moderada y suscripcion sin ventajas competitivas.
 - [ ] Preparar estrategia editorial de YouTube: movimientos semanales,
       explicaciones del mercado y resumen transparente de temporadas.
+- [ ] Evaluar audio chat por salas con TURN, moderacion y limites antes de
+      abrirlo al publico.
 
 Criterio:
 

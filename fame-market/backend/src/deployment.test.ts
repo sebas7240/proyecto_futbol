@@ -19,11 +19,11 @@ beforeEach(() => {
   process.env.DEPLOYMENT_ENV = 'staging';
   process.env.DATABASE_URL =
     'postgresql://fame:secret@postgres-staging:5432/fame_market_staging';
-  process.env.FRONTEND_ORIGINS = 'https://staging-fama.goleafutbol.com';
+  process.env.FRONTEND_ORIGINS = 'https://staging.fameplays.com';
   process.env.ADMIN_SECRET = 'staging-admin-secret';
   process.env.MONITORING_SECRET = 'staging-monitoring-secret';
   process.env.AUTH_MODE = 'firebase';
-  process.env.FIREBASE_PROJECT_ID = 'fame-market-staging';
+  process.env.FIREBASE_PROJECT_ID = 'fame-plays-staging';
 });
 
 afterEach(() => {
@@ -46,7 +46,7 @@ describe('deployment isolation', () => {
   });
 
   it('rejects the production frontend origin in staging', () => {
-    process.env.FRONTEND_ORIGINS = 'https://fama.goleafutbol.com';
+    process.env.FRONTEND_ORIGINS = 'https://fameplays.com';
     expect(() => validateDeploymentEnvironment()).toThrow(/produccion/i);
   });
 });

@@ -47,7 +47,7 @@ export function prometheusMetrics(database: {
 }) {
   const runtime = runtimeMetrics();
   const lines = [
-    metric('fame_market_up', 'Fame Market API process is running.', 'gauge', 1),
+    metric('fame_market_up', 'Fame Plays API process is running.', 'gauge', 1),
     metric(
       'fame_market_uptime_seconds',
       'API process uptime in seconds.',

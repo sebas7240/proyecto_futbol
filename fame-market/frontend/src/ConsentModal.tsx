@@ -27,7 +27,7 @@ export function ConsentModal({
         <small>Beta cerrada</small>
         <h2 id="consent-title">Antes de realizar tu primera operacion</h2>
         <p>
-          Fame Market es un juego con monedas y participaciones ficticias. No es
+          Fame Plays es un juego con monedas y participaciones ficticias. No es
           una inversion, no permite retiros y no promete premios.
         </p>
         <label>

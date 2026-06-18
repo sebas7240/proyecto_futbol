@@ -50,6 +50,9 @@ export interface Artist {
   subcategory: string;
   profession: string;
   themeTags: string[];
+  volatilityProfile: 'stable' | 'balanced' | 'volatile' | 'underdog';
+  riskLevel: number;
+  strategyNotes: string;
   imageUrl: string;
   imageUsageStatus:
     | 'none'

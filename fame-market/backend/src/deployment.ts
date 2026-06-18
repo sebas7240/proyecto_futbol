@@ -55,7 +55,8 @@ export function validateDeploymentEnvironment() {
         'Staging debe usar una base cuyo nombre incluya "staging".'
       );
     }
-    if (origins.some((origin) => hostname(origin) === 'fama.goleafutbol.com')) {
+    const productionHosts = new Set(['fameplays.com', 'www.fameplays.com']);
+    if (origins.some((origin) => productionHosts.has(hostname(origin)))) {
       throw new Error(
         'Staging no puede autorizar el dominio frontend de produccion.'
       );

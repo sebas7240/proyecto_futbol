@@ -38,7 +38,7 @@ positive written response is received.
 - Organization type: Independent Developer/Sole Proprietor.
 - Category: Gaming and Esports, or Media and Entertainment if only one may be
   selected.
-- API Client name: `Fame Market`.
+- API Client name: `Fame Plays`.
 - Client name contains "YouTube": No.
 - Target audience: General Public and Individual Content Creators.
 - Current monetization: Free service.
@@ -59,7 +59,7 @@ positive written response is received.
 
 Use this draft after replacing the bracketed fields:
 
-> Fame Market is a free fantasy market game about public attention. Players
+> Fame Plays is a free fantasy market game about public attention. Players
 > receive equal fictional balances and build fictional portfolios of public
 > figures. The service displays official YouTube videos and current public
 > statistics to help users understand content activity. Prices, balances and
@@ -79,7 +79,7 @@ Use this draft after replacing the bracketed fields:
 
 ## Independent value
 
-> Fame Market adds independent value by turning public content activity into an
+> Fame Plays adds independent value by turning public content activity into an
 > educational fantasy game with transparent methodology, equal starting
 > balances, weekly seasons and anti-abuse controls. Users can inspect official
 > source videos, raw public statistics and the separate explanation of any
@@ -106,7 +106,7 @@ Controls:
 
 - Only data returned by YouTube API Services is used in this signal.
 - A channel is compared only with its own history.
-- The metric has a visible `Calculated independently by Fame Market` label.
+- The metric has a visible `Calculated independently by Fame Plays` label.
 - Missing or stale data produces no signal.
 - Shorts, live streams and normal videos remain separated.
 - The signal starts in shadow mode.
@@ -131,12 +131,12 @@ quota.
 
 ## Public URLs after deployment
 
-- Primary URL: `https://DOMINIO-NUEVO/`
-- Privacy: `https://DOMINIO-NUEVO/privacidad`
-- Terms/rules: `https://DOMINIO-NUEVO/reglas`
-- Methodology: `https://DOMINIO-NUEVO/metodologia`
-- Rights: `https://DOMINIO-NUEVO/derechos`
-- Login: `https://DOMINIO-NUEVO/`
+- Primary URL: `https://fameplays.com/`
+- Privacy: `https://fameplays.com/privacidad`
+- Terms/rules: `https://fameplays.com/reglas`
+- Methodology: `https://fameplays.com/metodologia`
+- Rights: `https://fameplays.com/derechos`
+- Login: `https://fameplays.com/`
 - Admin evidence: provide reviewer instructions or a temporary review account.
 
 ## Required evidence checklist

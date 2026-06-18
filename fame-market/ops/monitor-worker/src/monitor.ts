@@ -1,4 +1,4 @@
-const STATE_KEY = 'fame-market-health';
+const STATE_KEY = 'fame-plays-health';
 
 type HealthState = 'healthy' | 'degraded';
 type AlertEvent = 'down' | 'recovered' | null;
@@ -180,7 +180,7 @@ function alertText(
     )
     .join('\n');
   return [
-    `[${icon}] Fame Market ${environment}`,
+    `[${icon}] Fame Plays ${environment}`,
     event === 'down'
       ? `La API fallo ${state.consecutiveFailures} veces consecutivas.`
       : 'La API volvio a responder correctamente.',

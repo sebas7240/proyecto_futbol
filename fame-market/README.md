@@ -1,4 +1,4 @@
-# Fame Market
+# Fame Plays
 
 Juego independiente sobre la economia de la atencion. Web, PWA y futura APK comparten el
 mismo frontend, API, autenticacion y portafolio.
@@ -46,6 +46,10 @@ mismo frontend, API, autenticacion y portafolio.
   figuras genericas sin romper compatibilidad.
 - Categorias `musica`, `creadores`, `cine-tv`, `deportes` y `otros` con
   intereses personales guardados por usuario.
+- Perfiles estrategicos visibles (`stable`, `balanced`, `volatile`,
+  `underdog`) con nivel de riesgo y nota explicativa.
+- Chat social por figura en Cloudflare Durable Objects, con emojis, reportes,
+  moderacion admin y notas de voz cortas.
 - Fuentes genericas `entity_sources` y contenido reciente `content_items` con
   compatibilidad hacia los videos existentes de YouTube.
 - Eventos externos `external_events` para contexto excepcional revisado, sin
@@ -104,6 +108,10 @@ Variables importantes:
 - `RIGHTS_IP_HASH_SALT`
 - `VITE_PUBLIC_SITE_URL`
 - `VITE_RIGHTS_CONTACT_EMAIL`
+- `VITE_CHAT_WS_URL`
+- `VITE_CHAT_VOICE_ENABLED`
+- `CHAT_WORKER_ADMIN_URL`
+- `CHAT_ADMIN_SECRET`
 - `BACKUP_ENCRYPTION_PASSWORD`
 - `SEASON_AUTOMATION_ENABLED`
 - `SEASON_CYCLE_INTERVAL_MINUTES`
@@ -112,13 +120,54 @@ Variables importantes:
 
 Los archivos `.env` estan ignorados por Git.
 
+## Chat social
+
+El chat de texto se ejecuta fuera del VPS mediante Cloudflare Durable Objects y
+WebSockets. Cada figura usa una sala propia, por ejemplo `entity:karol-g`.
+
+Controles incluidos:
+
+- Maximo 160 caracteres por mensaje.
+- Emojis rapidos desde el compositor.
+- Notas de voz de 5 a 10 segundos.
+- Ultimos 120 mensajes por sala.
+- Rate limit de 8 segundos por usuario.
+- Bloqueo basico de links e invitaciones externas.
+- Presencia simple para saber cuantas personas estan en la sala.
+- Reportes de usuarios y auto-ocultamiento al tercer reporte.
+- Moderacion desde `/admin`: ocultar mensajes, silenciar, bloquear y reactivar.
+
+Desarrollo local:
+
+```bash
+npx wrangler dev --config chat-worker/wrangler.jsonc
+```
+
+Despliegue:
+
+```bash
+npx wrangler deploy --config chat-worker/wrangler.jsonc
+```
+
+Configura la URL resultante en Cloudflare Pages como `VITE_CHAT_WS_URL`. El
+backend necesita `CHAT_WORKER_ADMIN_URL` y `CHAT_ADMIN_SECRET` para operar la
+moderacion sin exponer el secreto en el navegador. Configura el mismo secreto
+en el Worker con:
+
+```bash
+npx wrangler secret put CHAT_ADMIN_SECRET --config chat-worker/wrangler.jsonc
+```
+
+Las notas de voz no usan llamada en vivo ni WebRTC. El audio chat en vivo queda
+aplazado hasta completar TURN, moderacion y pruebas en movil/app.
+
 ## Cloudflare Turnstile
 
 1. Crear un widget administrado en Cloudflare Turnstile.
 2. Autorizar el dominio definitivo y `localhost` durante desarrollo.
 3. Configurar la clave publica como `VITE_TURNSTILE_SITE_KEY` en Pages.
 4. Configurar la clave secreta como `TURNSTILE_SECRET_KEY` solo en el backend.
-5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=DOMINIO-NUEVO`.
+5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=fameplays.com`.
 
 El frontend solicita un token al cotizar. El backend lo valida con Siteverify,
 comprueba la accion `trade_quote` y el hostname, y consume el token una sola
@@ -199,6 +248,10 @@ estado publico. La API publica solo devuelve eventos `approved` y `public`.
 Aunque un evento pueda tener una propuesta de impacto en puntos base, por ahora
 `appliedDeltaBps` permanece en cero y no modifica precios.
 
+Las integraciones directas con redes sociales como Instagram, X/Twitter o
+TikTok quedan aplazadas hasta confirmar permisos y terminos. Por ahora se
+prefieren fuentes oficiales, APIs permitidas y eventos revisados manualmente.
+
 Endpoints:
 
 ```text
@@ -247,7 +300,7 @@ con `BACKUP_RETENTION_DAYS`.
 Para conservar otra copia en Cloudflare R2 o almacenamiento S3 compatible:
 
 ```text
-BACKUP_S3_URI=s3://fame-market-backups/production
+BACKUP_S3_URI=s3://fame-plays-backups/production
 AWS_ENDPOINT_URL_S3=https://ACCOUNT_ID.r2.cloudflarestorage.com
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
@@ -284,7 +337,7 @@ Ejemplo de consulta protegida:
 
 ```bash
 curl -H "x-monitoring-secret: $MONITORING_SECRET" \
-  https://api.goleafutbol.com/fama/api/metrics
+  https://api.fameplays.com/api/metrics
 ```
 
 El Worker de `ops/monitor-worker` consulta ambos endpoints cada cinco minutos,

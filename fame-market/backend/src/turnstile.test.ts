@@ -17,14 +17,14 @@ describe('Turnstile verification', () => {
 
   it('accepts a valid token for the expected hostname and action', async () => {
     process.env.TURNSTILE_SECRET_KEY = 'test-secret';
-    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fama.goleafutbol.com';
+    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fameplays.com';
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
             success: true,
-            hostname: 'fama.goleafutbol.com',
+            hostname: 'fameplays.com',
             action: 'trade_quote',
             challenge_ts: '2026-06-14T00:00:00Z'
           }),
@@ -39,7 +39,7 @@ describe('Turnstile verification', () => {
       'trade_quote'
     );
     expect(result.skipped).toBe(false);
-    expect(result.hostname).toBe('fama.goleafutbol.com');
+    expect(result.hostname).toBe('fameplays.com');
   });
 
   it('rejects missing and mismatched tokens', async () => {
@@ -51,7 +51,7 @@ describe('Turnstile verification', () => {
       status: 403
     });
 
-    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fama.goleafutbol.com';
+    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fameplays.com';
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -72,14 +72,14 @@ describe('Turnstile verification', () => {
       status: 403
     });
 
-    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fama.goleafutbol.com';
+    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fameplays.com';
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
             success: true,
-            hostname: 'fama.goleafutbol.com'
+            hostname: 'fameplays.com'
           }),
           { status: 200 }
         )

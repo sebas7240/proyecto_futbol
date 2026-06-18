@@ -13,10 +13,13 @@ import {
   HardDrive,
   Inbox,
   LockKeyhole,
+  MessageCircle,
   Radar,
   RefreshCw,
   Save,
   Snowflake,
+  Trash2,
+  Volume2,
   Youtube
 } from 'lucide-react';
 import { api } from './api';
@@ -43,7 +46,7 @@ export function AdminPanel() {
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
   const seasonQuery = useQuery({ queryKey: ['ranking'], queryFn: api.ranking });
   const [adminSecret, setAdminSecret] = useState(
-    () => sessionStorage.getItem('fame-admin-secret') ?? ''
+    () => sessionStorage.getItem('fame-plays-admin-secret') ?? ''
   );
   const [handles, setHandles] = useState<Record<string, string>>({
     '10000000-0000-4000-8000-000000000001': '@KarolG',
@@ -59,6 +62,8 @@ export function AdminPanel() {
   const [rightsRequestNotes, setRightsRequestNotes] = useState<
     Record<string, string>
   >({});
+  const [chatRoom, setChatRoom] = useState('general');
+  const [chatReason, setChatReason] = useState('Moderacion manual');
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminSecret],
     queryFn: () => api.securityReviews(adminSecret),
@@ -90,6 +95,13 @@ export function AdminPanel() {
     enabled: Boolean(adminSecret),
     retry: false
   });
+  const chatModerationQuery = useQuery({
+    queryKey: ['chat-moderation', adminSecret, chatRoom],
+    queryFn: () => api.chatModeration(adminSecret, chatRoom),
+    enabled: Boolean(adminSecret && chatRoom),
+    retry: false,
+    refetchInterval: 15_000
+  });
   const seasonStatus =
     seasonQuery.data?.season?.status === 'active'
       ? 'activa'
@@ -101,7 +113,7 @@ export function AdminPanel() {
 
   const rememberSecret = (value: string) => {
     setAdminSecret(value);
-    sessionStorage.setItem('fame-admin-secret', value);
+    sessionStorage.setItem('fame-plays-admin-secret', value);
   };
 
   const register = async (artistId: string) => {
@@ -258,6 +270,37 @@ export function AdminPanel() {
     }
   };
 
+  const moderateChat = async (
+    action: 'hide-message' | 'mute-user' | 'ban-user' | 'clear-user',
+    input: {
+      messageId?: string;
+      userId?: string;
+      userName?: string;
+      durationMinutes?: number;
+    }
+  ) => {
+    setBusyArtist(`chat-${action}-${input.messageId ?? input.userId ?? 'room'}`);
+    setMessage('');
+    try {
+      await api.moderateChat(adminSecret, {
+        roomId: chatRoom,
+        action,
+        reason: chatReason.trim() || 'Moderacion manual',
+        ...input
+      });
+      setMessage('Moderacion del chat aplicada.');
+      await chatModerationQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo moderar el chat.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
   const toggleArtist = async (artistId: string, frozen: boolean) => {
     setBusyArtist(`artist-status-${artistId}`);
     setMessage('');
@@ -361,7 +404,7 @@ export function AdminPanel() {
         <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
         <div>
           <small>Administracion interna</small>
-          <h1>Control de Fame Market</h1>
+          <h1>Control de Fame Plays</h1>
         </div>
         <button onClick={syncAll} disabled={!adminSecret || Boolean(busyArtist)}>
           <RefreshCw size={17} /> Sincronizar todos
@@ -716,6 +759,172 @@ export function AdminPanel() {
           })
         ) : (
           <p>No hay resultados pendientes de revision.</p>
+        )}
+      </section>
+
+      <div className="admin-section-title">
+        <small>Comunidad en vivo</small>
+        <h2>Moderacion de chat</h2>
+      </div>
+
+      <section className="chat-moderation">
+        <div className="chat-moderation__controls">
+          <label>
+            Sala
+            <select
+              value={chatRoom}
+              onChange={(event) => setChatRoom(event.target.value)}
+            >
+              <option value="general">General</option>
+              {(artistsQuery.data ?? []).map((artist) => (
+                <option value={`entity:${artist.slug}`} key={artist.id}>
+                  {artist.symbol} - {artist.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Motivo
+            <input
+              value={chatReason}
+              maxLength={240}
+              onChange={(event) => setChatReason(event.target.value)}
+            />
+          </label>
+          <button
+            onClick={() => chatModerationQuery.refetch()}
+            disabled={!adminSecret || chatModerationQuery.isFetching}
+          >
+            <RefreshCw size={16} /> Actualizar
+          </button>
+        </div>
+
+        {!adminSecret ? (
+          <p>Ingresa el secreto para controlar el chat.</p>
+        ) : chatModerationQuery.isLoading ? (
+          <p>Cargando sala...</p>
+        ) : chatModerationQuery.isError ? (
+          <p>
+            No se pudo conectar la moderacion. Revisa CHAT_WORKER_ADMIN_URL y
+            CHAT_ADMIN_SECRET.
+          </p>
+        ) : (
+          <div className="chat-moderation__grid">
+            <div>
+              <h3>
+                <MessageCircle size={17} /> Mensajes recientes
+              </h3>
+              <div className="chat-moderation__messages">
+                {chatModerationQuery.data?.recentMessages.length ? (
+                  chatModerationQuery.data.recentMessages.map((chatMessage) => (
+                    <article
+                      className={`chat-moderation-card chat-moderation-card--${chatMessage.status}`}
+                      key={chatMessage.id}
+                    >
+                      <header>
+                        <span>
+                          <strong>{chatMessage.name}</strong>
+                          <small>
+                            {chatMessage.userId} · {chatMessage.type === 'voice'
+                              ? `nota ${Math.round(chatMessage.durationMs / 1000)}s`
+                              : 'texto'}
+                          </small>
+                        </span>
+                        <b>{chatMessage.reportCount} reportes</b>
+                      </header>
+                      <p>
+                        {chatMessage.type === 'voice'
+                          ? 'Nota de voz'
+                          : chatMessage.body || 'Mensaje vacio'}
+                      </p>
+                      <div className="chat-moderation-card__actions">
+                        <button
+                          onClick={() =>
+                            moderateChat('hide-message', {
+                              messageId: chatMessage.id
+                            })
+                          }
+                          disabled={Boolean(busyArtist)}
+                        >
+                          <Trash2 size={15} /> Ocultar
+                        </button>
+                        <button
+                          onClick={() =>
+                            moderateChat('mute-user', {
+                              userId: chatMessage.userId,
+                              userName: chatMessage.name,
+                              durationMinutes: 15
+                            })
+                          }
+                          disabled={Boolean(busyArtist)}
+                        >
+                          <Volume2 size={15} /> Silenciar
+                        </button>
+                        <button
+                          className="danger-action"
+                          onClick={() =>
+                            moderateChat('ban-user', {
+                              userId: chatMessage.userId,
+                              userName: chatMessage.name,
+                              durationMinutes: 1440
+                            })
+                          }
+                          disabled={Boolean(busyArtist)}
+                        >
+                          <Ban size={15} /> Bloquear
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p>No hay mensajes recientes en esta sala.</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3>
+                <Flag size={17} /> Acciones activas
+              </h3>
+              <div className="chat-moderation__actions-list">
+                {chatModerationQuery.data?.actions.filter((action) => action.active)
+                  .length ? (
+                  chatModerationQuery.data.actions
+                    .filter((action) => action.active)
+                    .map((action) => (
+                      <article className="chat-action-card" key={action.id}>
+                        <span>
+                          <strong>{action.name || action.userId}</strong>
+                          <small>
+                            {action.action === 'ban' ? 'Bloqueado' : 'Silenciado'}
+                            {action.expiresAt
+                              ? ` hasta ${new Date(action.expiresAt).toLocaleTimeString('es-CO', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}`
+                              : ''}
+                          </small>
+                        </span>
+                        <p>{action.reason}</p>
+                        <button
+                          onClick={() =>
+                            moderateChat('clear-user', {
+                              userId: action.userId,
+                              userName: action.name
+                            })
+                          }
+                          disabled={Boolean(busyArtist)}
+                        >
+                          Reactivar
+                        </button>
+                      </article>
+                    ))
+                ) : (
+                  <p>No hay usuarios castigados en esta sala.</p>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </section>
 

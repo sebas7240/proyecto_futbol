@@ -173,7 +173,7 @@ app.use(express.json({ limit: '32kb' }));
 app.get('/api/health/live', (_request, response) => {
   response.json({
     ok: true,
-    service: 'fame-market-backend',
+    service: 'fame-plays-backend',
     now: new Date().toISOString()
   });
 });
@@ -205,7 +205,7 @@ app.get('/api/status', async (_request, response) => {
   }
   response.json({
     ok: true,
-    service: 'fame-market-backend',
+    service: 'fame-plays-backend',
     persistence: market.persistence,
     environment: deploymentEnvironment(),
     databaseConnected: Boolean(database),
@@ -282,6 +282,65 @@ const externalEventPatchSchema = z.object({
   reviewStatus: z.enum(externalEventReviewStatuses).optional(),
   adminNotes: z.string().trim().max(1500).optional()
 });
+
+const chatRoomSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9:_-]+$/i)
+  .transform((value) => value.toLowerCase());
+
+const chatModerationSchema = z.object({
+  roomId: chatRoomSchema.default('general'),
+  action: z.enum(['hide-message', 'mute-user', 'ban-user', 'clear-user']),
+  messageId: z.string().trim().max(120).optional(),
+  userId: z.string().trim().max(120).optional(),
+  userName: z.string().trim().max(80).optional(),
+  durationMinutes: z.number().int().min(1).max(10_080).optional(),
+  reason: z.string().trim().max(240).optional()
+});
+
+async function requestChatModeration(
+  roomId: string,
+  init?: { method?: 'GET' | 'POST'; body?: unknown }
+) {
+  const baseUrl = (
+    process.env.CHAT_WORKER_ADMIN_URL ||
+    process.env.CHAT_WORKER_URL ||
+    ''
+  ).replace(/\/+$/, '');
+  const secret = process.env.CHAT_ADMIN_SECRET || '';
+  if (!baseUrl || !secret) {
+    throw new MarketError(
+      'Configura CHAT_WORKER_ADMIN_URL y CHAT_ADMIN_SECRET para moderar el chat.',
+      'CHAT_ADMIN_NOT_CONFIGURED',
+      503
+    );
+  }
+
+  const workerResponse = await fetch(
+    `${baseUrl}/admin/rooms/${encodeURIComponent(roomId)}/moderation`,
+    {
+      method: init?.method ?? 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'x-chat-admin-secret': secret
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined
+    }
+  );
+  const rawBody = await workerResponse.text();
+  const body = rawBody ? JSON.parse(rawBody) : {};
+  if (!workerResponse.ok) {
+    throw new MarketError(
+      body?.error || 'No se pudo consultar la moderacion del chat.',
+      'CHAT_ADMIN_FAILED',
+      workerResponse.status
+    );
+  }
+  return body;
+}
 
 app.post(
   '/api/legal/rights-requests',
@@ -852,6 +911,39 @@ app.get(
 );
 
 app.get(
+  '/api/admin/chat/moderation',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const roomId = chatRoomSchema.parse(request.query.roomId ?? 'general');
+      response.json(await requestChatModeration(roomId));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/chat/moderation',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = chatModerationSchema.parse(request.body);
+      response.json(
+        await requestChatModeration(input.roomId, {
+          method: 'POST',
+          body: input
+        })
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
   '/api/admin/external-events',
   requireAdmin,
   adminRateLimit,
@@ -1149,7 +1241,7 @@ async function start() {
   }
 
   app.listen(port, () => {
-    console.log(`Fame Market API listening on http://localhost:${port}`);
+    console.log(`Fame Plays API listening on http://localhost:${port}`);
   });
 
   if (
@@ -1260,6 +1352,6 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error('[Startup] Fame Market could not start', error);
+  console.error('[Startup] Fame Plays could not start', error);
   process.exitCode = 1;
 });

@@ -18,7 +18,7 @@ and remain idempotent.
 ```text
 ATTENTION_SYNC_ENABLED=true
 ATTENTION_SYNC_INTERVAL_MINUTES=360
-ATTENTION_USER_AGENT=FameMarket/0.1 (https://DOMINIO-NUEVO; contact: SUPPORT_EMAIL)
+ATTENTION_USER_AGENT=FamePlays/0.1 (https://fameplays.com; contact: SUPPORT_EMAIL)
 ```
 
 Admin endpoints:

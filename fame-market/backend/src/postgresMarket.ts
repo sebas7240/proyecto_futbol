@@ -36,6 +36,9 @@ interface DbArtist {
   subcategory: string | null;
   profession: string | null;
   theme_tags: string[] | null;
+  volatility_profile: 'stable' | 'balanced' | 'volatile' | 'underdog';
+  risk_level: number;
+  strategy_notes: string;
   image_url: string | null;
   image_usage_status: ImageUsageStatus;
   image_attribution: string | null;
@@ -737,6 +740,9 @@ export class PostgresMarketStore implements MarketDataStore {
       subcategory: string | null;
       profession: string | null;
       theme_tags: string[] | null;
+      volatility_profile: 'stable' | 'balanced' | 'volatile' | 'underdog';
+      risk_level: number;
+      strategy_notes: string;
       image_url: string | null;
       image_usage_status: ImageUsageStatus;
       image_attribution: string | null;
@@ -753,7 +759,8 @@ export class PostgresMarketStore implements MarketDataStore {
             AS unrealized_pnl,
           artist.slug, artist.symbol, artist.name, artist.country, artist.genre,
           artist.category, artist.subcategory, artist.profession,
-          artist.theme_tags, artist.image_url, artist.image_usage_status,
+          artist.theme_tags, artist.volatility_profile, artist.risk_level,
+          artist.strategy_notes, artist.image_url, artist.image_usage_status,
           artist.image_attribution,
           artist.current_price, artist.opening_price,
           artist.status,
@@ -787,6 +794,9 @@ export class PostgresMarketStore implements MarketDataStore {
         subcategory: position.subcategory ?? '',
         profession: position.profession ?? '',
         themeTags: position.theme_tags ?? [],
+        volatilityProfile: position.volatility_profile,
+        riskLevel: Number(position.risk_level),
+        strategyNotes: position.strategy_notes,
         imageUrl: publicArtistImage(
           position.image_url,
           position.image_usage_status
@@ -835,6 +845,9 @@ export class PostgresMarketStore implements MarketDataStore {
       subcategory: artist.subcategory ?? '',
       profession: artist.profession ?? '',
       themeTags: artist.theme_tags ?? [],
+      volatilityProfile: artist.volatility_profile,
+      riskLevel: Number(artist.risk_level),
+      strategyNotes: artist.strategy_notes,
       imageUrl: publicArtistImage(
         artist.image_url,
         artist.image_usage_status

@@ -22,7 +22,7 @@ function RulesPage() {
         <span><Scale size={20} /> Reglas de la beta</span>
         <h1>Un juego sobre la economia de la atencion</h1>
         <p>
-          Fame Market usa monedas, precios y participaciones completamente
+          Fame Plays usa monedas, precios y participaciones completamente
           ficticios. Participar no constituye una inversion ni genera derechos
           sobre artistas, canciones o ingresos reales.
         </p>
@@ -59,7 +59,7 @@ function RulesPage() {
         <p>
           Se prohiben multicuentas, automatizaciones no autorizadas, explotacion
           de errores, coordinacion para alterar precios y cualquier intento de
-          manipular el ranking. Fame Market puede congelar cuentas, artistas o
+          manipular el ranking. Fame Plays puede congelar cuentas, artistas o
           resultados mientras realiza una revision.
         </p>
       </section>
@@ -68,7 +68,7 @@ function RulesPage() {
         <p>
           Las estadisticas de YouTube se muestran como informacion publica para
           ayudar a tomar decisiones y actualmente no afectan el precio. El
-          Indice de Atencion es una metrica independiente de Fame Market, no
+          Indice de Atencion es una metrica independiente de Fame Plays, no
           una metrica publicada o aprobada por YouTube. Su metodologia y sus
           fuentes se publican en una pagina separada.
         </p>
@@ -102,7 +102,7 @@ function PrivacyPage() {
         <span><ShieldCheck size={20} /> Privacidad</span>
         <h1>Datos necesarios, sin adornos</h1>
         <p>
-          Esta politica explica que informacion usa Fame Market durante la beta
+          Esta politica explica que informacion usa Fame Plays durante la beta
           y por que. No vendemos datos personales ni usamos el portafolio
           ficticio para evaluar credito o inversiones reales.
         </p>
@@ -163,8 +163,8 @@ function PrivacyPage() {
       <section>
         <h2>6. YouTube API Services</h2>
         <p>
-          Fame Market usa YouTube API Services para mostrar canales y videos
-          oficiales. Al usar Fame Market tambien aplican los{' '}
+          Fame Plays usa YouTube API Services para mostrar canales y videos
+          oficiales. Al usar Fame Plays tambien aplican los{' '}
           <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">
             Terminos de Servicio de YouTube
           </a>
@@ -172,7 +172,7 @@ function PrivacyPage() {
           <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
             Politica de Privacidad de Google
           </a>
-          . Fame Market no solicita permisos para administrar tu cuenta de
+          . Fame Plays no solicita permisos para administrar tu cuenta de
           YouTube ni descarga comentarios individuales.
         </p>
       </section>
@@ -199,7 +199,7 @@ function MethodologyPage() {
         <span><Database size={20} /> Metodologia publica</span>
         <h1>Indice Automatico de Atencion</h1>
         <p>
-          Es una metrica calculada independientemente por Fame Market para
+          Es una metrica calculada independientemente por Fame Plays para
           observar cambios relativos de atencion. No es una estadistica
           publicada, respaldada ni aprobada por YouTube, Wikimedia o Google.
         </p>
@@ -248,7 +248,7 @@ function MethodologyPage() {
           Los datos publicos de YouTube actualmente se muestran por separado y
           no forman parte del indice. Solo se incorporaran despues de recibir
           autorizacion para metricas derivadas. Si se aprueba, cualquier score
-          se identificara expresamente como calculado por Fame Market y no como
+          se identificara expresamente como calculado por Fame Plays y no como
           un dato originado directamente en YouTube. La senal de YouTube se
           mantendra separada de Wikimedia u otras fuentes, salvo autorizacion
           escrita que permita combinarlas.
@@ -308,7 +308,7 @@ function RightsPage() {
         <span><BadgeInfo size={20} /> Derechos y correcciones</span>
         <h1>Identificacion informativa, sin afiliacion</h1>
         <p>
-          Fame Market es un simulador independiente. Las figuras y marcas
+          Fame Plays es un simulador independiente. Las figuras y marcas
           mencionadas no patrocinan, administran ni aprueban esta plataforma.
           Esta pagina explica la politica de nombres, imagenes y reclamaciones.
         </p>

@@ -12,6 +12,12 @@ export type EntityCategory =
   | 'deportes'
   | 'otros';
 
+export type VolatilityProfile =
+  | 'stable'
+  | 'balanced'
+  | 'volatile'
+  | 'underdog';
+
 export interface CategoryOverview {
   id: EntityCategory;
   label: string;
@@ -29,6 +35,9 @@ export interface ArtistSummary {
   subcategory: string;
   profession: string;
   themeTags: string[];
+  volatilityProfile: VolatilityProfile;
+  riskLevel: number;
+  strategyNotes: string;
   imageUrl: string;
   imageUsageStatus: ImageUsageStatus;
   imageAttribution: string;
@@ -388,6 +397,46 @@ export interface RightsRequest {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+}
+
+export interface ChatModerationMessage {
+  id: string;
+  userId: string;
+  name: string;
+  type: 'text' | 'voice';
+  body: string;
+  audioMimeType: string;
+  durationMs: number;
+  status: 'visible' | 'hidden';
+  reportCount: number;
+  createdAt: string;
+}
+
+export interface ChatModerationAction {
+  id: string;
+  userId: string;
+  name: string;
+  action: 'mute' | 'ban';
+  reason: string;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface ChatModerationReport {
+  id: string;
+  messageId: string;
+  userId: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface ChatModerationOverview {
+  roomId: string;
+  recentMessages: ChatModerationMessage[];
+  actions: ChatModerationAction[];
+  reports: ChatModerationReport[];
+  generatedAt: string;
 }
 
 export interface ArtistRightsRecord {

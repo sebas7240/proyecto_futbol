@@ -238,7 +238,7 @@ function compactDate(date: Date) {
 function wikimediaUserAgent() {
   return (
     process.env.ATTENTION_USER_AGENT ??
-    `FameMarket/0.1 (${process.env.PUBLIC_SITE_URL ?? 'http://localhost:5174'}; contact: ${
+    `FamePlays/0.1 (${process.env.PUBLIC_SITE_URL ?? 'http://localhost:5174'}; contact: ${
       process.env.RIGHTS_CONTACT_EMAIL ?? 'not-configured'
     })`
   );

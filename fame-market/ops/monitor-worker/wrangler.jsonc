@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "fame-market-monitor",
+  "name": "fame-plays-monitor",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-14",
   "compatibility_flags": ["nodejs_compat"],
@@ -10,7 +10,7 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "API_BASE_URL": "https://api.goleafutbol.com/fama/api",
+    "API_BASE_URL": "https://api.fameplays.com/api",
     "FAILURE_THRESHOLD": "2",
     "CHECK_BACKUPS": "true",
     "BACKUP_MAX_AGE_SECONDS": "129600",
@@ -42,10 +42,10 @@
   },
   "env": {
     "staging": {
-      "name": "fame-market-monitor-staging",
+      "name": "fame-plays-monitor-staging",
       "vars": {
         "ENVIRONMENT": "staging",
-        "API_BASE_URL": "https://staging-api.goleafutbol.com/api",
+        "API_BASE_URL": "https://staging-api.fameplays.com/api",
         "FAILURE_THRESHOLD": "2",
         "CHECK_BACKUPS": "false",
         "BACKUP_MAX_AGE_SECONDS": "129600",

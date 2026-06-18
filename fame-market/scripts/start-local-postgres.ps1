@@ -34,7 +34,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $dataDirectory 'PG_VERSION'))) {
 
   Add-Content -LiteralPath (Join-Path $dataDirectory 'postgresql.conf') -Value @"
 
-# Fame Market local development
+# Fame Plays local development
 listen_addresses = '127.0.0.1'
 port = $port
 max_connections = 30

@@ -1,6 +1,6 @@
 {
-  "name": "Fame Market",
-  "short_name": "Fame",
+  "name": "Fame Plays",
+  "short_name": "Plays",
   "description": "Juego de cultura y atencion con monedas ficticias.",
   "start_url": "/",
   "display": "standalone",

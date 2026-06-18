@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fame-market-shell-v1';
+const CACHE_NAME = 'fame-plays-shell-v1';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

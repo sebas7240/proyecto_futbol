@@ -4,6 +4,7 @@ import type {
   AttentionEvaluationResponse,
   AttentionSourceOverview,
   CategoryOverview,
+  ChatModerationOverview,
   ConsentStatus,
   EntityCategory,
   EntitySource,
@@ -43,7 +44,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       'content-type': 'application/json',
       ...(token
         ? { authorization: `Bearer ${token}` }
-        : { 'x-user-id': 'fame-local-demo' }),
+        : { 'x-user-id': 'fame-plays-local-demo' }),
       ...options?.headers
     }
   });
@@ -263,6 +264,30 @@ export const api = {
   async operations(adminSecret: string) {
     return request<OperationsOverview>('/admin/operations', {
       headers: { 'x-admin-secret': adminSecret }
+    });
+  },
+  async chatModeration(adminSecret: string, roomId: string) {
+    return request<ChatModerationOverview>(
+      `/admin/chat/moderation?roomId=${encodeURIComponent(roomId)}`,
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+  },
+  async moderateChat(
+    adminSecret: string,
+    input: {
+      roomId: string;
+      action: 'hide-message' | 'mute-user' | 'ban-user' | 'clear-user';
+      messageId?: string;
+      userId?: string;
+      userName?: string;
+      durationMinutes?: number;
+      reason?: string;
+    }
+  ) {
+    return request<ChatModerationOverview>('/admin/chat/moderation', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify(input)
     });
   },
   async adminExternalEvents(adminSecret: string) {

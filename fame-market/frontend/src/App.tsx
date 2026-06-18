@@ -25,6 +25,7 @@ import {
   subscribeToAuth
 } from './auth';
 import { ConsentModal } from './ConsentModal';
+import { ChatPanel } from './ChatPanel';
 import { EntityAvatar } from './EntityAvatar';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
@@ -33,7 +34,8 @@ import type {
   ArtistSummary,
   CategoryOverview,
   EntityCategory,
-  Quote
+  Quote,
+  VolatilityProfile
 } from './types';
 
 type ArtistFilter = 'trending' | 'favorites' | `category:${EntityCategory}`;
@@ -46,7 +48,7 @@ const compact = new Intl.NumberFormat('es-CO', {
   notation: 'compact',
   maximumFractionDigits: 1
 });
-const storedInterestsKey = 'fame-market:interests';
+const storedInterestsKey = 'fame-plays:interests';
 
 function readStoredInterests(): EntityCategory[] {
   try {
@@ -62,6 +64,16 @@ function categoryLabel(
   categories: CategoryOverview[]
 ) {
   return categories.find((category) => category.id === categoryId)?.label ?? categoryId;
+}
+
+function volatilityLabel(profile: VolatilityProfile) {
+  const labels: Record<VolatilityProfile, string> = {
+    stable: 'Estable',
+    balanced: 'Balanceado',
+    volatile: 'Volatil',
+    underdog: 'Underdog'
+  };
+  return labels[profile];
 }
 
 function Movement({ value }: { value: number }) {
@@ -99,6 +111,7 @@ function ArtistRow({
         />
         <span className="artist-row__identity">
           <strong>{artist.name}</strong>
+          <em>{volatilityLabel(artist.volatilityProfile)} / riesgo {artist.riskLevel}</em>
           <small>{artist.symbol} · {artist.profession || artist.country}</small>
         </span>
         <span className="artist-row__price">
@@ -216,7 +229,7 @@ function App() {
       firebaseUser &&
       tradesQuery.isSuccess &&
       tradesQuery.data.length === 0 &&
-      localStorage.getItem('fame-market:onboarding') !== 'done'
+      localStorage.getItem('fame-plays:onboarding') !== 'done'
     ) {
       setOnboardingOpen(true);
     }
@@ -400,6 +413,8 @@ function App() {
           item.category,
           item.subcategory,
           item.profession,
+          item.volatilityProfile,
+          item.strategyNotes,
           ...item.themeTags
         ].some((value) => value.toLocaleLowerCase('es').includes(query));
       const matchesFilter =
@@ -437,7 +452,7 @@ function App() {
   };
 
   const finishOnboarding = () => {
-    localStorage.setItem('fame-market:onboarding', 'done');
+    localStorage.setItem('fame-plays:onboarding', 'done');
     setOnboardingOpen(false);
   };
 
@@ -455,7 +470,7 @@ function App() {
         <div className="brand">
           <span className="brand__mark"><Music2 size={21} /></span>
           <span>
-            <strong>Fame Market</strong>
+            <strong>Fame Plays</strong>
             <small>
               {currentSeason
                 ? `${currentSeason.name} · ${
@@ -700,6 +715,12 @@ function App() {
                     {categoryLabel(artist.category, categories)} ·{' '}
                     {artist.country} · {compact.format(artist.holders)} jugadores
                   </p>
+                  <div className="strategy-tags">
+                    <span className={`strategy-tag strategy-tag--${artist.volatilityProfile}`}>
+                      {volatilityLabel(artist.volatilityProfile)}
+                    </span>
+                    <span>Riesgo {artist.riskLevel}/5</span>
+                  </div>
                 </div>
                 <div className="hero-price">
                   <small>Precio ficticio</small>
@@ -723,10 +744,20 @@ function App() {
                 trades={artistTrades}
               />
 
+              {artist.strategyNotes && (
+                <section className="strategy-note">
+                  <BriefcaseBusiness size={18} />
+                  <div>
+                    <small>Lectura estrategica</small>
+                    <p>{artist.strategyNotes}</p>
+                  </div>
+                </section>
+              )}
+
               {attentionQuery.data?.[0]?.signal && (
                 <section className="attention-public">
                   <div>
-                    <small>Indice independiente de Fame Market</small>
+                    <small>Indice independiente de Fame Plays</small>
                     <strong>Observacion de atencion en modo sombra</strong>
                     <p>
                       Wikimedia propone{' '}
@@ -972,6 +1003,13 @@ function App() {
             )}
             {notice && <p className="notice">{notice}</p>}
           </section>
+
+          <ChatPanel
+            roomId={selectedSlug ? `entity:${selectedSlug}` : 'general'}
+            roomLabel={artist?.symbol ?? 'General'}
+            userId={firebaseUser?.uid}
+            displayName={firebaseUser?.displayName}
+          />
 
           <section className="portfolio-summary">
             <div className="section-heading section-heading--compact">

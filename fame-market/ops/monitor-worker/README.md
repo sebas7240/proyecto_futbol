@@ -1,4 +1,4 @@
-# Fame Market Monitor
+# Fame Plays Monitor
 
 Cloudflare Worker programado que supervisa la API desde fuera del VPS y envia
 alertas a Telegram.
