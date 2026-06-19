@@ -674,6 +674,27 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.chart-shell {
+  margin-top: 14px;
+}
+
+.chart-toolbar--advanced {
+  min-height: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.chart-control-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: #f7f6f1;
+  border-radius: 7px;
+}
+
 .time-ranges {
   gap: 5px;
 }
@@ -681,6 +702,30 @@ button {
 .time-ranges button {
   min-width: 38px;
   padding: 6px 9px;
+}
+
+.chart-control-group button {
+  min-height: 32px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.chart-control-group button:hover,
+.chart-control-group button.is-active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.chart-style-toggle button,
+.chart-tools button {
+  width: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
 
 .chart-toolbar > span {
@@ -691,9 +736,51 @@ button {
   font-size: 12px;
 }
 
+.price-chart-wrap {
+  position: relative;
+}
+
 .price-chart {
   width: 100%;
   height: 360px;
+}
+
+.chart-drawing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.chart-drawing-layer.is-drawing {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.chart-drawing-layer line {
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-drawing-layer circle {
+  fill: var(--blue);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.chart-drawing-layer text {
+  fill: var(--paper);
+  paint-order: stroke;
+  stroke: var(--ink);
+  stroke-width: 5;
+  text-anchor: end;
+  dominant-baseline: middle;
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .source-strip,
@@ -1249,6 +1336,21 @@ button {
 .voice-recorder small {
   color: var(--muted);
   font-size: 11px;
+}
+
+.voice-meter {
+  width: min(210px, 100%);
+  height: 5px;
+  overflow: hidden;
+  background: #e6e3d7;
+  border-radius: 999px;
+}
+
+.voice-meter i {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: inherit;
 }
 
 .voice-recorder button {
@@ -3601,6 +3703,15 @@ button {
 
   .chart-toolbar {
     overflow-x: auto;
+  }
+
+  .chart-toolbar--advanced {
+    justify-content: flex-start;
+    padding-bottom: 5px;
+  }
+
+  .chart-control-group {
+    flex: 0 0 auto;
   }
 
   .chart-toolbar > span {

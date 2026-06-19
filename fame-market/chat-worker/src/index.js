@@ -1,8 +1,8 @@
 const DEFAULT_HISTORY_LIMIT = 120;
 const DEFAULT_MESSAGE_LIMIT = 160;
 const DEFAULT_RATE_LIMIT_SECONDS = 8;
-const DEFAULT_VOICE_MAX_BYTES = 240_000;
-const MIN_VOICE_MS = 4_500;
+const DEFAULT_VOICE_MAX_BYTES = 500_000;
+const MIN_VOICE_MS = 900;
 const MAX_VOICE_MS = 10_500;
 const AUTO_HIDE_REPORTS = 3;
 
@@ -437,7 +437,7 @@ export class ChatRoom {
       ws.send(
         JSON.stringify({
           type: 'error',
-          message: 'La nota de voz debe durar entre 5 y 10 segundos.'
+          message: 'La nota de voz debe durar entre 1 y 10 segundos.'
         })
       );
       return;

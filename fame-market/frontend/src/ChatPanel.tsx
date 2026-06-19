@@ -78,7 +78,7 @@ const guestNameKey = 'fame-plays:chat-guest-name';
 const guestIdKey = 'fame-plays:chat-guest-id';
 const chatBaseUrl = (import.meta.env.VITE_CHAT_WS_URL ?? '').trim();
 const maxMessageLength = 160;
-const minVoiceMs = 5_000;
+const minVoiceMs = 1_000;
 const maxVoiceMs = 10_000;
 const emojiOptions = ['🔥', '😂', '👏', '🎤', '🏆', '⚽', '👀', '📈', '🚀', '💚'];
 
@@ -178,6 +178,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     }
 
     let retryTimer: number | undefined;
+    let pingTimer: number | undefined;
     let closedByEffect = false;
 
     const connect = () => {
@@ -190,10 +191,21 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
 
       socket.addEventListener('open', () => {
         setStatus('connected');
+        pingTimer = window.setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25_000);
       });
 
       socket.addEventListener('message', (event) => {
-        const payload = JSON.parse(event.data) as ChatEvent;
+        let payload: ChatEvent;
+        try {
+          payload = JSON.parse(event.data) as ChatEvent;
+        } catch {
+          setNotice('El chat recibio una respuesta invalida.');
+          return;
+        }
         if (payload.type === 'ready') {
           setMessages(payload.history);
           setPresence(payload.presence);
@@ -217,6 +229,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       });
 
       socket.addEventListener('close', () => {
+        if (pingTimer) window.clearInterval(pingTimer);
         if (closedByEffect) return;
         setStatus('disconnected');
         retryTimer = window.setTimeout(connect, 3500);
@@ -232,6 +245,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     return () => {
       closedByEffect = true;
       if (retryTimer) window.clearTimeout(retryTimer);
+      if (pingTimer) window.clearInterval(pingTimer);
       socketRef.current?.close();
     };
   }, [identity.name, identity.userId, roomId]);
@@ -301,7 +315,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         setElapsedMs(durationMs);
         if (durationMs < minVoiceMs) {
           setRecorderState('idle');
-          setNotice('La nota debe durar al menos 5 segundos.');
+          setNotice('La nota debe durar al menos 1 segundo.');
           return;
         }
         try {
@@ -459,7 +473,12 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
                   ? 'Enviando nota...'
                   : 'Nota de voz'}
             </strong>
-            <small>Duracion permitida: 5 a 10 segundos.</small>
+            <small>Duracion permitida: 1 a 10 segundos.</small>
+            {recorderState === 'recording' && (
+              <span className="voice-meter" aria-hidden="true">
+                <i style={{ width: `${Math.min(100, (elapsedMs / maxVoiceMs) * 100)}%` }} />
+              </span>
+            )}
           </div>
           {recorderState === 'recording' ? (
             <button onClick={stopRecording} disabled={!canStopRecording}>

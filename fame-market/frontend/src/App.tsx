@@ -7,7 +7,6 @@ import {
   BarChart3,
   BriefcaseBusiness,
   ChevronRight,
-  Clock3,
   Music2,
   Play,
   Search,
@@ -729,15 +728,6 @@ function App() {
                 </div>
               </div>
 
-              <div className="chart-toolbar">
-                <div className="time-ranges">
-                  <button>1H</button>
-                  <button>24H</button>
-                  <button className="is-active">7D</button>
-                  <button>Temporada</button>
-                </div>
-                <span><Clock3 size={15} /> Actualizacion en vivo</span>
-              </div>
               <PriceChart
                 data={artist.history}
                 positive={artist.changePercent >= 0}
