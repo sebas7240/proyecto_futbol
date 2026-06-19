@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { MarketError } from './market.js';
 import { incrementMetric } from './metrics.js';
 
@@ -11,6 +11,92 @@ interface SiteverifyResponse {
   action?: string;
   challenge_ts?: string;
   'error-codes'?: string[];
+}
+
+interface TurnstilePassPayload {
+  version: 1;
+  userId: string;
+  action: string;
+  expiresAt: number;
+}
+
+const DEFAULT_SESSION_TTL_SECONDS = 30 * 60;
+
+function sessionTtlSeconds() {
+  const configured = Number(process.env.TURNSTILE_SESSION_TTL_SECONDS);
+  if (!Number.isFinite(configured)) return DEFAULT_SESSION_TTL_SECONDS;
+  return Math.max(5 * 60, Math.min(configured, 60 * 60));
+}
+
+function sessionSecret() {
+  return (
+    process.env.TURNSTILE_SESSION_SECRET ||
+    process.env.TURNSTILE_SECRET_KEY ||
+    ''
+  );
+}
+
+function signPassPayload(encodedPayload: string) {
+  return createHmac('sha256', sessionSecret())
+    .update(`fame-plays-turnstile:${encodedPayload}`)
+    .digest('base64url');
+}
+
+function issueTurnstilePass(userId: string, action: string) {
+  const expiresAt = Math.floor(Date.now() / 1000) + sessionTtlSeconds();
+  const payload: TurnstilePassPayload = {
+    version: 1,
+    userId,
+    action,
+    expiresAt
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return {
+    value: `${encodedPayload}.${signPassPayload(encodedPayload)}`,
+    expiresAt: new Date(expiresAt * 1000).toISOString()
+  };
+}
+
+function validTurnstilePass(
+  pass: string | undefined,
+  userId: string,
+  expectedAction: string
+) {
+  if (!pass || pass.length > 4096 || !sessionSecret()) return null;
+  const [encodedPayload, signature, extra] = pass.split('.');
+  if (!encodedPayload || !signature || extra) return null;
+
+  const expectedSignature = Buffer.from(
+    signPassPayload(encodedPayload),
+    'base64url'
+  );
+  const receivedSignature = Buffer.from(signature, 'base64url');
+  if (
+    expectedSignature.length !== receivedSignature.length ||
+    !timingSafeEqual(expectedSignature, receivedSignature)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8')
+    ) as TurnstilePassPayload;
+    if (
+      payload.version !== 1 ||
+      payload.userId !== userId ||
+      payload.action !== expectedAction ||
+      payload.expiresAt <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+    return {
+      value: pass,
+      expiresAt: new Date(payload.expiresAt * 1000).toISOString()
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function turnstileConfigured() {
@@ -84,3 +170,33 @@ export async function verifyTurnstileToken(
     challengeAt: result.challenge_ts ?? null
   };
 }
+
+export async function verifyTurnstileAccess(
+  token: string | undefined,
+  pass: string | undefined,
+  userId: string,
+  remoteIp: string,
+  expectedAction: string
+) {
+  if (!turnstileConfigured()) {
+    return { skipped: true, pass: null, expiresAt: null };
+  }
+
+  const activePass = validTurnstilePass(pass, userId, expectedAction);
+  if (activePass) {
+    return {
+      skipped: false,
+      pass: activePass.value,
+      expiresAt: activePass.expiresAt
+    };
+  }
+
+  await verifyTurnstileToken(token, remoteIp, expectedAction);
+  const issuedPass = issueTurnstilePass(userId, expectedAction);
+  return {
+    skipped: false,
+    pass: issuedPass.value,
+    expiresAt: issuedPass.expiresAt
+  };
+}
+

@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MarketError } from './market.js';
-import { verifyTurnstileToken } from './turnstile.js';
+import {
+  verifyTurnstileAccess,
+  verifyTurnstileToken
+} from './turnstile.js';
 
 describe('Turnstile verification', () => {
   afterEach(() => {
     delete process.env.TURNSTILE_SECRET_KEY;
+    delete process.env.TURNSTILE_SESSION_SECRET;
+    delete process.env.TURNSTILE_SESSION_TTL_SECONDS;
     delete process.env.TURNSTILE_ALLOWED_HOSTNAMES;
     vi.unstubAllGlobals();
   });
@@ -92,4 +97,79 @@ describe('Turnstile verification', () => {
       status: 403
     });
   });
+
+  it('issues a user-bound pass and reuses it without another challenge', async () => {
+    process.env.TURNSTILE_SECRET_KEY = 'test-secret';
+    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fameplays.com';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          hostname: 'fameplays.com',
+          action: 'trade_quote'
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await verifyTurnstileAccess(
+      'valid-token',
+      undefined,
+      'user-one',
+      '203.0.113.10',
+      'trade_quote'
+    );
+    expect(first.pass).toBeTruthy();
+    expect(first.expiresAt).toBeTruthy();
+
+    const reused = await verifyTurnstileAccess(
+      undefined,
+      first.pass ?? undefined,
+      'user-one',
+      '203.0.113.10',
+      'trade_quote'
+    );
+    expect(reused.pass).toBe(first.pass);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not accept a pass for a different user', async () => {
+    process.env.TURNSTILE_SECRET_KEY = 'test-secret';
+    process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'fameplays.com';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            hostname: 'fameplays.com',
+            action: 'trade_quote'
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const first = await verifyTurnstileAccess(
+      'valid-token',
+      undefined,
+      'user-one',
+      '203.0.113.10',
+      'trade_quote'
+    );
+
+    await expect(
+      verifyTurnstileAccess(
+        undefined,
+        first.pass ?? undefined,
+        'user-two',
+        '203.0.113.10',
+        'trade_quote'
+      )
+    ).rejects.toMatchObject<Partial<MarketError>>({
+      code: 'TURNSTILE_REQUIRED',
+      status: 403
+    });
+  });
 });
+

@@ -33,6 +33,18 @@ import type {
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4020/api';
 let tokenProvider: (() => Promise<string | null>) | null = null;
 
+export class ApiError extends Error {
+  code: string;
+  status: number;
+
+  constructor(message: string, code: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export function setTokenProvider(provider: () => Promise<string | null>) {
   tokenProvider = provider;
 }
@@ -51,7 +63,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const body = await response.json();
   if (!response.ok) {
-    throw new Error(body?.error?.message || 'No se pudo completar la operacion.');
+    throw new ApiError(
+      body?.error?.message || 'No se pudo completar la operacion.',
+      body?.error?.code || 'REQUEST_FAILED',
+      response.status
+    );
   }
   return body;
 }
@@ -155,13 +171,23 @@ export const api = {
     artistId: string,
     side: 'buy' | 'sell',
     quantity: number,
-    turnstileToken?: string
+    turnstileToken?: string,
+    turnstilePass?: string
   ) {
-    const body = await request<{ quote: Quote }>('/trades/quote', {
+    return request<{
+      quote: Quote;
+      turnstilePass: string | null;
+      turnstilePassExpiresAt: string | null;
+    }>('/trades/quote', {
       method: 'POST',
-      body: JSON.stringify({ artistId, side, quantity, turnstileToken })
+      body: JSON.stringify({
+        artistId,
+        side,
+        quantity,
+        turnstileToken,
+        turnstilePass
+      })
     });
-    return body.quote;
   },
   async execute(quoteId: string) {
     return request('/trades', {
@@ -433,3 +459,4 @@ export const api = {
     });
   }
 };
+

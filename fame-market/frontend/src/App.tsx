@@ -15,7 +15,7 @@ import {
   WalletCards,
   X
 } from 'lucide-react';
-import { api, setTokenProvider } from './api';
+import { api, ApiError, setTokenProvider } from './api';
 import {
   currentIdToken,
   firebaseReady,
@@ -48,6 +48,42 @@ const compact = new Intl.NumberFormat('es-CO', {
   maximumFractionDigits: 1
 });
 const storedInterestsKey = 'fame-plays:interests';
+const turnstilePassKey = 'fame-plays:turnstile-pass';
+
+interface TurnstilePassState {
+  value: string;
+  expiresAt: string;
+  userId: string;
+}
+
+function readStoredTurnstilePass(): TurnstilePassState | null {
+  try {
+    const parsed = JSON.parse(
+      sessionStorage.getItem(turnstilePassKey) ?? 'null'
+    ) as TurnstilePassState | null;
+    if (
+      !parsed?.value ||
+      !parsed.expiresAt ||
+      !parsed.userId ||
+      Date.parse(parsed.expiresAt) <= Date.now()
+    ) {
+      try {
+        sessionStorage.removeItem(turnstilePassKey);
+      } catch {
+        // Storage can be unavailable in restricted embedded browsers.
+      }
+      return null;
+    }
+    return parsed;
+  } catch {
+    try {
+      sessionStorage.removeItem(turnstilePassKey);
+    } catch {
+      // The in-memory flow remains available without session storage.
+    }
+    return null;
+  }
+}
 
 function readStoredInterests(): EntityCategory[] {
   try {
@@ -164,9 +200,39 @@ function App() {
     useState<EntityCategory[]>(readStoredInterests);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstilePass, setTurnstilePass] =
+    useState<TurnstilePassState | null>(readStoredTurnstilePass);
   const [turnstileReset, setTurnstileReset] = useState(0);
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
+  const turnstileUserId = firebaseUser?.uid ?? (!firebaseReady ? 'local-demo' : '');
+  const activeTurnstilePass =
+    turnstilePass?.userId === turnstileUserId &&
+    Date.parse(turnstilePass.expiresAt) > Date.now()
+      ? turnstilePass.value
+      : undefined;
+  const turnstileAccessReady =
+    !turnstileSiteKey || Boolean(activeTurnstilePass || turnstileToken);
+
+  function clearTurnstilePass() {
+    setTurnstilePass(null);
+    try {
+      sessionStorage.removeItem(turnstilePassKey);
+    } catch {
+      // Some embedded browsers restrict session storage.
+    }
+  }
+
+  function saveTurnstilePass(value: string, expiresAt: string) {
+    if (!turnstileUserId) return;
+    const nextPass = { value, expiresAt, userId: turnstileUserId };
+    setTurnstilePass(nextPass);
+    try {
+      sessionStorage.setItem(turnstilePassKey, JSON.stringify(nextPass));
+    } catch {
+      // The in-memory pass still avoids repeated challenges on this page.
+    }
+  }
 
   useEffect(() => {
     setTokenProvider(currentIdToken);
@@ -180,6 +246,21 @@ function App() {
       queryClient.invalidateQueries({ queryKey: ['consent'] });
     });
   }, [queryClient]);
+
+  useEffect(() => {
+    if (!authReady || !turnstilePass) return;
+    if (turnstilePass.userId !== turnstileUserId) {
+      clearTurnstilePass();
+      return;
+    }
+    const remainingMs = Date.parse(turnstilePass.expiresAt) - Date.now();
+    if (remainingMs <= 0) {
+      clearTurnstilePass();
+      return;
+    }
+    const timer = window.setTimeout(clearTurnstilePass, remainingMs);
+    return () => window.clearTimeout(timer);
+  }, [authReady, turnstilePass, turnstileUserId]);
 
   const portfolioQuery = useQuery({
     queryKey: ['portfolio', firebaseUser?.uid ?? 'local'],
@@ -267,18 +348,32 @@ function App() {
         artistQuery.data!.id,
         side,
         quantity,
-        turnstileToken ?? undefined
+        turnstileToken ?? undefined,
+        activeTurnstilePass
       ),
-    onSuccess: (nextQuote) => {
-      setQuote(nextQuote);
+    onSuccess: (result) => {
+      setQuote(result.quote);
+      if (result.turnstilePass && result.turnstilePassExpiresAt) {
+        saveTurnstilePass(
+          result.turnstilePass,
+          result.turnstilePassExpiresAt
+        );
+      }
+      setTurnstileToken(null);
       setNotice('');
     },
-    onError: (error) => setNotice(error.message),
-    onSettled: () => {
-      if (turnstileSiteKey) {
+    onError: (error) => {
+      if (
+        error instanceof ApiError &&
+        ['TURNSTILE_REQUIRED', 'TURNSTILE_REJECTED'].includes(error.code)
+      ) {
+        clearTurnstilePass();
+      }
+      if (turnstileSiteKey && turnstileToken) {
         setTurnstileToken(null);
         setTurnstileReset((current) => current + 1);
       }
+      setNotice(error.message);
     }
   });
 
@@ -928,6 +1023,7 @@ function App() {
               <small>participaciones</small>
             </label>
             {turnstileSiteKey &&
+              !activeTurnstilePass &&
               !quote &&
               (!firebaseReady || Boolean(firebaseUser)) &&
               consentAccepted &&
@@ -973,7 +1069,7 @@ function App() {
                   !consentReady ||
                   !consentAccepted ||
                   currentSeason?.status !== 'active' ||
-                  (Boolean(turnstileSiteKey) && !turnstileToken)
+                  !turnstileAccessReady
                 }
               >
                 {currentSeason?.status !== 'active'
@@ -986,7 +1082,7 @@ function App() {
                       ? 'Acepta las reglas para operar'
                   : quoteMutation.isPending
                     ? 'Calculando...'
-                    : turnstileSiteKey && !turnstileToken
+                    : !turnstileAccessReady
                       ? 'Verificando seguridad...'
                     : `Revisar ${side === 'buy' ? 'compra' : 'venta'}`}
               </button>
@@ -1071,3 +1167,4 @@ function App() {
 }
 
 export default App;
+

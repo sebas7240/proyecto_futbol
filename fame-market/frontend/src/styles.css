@@ -783,6 +783,29 @@ button {
   font-weight: 850;
 }
 
+.chart-drawing-layer .chart-measurement text {
+  text-anchor: middle;
+  font-size: 12px;
+}
+
+.chart-drawing-layer .chart-measurement.is-positive line,
+.chart-drawing-layer .chart-measurement.is-positive circle {
+  stroke: #168f5c;
+}
+
+.chart-drawing-layer .chart-measurement.is-positive circle {
+  fill: #168f5c;
+}
+
+.chart-drawing-layer .chart-measurement.is-negative line,
+.chart-drawing-layer .chart-measurement.is-negative circle {
+  stroke: #d94b43;
+}
+
+.chart-drawing-layer .chart-measurement.is-negative circle {
+  fill: #d94b43;
+}
+
 .source-strip,
 .external-event-strip,
 .youtube-strip {
@@ -3846,3 +3869,4 @@ button {
     font-size: 12px;
   }
 }
+

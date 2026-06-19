@@ -106,6 +106,7 @@ Variables importantes:
 - `MONITORING_SECRET`
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_ALLOWED_HOSTNAMES`
+- `TURNSTILE_SESSION_TTL_SECONDS`
 - `CONSENT_REQUIRED`
 - `RIGHTS_IP_HASH_SALT`
 - `VITE_PUBLIC_SITE_URL`
@@ -131,7 +132,7 @@ Controles incluidos:
 
 - Maximo 160 caracteres por mensaje.
 - Emojis rapidos desde el compositor.
-- Notas de voz de 5 a 10 segundos.
+- Notas de voz de 1 a 10 segundos.
 - Ultimos 120 mensajes por sala.
 - Rate limit de 8 segundos por usuario.
 - Bloqueo basico de links e invitaciones externas.
@@ -170,11 +171,15 @@ aplazado hasta completar TURN, moderacion y pruebas en movil/app.
 3. Configurar la clave publica como `VITE_TURNSTILE_SITE_KEY` en Pages.
 4. Configurar la clave secreta como `TURNSTILE_SECRET_KEY` solo en el backend.
 5. Definir `TURNSTILE_ALLOWED_HOSTNAMES=fameplays.com`.
+6. Mantener `TURNSTILE_SESSION_TTL_SECONDS=1800` para una validacion cada 30
+   minutos por usuario y sesion.
 
-El frontend solicita un token al cotizar. El backend lo valida con Siteverify,
-comprueba la accion `trade_quote` y el hostname, y consume el token una sola
-vez. Si la clave secreta no esta configurada, la proteccion queda desactivada
-para no bloquear el desarrollo local.
+El frontend solicita un token en la primera cotizacion. El backend lo valida
+con Siteverify, comprueba la accion `trade_quote` y el hostname, consume el
+token una sola vez y devuelve un pase HMAC temporal ligado al UID. Durante su
+vigencia las siguientes cotizaciones usan ese pase sin mostrar otro desafio.
+Si la clave secreta no esta configurada, la proteccion queda desactivada para
+no bloquear el desarrollo local.
 
 ## YouTube
 
@@ -384,3 +389,4 @@ eliminan operaciones ni modifican balances automaticamente.
 
 FameCoins, precios y participaciones son ficticios. No representan acciones,
 dinero, inversiones ni activos convertibles.
+

@@ -84,7 +84,7 @@ import {
 import type { MarketDataStore } from './types.js';
 import {
   turnstileConfigured,
-  verifyTurnstileToken
+  verifyTurnstileAccess
 } from './turnstile.js';
 import {
   pruneYouTubeSnapshots,
@@ -665,7 +665,8 @@ const quoteSchema = z.object({
   artistId: z.string().min(1),
   side: z.enum(['buy', 'sell']),
   quantity: z.number().int().min(1).max(500),
-  turnstileToken: z.string().max(2048).optional()
+  turnstileToken: z.string().max(2048).optional(),
+  turnstilePass: z.string().max(4096).optional()
 });
 
 app.post(
@@ -676,8 +677,10 @@ app.post(
   async (request, response, next) => {
     try {
       const input = quoteSchema.parse(request.body);
-      await verifyTurnstileToken(
+      const turnstile = await verifyTurnstileAccess(
         input.turnstileToken,
+        input.turnstilePass,
+        request.authenticatedUser!.uid,
         requestIp(request),
         'trade_quote'
       );
@@ -687,7 +690,9 @@ app.post(
           input.artistId,
           input.side,
           input.quantity
-        )
+        ),
+        turnstilePass: turnstile.pass,
+        turnstilePassExpiresAt: turnstile.expiresAt
       });
       incrementMetric('trade_quotes_total');
     } catch (error) {
@@ -1383,3 +1388,4 @@ start().catch((error) => {
   console.error('[Startup] Fame Plays could not start', error);
   process.exitCode = 1;
 });
+
