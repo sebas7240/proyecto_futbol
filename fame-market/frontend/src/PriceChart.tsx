@@ -8,6 +8,7 @@ import {
   MousePointer2,
   PencilRuler,
   RotateCcw,
+  Ruler,
   Trash2
 } from 'lucide-react';
 import {
@@ -33,7 +34,7 @@ interface PriceChartProps {
 
 type ChartInterval = '15m' | '1h' | '4h' | '1d' | '1w' | 'all';
 type ChartStyle = 'candles' | 'area' | 'line';
-type ToolMode = 'cursor' | 'trend' | 'horizontal';
+type ToolMode = 'cursor' | 'trend' | 'horizontal' | 'measure';
 type ActiveSeries = ISeriesApi<SeriesType, UTCTimestamp>;
 
 interface CandlePoint {
@@ -47,6 +48,7 @@ interface CandlePoint {
 interface DrawingPoint {
   x: number;
   y: number;
+  price?: number;
   priceLabel?: string;
 }
 
@@ -282,6 +284,7 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
     return {
       x,
       y,
+      price: typeof price === 'number' ? price : undefined,
       priceLabel: typeof price === 'number' ? `${price.toFixed(2)} FC` : undefined
     };
   }
@@ -303,7 +306,7 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
     }
     setDrawings((current) => [
       ...current,
-      { id: `draw-${Date.now()}`, type: 'trend', points: [draftPoint, point] }
+      { id: `draw-${Date.now()}`, type: toolMode, points: [draftPoint, point] }
     ]);
     setDraftPoint(null);
   }
@@ -377,6 +380,14 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
           >
             <Crosshair size={16} />
           </button>
+          <button
+            className={toolMode === 'measure' ? 'is-active' : ''}
+            onClick={() => startTool('measure')}
+            title="Medir variacion porcentual"
+            type="button"
+          >
+            <Ruler size={16} />
+          </button>
           <button onClick={resetZoom} title="Ajustar grafica" type="button">
             <RotateCcw size={16} />
           </button>
@@ -398,31 +409,68 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
           onClick={handleOverlayClick}
           aria-hidden="true"
         >
-          {drawings.map((drawing) =>
-            drawing.type === 'horizontal' ? (
-              <g key={drawing.id}>
-                <line
-                  x1="0%"
-                  x2="100%"
-                  y1={`${drawing.points[0].y * 100}%`}
-                  y2={`${drawing.points[0].y * 100}%`}
-                />
-                {drawing.points[0].priceLabel && (
-                  <text x="99%" y={`${drawing.points[0].y * 100}%`}>
-                    {drawing.points[0].priceLabel}
+          {drawings.map((drawing) => {
+            if (drawing.type === 'horizontal') {
+              return (
+                <g key={drawing.id}>
+                  <line
+                    x1="0%"
+                    x2="100%"
+                    y1={`${drawing.points[0].y * 100}%`}
+                    y2={`${drawing.points[0].y * 100}%`}
+                  />
+                  {drawing.points[0].priceLabel && (
+                    <text x="99%" y={`${drawing.points[0].y * 100}%`}>
+                      {drawing.points[0].priceLabel}
+                    </text>
+                  )}
+                </g>
+              );
+            }
+
+            const [start, end] = drawing.points;
+            if (drawing.type === 'measure') {
+              const variation =
+                start.price && end.price
+                  ? ((end.price - start.price) / start.price) * 100
+                  : 0;
+              const variationLabel = `${variation >= 0 ? '+' : ''}${variation.toFixed(2)}%`;
+              return (
+                <g
+                  className={`chart-measurement ${
+                    variation >= 0 ? 'is-positive' : 'is-negative'
+                  }`}
+                  key={drawing.id}
+                >
+                  <line
+                    x1={`${start.x * 100}%`}
+                    y1={`${start.y * 100}%`}
+                    x2={`${end.x * 100}%`}
+                    y2={`${end.y * 100}%`}
+                  />
+                  <circle cx={`${start.x * 100}%`} cy={`${start.y * 100}%`} r="4" />
+                  <circle cx={`${end.x * 100}%`} cy={`${end.y * 100}%`} r="4" />
+                  <text
+                    x={`${((start.x + end.x) / 2) * 100}%`}
+                    y={`${((start.y + end.y) / 2) * 100}%`}
+                    dy="-8"
+                  >
+                    {variationLabel}
                   </text>
-                )}
-              </g>
-            ) : (
+                </g>
+              );
+            }
+
+            return (
               <line
                 key={drawing.id}
-                x1={`${drawing.points[0].x * 100}%`}
-                y1={`${drawing.points[0].y * 100}%`}
-                x2={`${drawing.points[1].x * 100}%`}
-                y2={`${drawing.points[1].y * 100}%`}
+                x1={`${start.x * 100}%`}
+                y1={`${start.y * 100}%`}
+                x2={`${end.x * 100}%`}
+                y2={`${end.y * 100}%`}
               />
-            )
-          )}
+            );
+          })}
           {draftPoint && (
             <circle cx={`${draftPoint.x * 100}%`} cy={`${draftPoint.y * 100}%`} r="4" />
           )}
@@ -431,3 +479,4 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
     </section>
   );
 }
+
