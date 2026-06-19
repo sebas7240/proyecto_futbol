@@ -1,2 +1,2 @@
-# Daily at 03:15 UTC. Install with crontab -e on the VPS.
-15 3 * * * cd /opt/fame-market && /usr/bin/docker compose --profile ops run --rm backup >> /var/log/fame-market-backup.log 2>&1
+# Daily at 03:15 UTC. Adjust APP_DIR to the project path on the VPS.
+15 3 * * * APP_DIR=/root/fame-plays-repo/fame-market; cd "$APP_DIR" && /usr/bin/docker compose --project-name fameplays --env-file .env --profile ops run --rm backup >> /var/log/fame-market-backup.log 2>&1
