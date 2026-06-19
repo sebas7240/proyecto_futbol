@@ -1014,10 +1014,12 @@ Criterio:
 - [x] Agregar favoritos persistentes, filtros y busqueda responsive.
 - [x] Agregar grafica de precio inicial.
 - [x] Agregar marcadores personales de compra y venta en la grafica.
+- [x] Agregar velas japonesas, temporalidades y herramientas basicas.
+- [x] Agregar regla interactiva para medir variacion porcentual.
 - [x] Crear onboarding corto.
 - [x] Agregar chat de texto por figura con WebSockets y Durable Objects.
 - [x] Agregar emojis rapidos, reportes y moderacion admin del chat.
-- [x] Agregar notas de voz de 5 a 10 segundos sin cargar el VPS.
+- [x] Agregar notas de voz de 1 a 10 segundos sin cargar el VPS.
 - [x] Mantener audio en vivo como beta cerrada sin activarlo por defecto.
 
 Criterio:
@@ -1041,7 +1043,7 @@ Criterio:
 ### Fase 6 - Seguridad y administracion
 
 - [x] Rate limits.
-- [x] Turnstile o App Check.
+- [x] Turnstile con pase HMAC de 30 minutos ligado al usuario.
 - [x] Alertas de operaciones sospechosas.
 - [x] Congelar usuario o figura.
 - [x] Auditoria de acciones admin.
@@ -1232,7 +1234,8 @@ La primera vertical tecnica ya incluye:
 3. Firebase Auth real.
 4. Compra, venta, ledger y precios persistentes.
 5. PWA responsive y panel admin de YouTube.
-6. Tres canales oficiales registrados y 30 videos reales sincronizados.
+6. Veinticuatro canales oficiales registrados y mas de 240 contenidos reales
+   sincronizados.
 7. Busqueda, filtro latino y favoritos persistentes por usuario.
 8. Marcadores personales de compra y venta en la grafica.
 9. Onboarding para la primera operacion.
@@ -1246,7 +1249,8 @@ La primera vertical tecnica ya incluye:
 17. Limites atomicos de 60 operaciones diarias y 5 segundos entre operaciones.
 18. Rate limits persistentes para cotizaciones, ejecuciones y administracion.
 19. Congelamiento de usuarios y figuras con auditoria.
-20. Turnstile validado en servidor para cada cotizacion.
+20. Turnstile validado en servidor al iniciar la sesion antifraude y pase HMAC
+    de 30 minutos para cotizaciones posteriores del mismo usuario.
 21. Backups cifrados, checksum y restauracion automatica de prueba.
 22. Copia externa opcional compatible con Cloudflare R2.
 23. Health checks, metricas Prometheus y panel de estado operativo.
@@ -1274,6 +1278,10 @@ La primera vertical tecnica ya incluye:
     fuentes del catalogo.
 42. Monitor externo ajustado para produccion sin depender de Telegram mientras
     no esten configurados sus secretos.
+43. Backups externos cifrados en Cloudflare R2 y restauracion verificada.
+44. Staging aislado publicado con API, frontend, Firebase y Turnstile propios.
+45. Chat de produccion conectado a Pages con notas de voz de 1 a 10 segundos.
+46. Grafica con velas, temporalidades, dibujos y medicion porcentual.
 
 Siguiente bloque recomendado:
 
@@ -1281,11 +1289,15 @@ Siguiente bloque recomendado:
 2. Revisar una por una las imagenes y mantener avatares abstractos mientras no
    exista licencia verificable.
 3. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
-4. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
-   cuando el catalogo mixto este listo, manteniendo aliases temporales.
-5. Crear adaptadores de fuentes genericos para creadores y cine/TV.
-6. Activar R2 en Cloudflare Dashboard, crear `fame-plays-backups` y generar
-   credenciales S3 limitadas para backup externo.
-7. Completar secretos de staging y desplegar `staging-api.fameplays.com`.
-8. Configurar Telegram opcional para alertas del monitor externo.
+4. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
+   categorias sin guardar contenido sensible.
+5. Mostrar en la grafica que movimientos provienen de operaciones, temporadas
+   o senales externas en sombra.
+6. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
+   manteniendo aliases temporales y pruebas de compatibilidad.
+7. Crear adaptadores de fuentes genericos para creadores y cine/TV.
+8. Completar revision humana de umbrales antes de aplicar cualquier senal
+   externa a precios.
+9. Configurar Telegram opcional para alertas del monitor externo.
 9. Retomar el formulario de metricas derivadas de YouTube mas adelante.
+
