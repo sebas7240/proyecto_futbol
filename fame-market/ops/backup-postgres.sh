@@ -128,11 +128,13 @@ if [ -n "${BACKUP_S3_URI:-}" ]; then
   aws s3 cp \
     "${FINAL_FILE}" \
     "${REMOTE_PREFIX}/$(basename "${FINAL_FILE}")" \
-    --endpoint-url "${AWS_ENDPOINT_URL_S3}"
+    --endpoint-url "${AWS_ENDPOINT_URL_S3}" \
+    --checksum-algorithm CRC32
   aws s3 cp \
     "${FINAL_FILE}.sha256" \
     "${REMOTE_PREFIX}/$(basename "${FINAL_FILE}.sha256")" \
-    --endpoint-url "${AWS_ENDPOINT_URL_S3}"
+    --endpoint-url "${AWS_ENDPOINT_URL_S3}" \
+    --checksum-algorithm CRC32
   OFFSITE_UPLOADED="true"
 fi
 
