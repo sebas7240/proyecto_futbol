@@ -88,7 +88,7 @@ fi
 (
   cd "$(dirname "${FINAL_FILE}")"
   sha256sum "$(basename "${FINAL_FILE}")" > "$(basename "${FINAL_FILE}").sha256"
-  sha256sum --check "$(basename "${FINAL_FILE}").sha256"
+  sha256sum -c "$(basename "${FINAL_FILE}").sha256"
 )
 
 if [ "${FINAL_FILE}" != "${RAW_FILE}" ]; then

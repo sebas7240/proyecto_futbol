@@ -18,7 +18,7 @@ fi
 if [ -f "${RESTORE_FILE}.sha256" ]; then
   (
     cd "$(dirname "${RESTORE_FILE}")"
-    sha256sum --check "$(basename "${RESTORE_FILE}").sha256"
+    sha256sum -c "$(basename "${RESTORE_FILE}").sha256"
   )
 fi
 
