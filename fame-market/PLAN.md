@@ -962,9 +962,7 @@ Criterio:
 - [x] Preparar configuracion reproducible de staging aislado.
 - [x] Desplegar produccion en `fameplays.com` con backend aislado y Firebase
       propio.
-- [ ] Desplegar staging con sus secretos definitivos.
-      Estado: configuracion lista; falta crear `.env.staging`,
-      `frontend/.env.staging`, DNS `staging-api` y secretos reales.
+- [x] Desplegar staging con API, frontend, Firebase y Turnstile aislados.
 
 Criterio:
 
@@ -1080,7 +1078,9 @@ Criterio:
       YouTube.
 - [x] Desplegar el dominio publico con HTTPS.
 - [ ] Enviar la solicitud de metricas derivadas a YouTube.
-- [ ] Agregar adaptadores aprobados de YouTube, Twitch y GDELT.
+- [x] Agregar adaptador GDELT para titulares publicos en modo sombra.
+- [ ] Evaluar y autorizar adaptadores de senal para YouTube y Twitch antes de
+      permitir metricas derivadas o impacto en precio.
 - [x] Crear `external_events` solo para correcciones excepcionales.
 - [ ] Aplicar automaticamente senales aprobadas respetando `+/-0,60%` diario.
 - [x] Actualizar reglas y privacidad para el indice externo en modo sombra.
@@ -1089,7 +1089,7 @@ Criterio:
 - [x] Publicar en produccion metodologia, fuentes y estado de cada fuente.
 - [ ] Mostrar en la grafica y ficha que parte vino de operaciones y que parte de
       senales externas.
-- [ ] Mantener aliases temporales para clientes que aun consuman `/artists`.
+- [x] Mantener aliases temporales para clientes que aun consuman `/artists`.
 
 Criterio:
 
@@ -1213,7 +1213,7 @@ La primera version publica debe incluir solo:
 
 Dejaria para despues:
 
-- Comentarios internos.
+- Llamadas de audio en vivo; las notas de voz cortas ya estan implementadas.
 - Clanes.
 - Batallas.
 - Cajas diarias.
@@ -1290,23 +1290,27 @@ La primera vertical tecnica ya incluye:
     antes de permitir cualquier efecto real sobre precios.
 50. Notas de voz compatibles con MIME que incluye parametros de codec y
     grabacion limitada a 32 kbps para evitar rechazos por tamano.
+51. Codigo de notas de voz y Pulso de noticias integrado en `main` mediante el
+    commit `da5a0c1`; falta completar su activacion operativa en Worker y VPS.
 
 Siguiente bloque recomendado:
 
-1. Completar busqueda de marcas y riesgo de confusion con evidencia fechada.
-2. Revisar una por una las imagenes y mantener avatares abstractos mientras no
-   exista licencia verificable.
-3. Mantener Wikimedia en modo sombra durante 30 dias de produccion.
-4. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
+1. Desplegar `da5a0c1` en el VPS, ejecutar la migracion `014_news_pulse.sql` y
+   activar `NEWS_SYNC_ENABLED=true` manteniendo el impacto en modo sombra.
+2. Desplegar el Worker de chat y validar notas de voz WebM desde Android, iOS y
+   navegador de escritorio.
+3. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
    categorias sin guardar contenido sensible.
-5. Mostrar en la grafica que movimientos provienen de operaciones, temporadas
-   o senales externas en sombra.
-6. Migrar internamente `artists`/`artist_id` a `market_entities`/`entity_id`
-   manteniendo aliases temporales y pruebas de compatibilidad.
-7. Crear adaptadores de fuentes genericos para creadores y cine/TV.
-8. Completar revision humana de umbrales antes de aplicar cualquier senal
-   externa a precios.
-9. Evaluar durante 30 dias el Pulso de noticias en modo sombra y comparar sus
-   propuestas con variacion, diversidad de fuentes y falsos positivos.
-10. Configurar Telegram opcional para alertas del monitor externo.
-11. Retomar el formulario de metricas derivadas de YouTube mas adelante.
+4. Mostrar en la grafica que movimientos provienen de operaciones, temporadas
+   o senales externas.
+5. Mantener Wikimedia y noticias en modo sombra durante 30 dias, revisar falsos
+   positivos y aprobar umbrales antes de aplicar senales.
+6. Completar busqueda de marcas, revision juridica local e imagenes con
+   evidencia fechada.
+7. Migrar internamente `artists`/`artist_id` a
+   `market_entities`/`entity_id` con aliases y pruebas de compatibilidad.
+8. Evaluar adaptadores adicionales por categoria y el permiso de metricas
+   derivadas de YouTube; Twitch permanece pendiente de autorizacion tecnica.
+9. Probar la beta con 20 a 50 usuarios y ajustar liquidez, limites y UX movil.
+10. Dejar referidos, premios, monetizacion y audio en vivo para despues de la
+    beta y la revision juridica.
