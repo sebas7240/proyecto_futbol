@@ -34,3 +34,6 @@ backend/node_modules/
 frontend/node_modules/
 frontend/build/
 *.log
+
+# Local deployment secret checklist (may be filled by the operator)
+fame-market/GITHUB_ACTIONS_SECRETS_SETUP.txt
