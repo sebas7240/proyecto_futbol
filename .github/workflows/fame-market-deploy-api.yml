@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/fame_plays_deploy
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/fame_plays_deploy
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/fame_plays_deploy ~/.ssh/known_hosts
 
