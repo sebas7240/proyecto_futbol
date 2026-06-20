@@ -3,6 +3,43 @@
 Fame Plays debe mantenerse aislado de Golea. Usa contenedores, puertos,
 dominios, bases y volumenes propios.
 
+## Despliegue automatico con GitHub Actions
+
+El repositorio incluye tres workflows aislados:
+
+- `Fame Plays CI`: compila y prueba cambios antes del despliegue.
+- `Deploy Fame Plays Chat Worker`: publica el Worker con Wrangler.
+- `Deploy Fame Plays API`: actualiza el checkout existente del VPS y levanta
+  solamente el Compose ubicado en `fame-market`.
+
+En GitHub abre `Settings > Environments`, crea
+`fame-plays-production` y agrega estos secretos al entorno:
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+VPS_HOST
+VPS_USER
+VPS_SSH_PRIVATE_KEY
+VPS_KNOWN_HOSTS
+VPS_DEPLOY_PATH
+```
+
+El token de Cloudflare debe quedar limitado a la cuenta correcta y permitir
+editar Workers Scripts. `VPS_SSH_PRIVATE_KEY` contiene la llave privada
+OpenSSH completa, mientras `VPS_KNOWN_HOSTS` contiene la clave publica del
+servidor previamente verificada. Nunca guardes estos valores en archivos del
+repositorio.
+
+`VPS_DEPLOY_PATH` es la carpeta del checkout que contiene `.git` y
+`fame-market`, no la carpeta `fame-market` directamente. El workflow se detiene
+si encuentra cambios versionados en el servidor y nunca usa `git reset`.
+
+La primera ejecucion se hace manualmente desde `Actions > nombre del workflow
+> Run workflow`. Despues, los cambios relevantes fusionados en `main` se
+despliegan automaticamente. Cloudflare Pages conserva su integracion Git
+actual y no necesita otro workflow.
+
 ## 1. Staging
 
 1. Copia `.env.staging.example` como `.env.staging`.
