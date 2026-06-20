@@ -70,6 +70,20 @@ Backend:
    salt de derechos y PostgreSQL.
 3. Levanta el backend con Docker Compose sin tocar los contenedores de Golea:
 
+Para iniciar el Pulso de noticias sin modificar precios, agrega al `.env`:
+
+```text
+NEWS_SYNC_ENABLED=true
+NEWS_SYNC_INTERVAL_MINUTES=120
+NEWS_SYNC_CONCURRENCY=3
+NEWS_SIGNAL_MODE=shadow
+NEWS_PRICE_IMPACT_ENABLED=false
+NEWS_MAX_DAILY_BPS=15
+```
+
+`AUTO_MIGRATE=true` aplica `014_news_pulse.sql` durante el arranque. No actives
+`NEWS_PRICE_IMPACT_ENABLED` hasta completar la observacion y revision humana.
+
 ```bash
 docker compose --env-file .env up --build -d
 ```
