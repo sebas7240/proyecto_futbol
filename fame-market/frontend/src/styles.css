@@ -2780,6 +2780,115 @@ button {
   font-weight: 800;
 }
 
+.news-pulse {
+  padding: 20px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.news-signal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #c9c6bc;
+  border-radius: 5px;
+  color: var(--muted);
+  background: #f4f3ee;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.news-signal--applied {
+  border-color: #85ae94;
+  color: #174f30;
+  background: #edf6ef;
+}
+
+.news-list {
+  border-top: 1px solid var(--line);
+}
+
+.news-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.news-row:hover {
+  background: #f8f7f3;
+}
+
+.news-row__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #d7d4ca;
+  color: #4f4b43;
+  background: #f1f0eb;
+}
+
+.news-row__body {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.news-row__body strong {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-row__body small,
+.news-pulse__note,
+.news-pulse__empty {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.news-tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #5c5a53;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.news-tone.is-positive {
+  color: #1d6b3f;
+}
+
+.news-tone.is-negative {
+  color: #9c352f;
+}
+
+.news-row__external {
+  color: #858176;
+}
+
+.news-pulse__empty {
+  margin: 0;
+  padding: 22px 2px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.news-pulse__note {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
 .admin-artists {
   display: grid;
   gap: 8px;
@@ -3505,6 +3614,30 @@ button {
     flex-direction: column;
   }
 
+  .news-pulse .section-heading {
+    align-items: flex-start;
+    gap: 9px;
+    flex-direction: column;
+  }
+
+  .news-row {
+    grid-template-columns: 30px minmax(0, 1fr) 16px;
+  }
+
+  .news-tone {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .news-row__external {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .news-row__body strong {
+    white-space: normal;
+  }
+
   .admin-season__actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -3869,4 +4002,3 @@ button {
     font-size: 12px;
   }
 }
-
