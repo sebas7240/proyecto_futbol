@@ -1,0 +1,100 @@
+name: Deploy Fame Plays API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "fame-market/backend/**"
+      - "fame-market/docker-compose.yml"
+      - "fame-market/package.json"
+      - "fame-market/package-lock.json"
+      - ".github/workflows/fame-market-deploy-api.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fame-plays-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: fame-plays-production
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_SSH_PRIVATE_KEY VPS_KNOWN_HOSTS VPS_DEPLOY_PATH; do
+            test -n "${!name}" || { echo "Missing $name"; exit 1; }
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/fame_plays_deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/fame_plays_deploy ~/.ssh/known_hosts
+
+      - name: Deploy API on VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh \
+            -i ~/.ssh/fame_plays_deploy \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            bash -s -- "$VPS_DEPLOY_PATH" "$GITHUB_SHA" <<'REMOTE'
+          set -Eeuo pipefail
+          DEPLOY_PATH="$1"
+          EXPECTED_SHA="$2"
+
+          cd "$DEPLOY_PATH"
+          if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+            echo "The VPS repository has tracked local changes; deployment stopped."
+            exit 1
+          fi
+
+          git fetch origin main
+          git checkout main
+          git merge --ff-only "$EXPECTED_SHA"
+
+          if [[ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]]; then
+            echo "The checked out commit does not match the workflow commit."
+            exit 1
+          fi
+
+          cd fame-market
+          test -f .env || { echo "fame-market/.env is missing"; exit 1; }
+          docker compose --env-file .env config --quiet
+          docker compose --env-file .env up --build -d
+
+          for attempt in {1..12}; do
+            if curl --fail --silent http://127.0.0.1:4020/api/health/ready >/dev/null; then
+              docker compose --env-file .env ps
+              exit 0
+            fi
+            sleep 5
+          done
+
+          docker compose --env-file .env logs --tail=100 api
+          echo "Fame Plays API did not become ready."
+          exit 1
+          REMOTE
