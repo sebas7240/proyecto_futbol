@@ -26,6 +26,7 @@ import {
 import { ConsentModal } from './ConsentModal';
 import { ChatPanel } from './ChatPanel';
 import { EntityAvatar } from './EntityAvatar';
+import { NewsPulse } from './NewsPulse';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
 import { TurnstileWidget } from './TurnstileWidget';
@@ -375,6 +376,12 @@ function App() {
       }
       setNotice(error.message);
     }
+  });
+  const newsQuery = useQuery({
+    queryKey: ['news-pulse', selectedSlug],
+    queryFn: () => api.newsPulse(selectedSlug),
+    enabled: Boolean(selectedSlug),
+    refetchInterval: 5 * 60 * 1000
   });
 
   const executeMutation = useMutation({
@@ -860,6 +867,8 @@ function App() {
                 </section>
               )}
 
+              <NewsPulse data={newsQuery.data} loading={newsQuery.isLoading} />
+
               {Boolean(sourcesQuery.data?.length) && (
                 <section className="source-strip">
                   <div className="section-heading section-heading--compact">
@@ -1167,4 +1176,3 @@ function App() {
 }
 
 export default App;
-
