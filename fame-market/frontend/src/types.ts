@@ -126,6 +126,39 @@ export interface ExternalEvent {
   reviewedAt: string | null;
 }
 
+export type NewsSentimentLabel = 'positive' | 'negative' | 'neutral' | 'review';
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  sourceUrl: string;
+  thumbnailUrl: string;
+  publishedAt: string;
+  sourceDomain: string;
+  language: string;
+  sentimentScore: number;
+  sentimentLabel: NewsSentimentLabel;
+}
+
+export interface NewsSignal {
+  windowEndsAt: string;
+  articleCount: number;
+  sourceCount: number;
+  attentionScore: number;
+  sentimentScore: number;
+  confidence: number;
+  proposedDeltaBps: number;
+  appliedDeltaBps: number;
+  mode: 'shadow' | 'applied' | 'skipped' | 'halted';
+  createdAt: string;
+}
+
+export interface NewsPulse {
+  mode: 'shadow' | 'applied';
+  signal: NewsSignal | null;
+  items: NewsItem[];
+}
+
 export interface ArtistDetails extends ArtistSummary {
   history: PricePoint[];
   videos: ArtistVideo[];
@@ -285,6 +318,7 @@ export interface OperationsOverview {
   };
   jobs: {
     'attention-sync': MaintenanceRun | null;
+    'news-sync': MaintenanceRun | null;
     'database-backup': MaintenanceRun | null;
     'youtube-sync': MaintenanceRun | null;
     'season-cycle': MaintenanceRun | null;
