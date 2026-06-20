@@ -577,8 +577,8 @@ export async function createNextSeason() {
     );
     await client.query(
       `
-        INSERT INTO price_ticks (artist_id, season_id, price)
-        SELECT id, $1, current_price
+        INSERT INTO price_ticks (artist_id, season_id, price, source_type)
+        SELECT id, $1, current_price, 'season'
         FROM artists
         WHERE status = 'active'
       `,

@@ -245,6 +245,29 @@ Documentacion:
 
 Los datos de YouTube visibles no afectan precios. Una futura metrica derivada
 de YouTube usara solamente YouTube API Data y permanecera separada de Wikimedia
+
+## Pulso de noticias
+
+El backend consulta GDELT DOC 2.0 para descubrir titulares publicos recientes
+por figura. Guarda solamente el titular, metadatos y enlace al medio original;
+no copia el contenido del articulo. La senal combina recencia, diversidad de
+dominios y un lexico conservador en espanol, ingles y portugues.
+
+La configuracion recomendada para iniciar es:
+
+```text
+NEWS_SYNC_ENABLED=true
+NEWS_SYNC_INTERVAL_MINUTES=120
+NEWS_SIGNAL_MODE=shadow
+NEWS_PRICE_IMPACT_ENABLED=false
+NEWS_MAX_DAILY_BPS=15
+```
+
+En modo sombra la web muestra el pulso, pero no cambia precios. Para evitar una
+activacion accidental, el impacto exige simultaneamente
+`NEWS_SIGNAL_MODE=applied` y `NEWS_PRICE_IMPACT_ENABLED=true`. Tambien requiere
+dos medios independientes, limita cada senal a 12 puntos base y detiene temas
+sensibles para revision humana.
 salvo autorizacion escrita expresa.
 
 La solicitud de metricas derivadas queda aplazada hasta que el nombre y dominio
@@ -389,4 +412,3 @@ eliminan operaciones ni modifican balances automaticamente.
 
 FameCoins, precios y participaciones son ficticios. No representan acciones,
 dinero, inversiones ni activos convertibles.
-

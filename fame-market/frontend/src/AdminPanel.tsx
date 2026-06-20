@@ -14,6 +14,7 @@ import {
   Inbox,
   LockKeyhole,
   MessageCircle,
+  Newspaper,
   Radar,
   RefreshCw,
   Save,
@@ -173,6 +174,31 @@ export function AdminPanel() {
         error instanceof Error
           ? error.message
           : 'No se pudo actualizar el indice de atencion.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const syncNews = async () => {
+    setBusyArtist('news');
+    setMessage('');
+    try {
+      const result = await api.syncNews(adminSecret);
+      const successful = result.results.filter((item) => item.ok).length;
+      const stored = result.results.reduce(
+        (sum, item) => sum + Number(item.stored ?? 0),
+        0
+      );
+      setMessage(
+        `${successful} figuras revisadas y ${stored} titulares guardados en modo ${result.mode}.`
+      );
+      await operationsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el pulso de noticias.'
       );
     } finally {
       setBusyArtist('');
@@ -621,6 +647,20 @@ export function AdminPanel() {
           <p>No hay fuentes de atencion configuradas.</p>
         )}
       </section>
+
+      <div className="admin-section-title attention-heading">
+        <div>
+          <small>Noticias externas controladas</small>
+          <h2>Pulso de noticias</h2>
+        </div>
+        <button
+          onClick={syncNews}
+          disabled={!adminSecret || Boolean(busyArtist)}
+        >
+          <Newspaper size={17} />
+          {busyArtist === 'news' ? 'Consultando...' : 'Sincronizar noticias'}
+        </button>
+      </div>
 
       <section className="admin-season">
         <div>

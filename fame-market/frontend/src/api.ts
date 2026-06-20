@@ -8,6 +8,7 @@ import type {
   ConsentStatus,
   EntityCategory,
   EntitySource,
+  NewsPulse,
   ExternalEvent,
   ExternalEventDirection,
   ExternalEventReviewStatus,
@@ -104,6 +105,9 @@ export const api = {
       `/artists/${slug}/attention`
     );
     return body.attention;
+  },
+  async newsPulse(slug: string) {
+    return request<NewsPulse>(`/entities/${slug}/news`);
   },
   async publicAttentionStatus() {
     return request<PublicAttentionStatus>('/attention/status');
@@ -255,6 +259,21 @@ export const api = {
         error?: string;
       }>;
     }>('/admin/attention/sync', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ artistId })
+    });
+  },
+  async syncNews(adminSecret: string, artistId?: string) {
+    return request<{
+      mode: 'shadow' | 'applied';
+      results: Array<{
+        ok: boolean;
+        artistName: string;
+        stored?: number;
+        error?: string;
+      }>;
+    }>('/admin/news/sync', {
       method: 'POST',
       headers: { 'x-admin-secret': adminSecret },
       body: JSON.stringify({ artistId })
@@ -459,4 +478,3 @@ export const api = {
     });
   }
 };
-

@@ -85,6 +85,7 @@ export async function listEntityContent(
       ) snapshot ON TRUE
       WHERE item.artist_id = $1
         AND item.eligibility_status = 'eligible'
+        AND item.content_type IN ('video', 'short', 'stream')
       ORDER BY item.published_at DESC NULLS LAST, item.last_synced_at DESC
       LIMIT $2
     `,

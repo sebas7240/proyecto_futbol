@@ -50,6 +50,11 @@ import {
 } from './interests.js';
 import { incrementMetric } from './metrics.js';
 import {
+  getNewsPulseBySlug,
+  newsSignalMode,
+  syncNewsPulse
+} from './news.js';
+import {
   getOperationalOverview,
   operationsMetrics,
   readinessStatus,
@@ -518,6 +523,14 @@ app.get('/api/artists/:slug/attention', async (request, response, next) => {
   }
 });
 
+app.get('/api/entities/:slug/news', async (request, response, next) => {
+  try {
+    response.json(await getNewsPulseBySlug(String(request.params.slug)));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/me/portfolio', requireAuth, async (request, response, next) => {
   try {
     response.json({
@@ -800,6 +813,43 @@ app.post(
         })
       );
       response.json({ mode: attentionMode(), results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/news/sync',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'El pulso de noticias requiere PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = z
+        .object({ artistId: z.string().uuid().optional() })
+        .parse(request.body ?? {});
+      const results = await runMonitoredJob(
+        'news-sync',
+        () => syncNewsPulse(input.artistId),
+        { source: 'admin', artistId: input.artistId ?? null, mode: newsSignalMode() },
+        (outcomes) => ({
+          entities: outcomes.length,
+          successful: outcomes.filter((outcome) => outcome.ok).length,
+          articles: outcomes.reduce(
+            (sum, outcome) => sum + (outcome.ok ? Number(outcome.stored) : 0),
+            0
+          ),
+          mode: newsSignalMode()
+        })
+      );
+      response.json({ mode: newsSignalMode(), results });
     } catch (error) {
       next(error);
     }
@@ -1361,6 +1411,38 @@ async function start() {
     timer.unref();
   }
 
+  if (databaseConfigured() && process.env.NEWS_SYNC_ENABLED === 'true') {
+    const intervalMinutes = Math.max(
+      Number(process.env.NEWS_SYNC_INTERVAL_MINUTES ?? 120),
+      60
+    );
+    const sync = async () => {
+      const results = await runMonitoredJob(
+        'news-sync',
+        syncNewsPulse,
+        { source: 'scheduler', mode: newsSignalMode() },
+        (outcomes) => ({
+          entities: outcomes.length,
+          successful: outcomes.filter((outcome) => outcome.ok).length,
+          articles: outcomes.reduce(
+            (sum, outcome) => sum + (outcome.ok ? Number(outcome.stored) : 0),
+            0
+          ),
+          mode: newsSignalMode()
+        })
+      );
+      console.log(
+        `[News] mode=${newsSignalMode()} entities=${results.length} successful=${results.filter((outcome) => outcome.ok).length}`
+      );
+    };
+    sync().catch((error) => console.error('[News] Initial sync failed', error));
+    const timer = setInterval(
+      () => sync().catch((error) => console.error('[News] Scheduled sync failed', error)),
+      intervalMinutes * 60 * 1000
+    );
+    timer.unref();
+  }
+
   if (
     databaseConfigured() &&
     process.env.SEASON_AUTOMATION_ENABLED !== 'false'
@@ -1388,4 +1470,3 @@ start().catch((error) => {
   console.error('[Startup] Fame Plays could not start', error);
   process.exitCode = 1;
 });
-

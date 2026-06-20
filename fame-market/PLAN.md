@@ -1282,6 +1282,14 @@ La primera vertical tecnica ya incluye:
 44. Staging aislado publicado con API, frontend, Firebase y Turnstile propios.
 45. Chat de produccion conectado a Pages con notas de voz de 1 a 10 segundos.
 46. Grafica con velas, temporalidades, dibujos y medicion porcentual.
+47. Pulso de noticias multilingue basado en GDELT, con deduplicacion,
+    diversidad de medios, decaimiento temporal y sentimiento conservador.
+48. Noticias sensibles enviadas a revision sin impacto automatico y senales
+    horarias idempotentes con limite de 12 bps por senal y 15 bps diarios.
+49. Vista publica de titulares enlazados a su fuente y modo sombra activado
+    antes de permitir cualquier efecto real sobre precios.
+50. Notas de voz compatibles con MIME que incluye parametros de codec y
+    grabacion limitada a 32 kbps para evitar rechazos por tamano.
 
 Siguiente bloque recomendado:
 
@@ -1298,6 +1306,7 @@ Siguiente bloque recomendado:
 7. Crear adaptadores de fuentes genericos para creadores y cine/TV.
 8. Completar revision humana de umbrales antes de aplicar cualquier senal
    externa a precios.
-9. Configurar Telegram opcional para alertas del monitor externo.
-9. Retomar el formulario de metricas derivadas de YouTube mas adelante.
-
+9. Evaluar durante 30 dias el Pulso de noticias en modo sombra y comparar sus
+   propuestas con variacion, diversidad de fuentes y falsos positivos.
+10. Configurar Telegram opcional para alertas del monitor externo.
+11. Retomar el formulario de metricas derivadas de YouTube mas adelante.

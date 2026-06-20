@@ -293,7 +293,9 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       const mimeType = preferredMimeType();
       const recorder = new MediaRecorder(
         stream,
-        mimeType ? { mimeType } : undefined
+        mimeType
+          ? { mimeType, audioBitsPerSecond: 32_000 }
+          : { audioBitsPerSecond: 32_000 }
       );
       streamRef.current = stream;
       recorderRef.current = recorder;

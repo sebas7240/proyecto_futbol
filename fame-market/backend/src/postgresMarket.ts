@@ -614,8 +614,8 @@ export class PostgresMarketStore implements MarketDataStore {
       await client.query(
         `
           INSERT INTO price_ticks (
-            artist_id, season_id, price, buy_volume, sell_volume
-          ) VALUES ($1, $2, $3, $4, $5)
+            artist_id, season_id, price, buy_volume, sell_volume, source_type
+          ) VALUES ($1, $2, $3, $4, $5, 'trade')
         `,
         [
           quote.artist_id,
