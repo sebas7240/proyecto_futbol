@@ -16,6 +16,7 @@ interface MaintenanceRow {
 
 const monitoredJobs = [
   'attention-sync',
+  'news-sync',
   'database-backup',
   'youtube-sync',
   'season-cycle'
