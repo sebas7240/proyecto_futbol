@@ -39,5 +39,7 @@ npx wrangler secret put CHAT_ADMIN_SECRET --config chat-worker/wrangler.jsonc
 ```
 
 El backend debe usar la misma clave en `CHAT_ADMIN_SECRET` y apuntar al Worker
-con `CHAT_WORKER_ADMIN_URL`. Las notas de voz se guardan como mensajes de 5 a
-10 segundos; no usan WebRTC ni llamadas en vivo.
+con `CHAT_WORKER_ADMIN_URL`. Las notas de voz se guardan como mensajes de 1 a
+10 segundos; no usan WebRTC ni llamadas en vivo. El Worker acepta MIME con
+parametros de codec, como `audio/webm;codecs=opus`, y limita cada mensaje a
+500 KB.
