@@ -5,6 +5,10 @@ import { databaseConfigured, getPool } from './database.js';
 const ALGORITHM_VERSION = 'news-pulse-12h-v1';
 const NEWS_PROVIDER = 'gdelt';
 const DEFAULT_GDELT_URL = 'https://api.gdeltproject.org/api/v2/doc/doc';
+const DEFAULT_GDELT_MIN_INTERVAL_MS = 6_000;
+const GDELT_MAX_ATTEMPTS = 3;
+
+let nextGdeltRequestAt = 0;
 
 const positiveWords = new Set([
   'acuerdo', 'award', 'awards', 'collaboration', 'colaboracion', 'crece',
@@ -73,6 +77,28 @@ export interface CalculatedNewsSignal {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function gdeltMinimumInterval() {
+  return clamp(
+    Number(process.env.NEWS_GDELT_MIN_INTERVAL_MS ?? DEFAULT_GDELT_MIN_INTERVAL_MS),
+    1_000,
+    30_000
+  );
+}
+
+async function waitForGdeltSlot() {
+  const now = Date.now();
+  const scheduledAt = Math.max(now, nextGdeltRequestAt);
+  nextGdeltRequestAt = scheduledAt + gdeltMinimumInterval();
+  const delay = scheduledAt - now;
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
+function postponeGdeltRequests(delayMs: number) {
+  nextGdeltRequestAt = Math.max(nextGdeltRequestAt, Date.now() + delayMs);
 }
 
 function normalizedText(value: string) {
@@ -286,14 +312,41 @@ async function ensureNewsSource(artist: ArtistNewsTarget, sourceUrl: string) {
 
 async function fetchNews(artist: ArtistNewsTarget) {
   const url = buildGdeltUrl(artist);
-  const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    signal: AbortSignal.timeout(15_000)
-  });
-  if (!response.ok) throw new Error(`GDELT respondio HTTP ${response.status}.`);
-  const payload = (await response.json()) as { articles?: GdeltArticle[] };
-  const articles = Array.isArray(payload.articles) ? payload.articles : [];
-  return { url: url.toString(), articles };
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt += 1) {
+    await waitForGdeltSlot();
+    try {
+      const response = await fetch(url, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000)
+      });
+      if (response.ok) {
+        const payload = (await response.json()) as { articles?: GdeltArticle[] };
+        const articles = Array.isArray(payload.articles) ? payload.articles : [];
+        return { url: url.toString(), articles };
+      }
+
+      lastError = new Error(`GDELT respondio HTTP ${response.status}.`);
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === GDELT_MAX_ATTEMPTS) throw lastError;
+
+      const retryAfterSeconds = Number(response.headers.get('retry-after'));
+      postponeGdeltRequests(
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds * 1_000
+          : gdeltMinimumInterval()
+      );
+    } catch (error) {
+      lastError = error;
+      if (attempt === GDELT_MAX_ATTEMPTS) throw error;
+      postponeGdeltRequests(gdeltMinimumInterval());
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('No fue posible consultar GDELT.');
 }
 
 async function storeArticles(
