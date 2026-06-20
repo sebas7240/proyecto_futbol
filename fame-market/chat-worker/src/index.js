@@ -93,14 +93,21 @@ function clampNumber(value, fallback, min, max) {
   return Math.max(min, Math.min(number, max));
 }
 
-function parseAudioDataUrl(input, maxBytes) {
+export function parseAudioDataUrl(input, maxBytes) {
   const value = String(input || '');
-  const match = value.match(/^data:([^;,]+);base64,([a-z0-9+/=]+)$/i);
-  if (!match) return null;
-  const mimeType = match[1].toLowerCase();
-  const data = match[2];
+  const commaIndex = value.indexOf(',');
+  if (commaIndex < 0) return null;
+  const header = value.slice(0, commaIndex);
+  const data = value.slice(commaIndex + 1);
+  if (!/^data:[^,]+;base64$/i.test(header) || !/^[a-z0-9+/]+={0,2}$/i.test(data)) {
+    return null;
+  }
+  const mediaType = header.slice(5, -7);
+  const mimeType = mediaType.split(';', 1)[0]?.trim().toLowerCase();
+  if (!mimeType) return null;
   if (!allowedAudioTypes.includes(mimeType)) return null;
-  const estimatedBytes = Math.ceil((data.length * 3) / 4);
+  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0;
+  const estimatedBytes = Math.max(0, Math.floor((data.length * 3) / 4) - padding);
   if (estimatedBytes > maxBytes) return null;
   return { dataUrl: `data:${mimeType};base64,${data}`, mimeType, estimatedBytes };
 }
