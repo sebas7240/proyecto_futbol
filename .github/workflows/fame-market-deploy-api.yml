@@ -9,7 +9,6 @@ on:
       - "fame-market/docker-compose.yml"
       - "fame-market/package.json"
       - "fame-market/package-lock.json"
-      - ".github/workflows/fame-market-deploy-api.yml"
 
 permissions:
   contents: read
@@ -47,9 +46,14 @@ jobs:
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/fame_plays_deploy
+          if [[ "$VPS_SSH_PRIVATE_KEY" == *"BEGIN OPENSSH PRIVATE KEY"* ]]; then
+            printf '%s\n' "$VPS_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/fame_plays_deploy
+          else
+            printf '%s' "$VPS_SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/fame_plays_deploy
+          fi
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/fame_plays_deploy ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/fame_plays_deploy >/dev/null
 
       - name: Deploy API on VPS
         shell: bash
@@ -83,18 +87,19 @@ jobs:
 
           cd fame-market
           test -f .env || { echo "fame-market/.env is missing"; exit 1; }
-          docker compose --env-file .env config --quiet
-          docker compose --env-file .env up --build -d
+          docker compose -p fameplays --env-file .env config --quiet
+          docker compose -p fameplays --env-file .env up --build -d
 
           for attempt in {1..12}; do
             if curl --fail --silent http://127.0.0.1:4020/api/health/ready >/dev/null; then
-              docker compose --env-file .env ps
+              docker compose -p fameplays --env-file .env ps
               exit 0
             fi
             sleep 5
           done
 
-          docker compose --env-file .env logs --tail=100 api
+          docker compose -p fameplays --env-file .env logs --tail=100 api
           echo "Fame Plays API did not become ready."
           exit 1
           REMOTE
+
