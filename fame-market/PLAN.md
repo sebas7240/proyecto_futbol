@@ -426,7 +426,7 @@ El aviso visible sera:
 > o sus marcas.
 
 Este enfoque reduce riesgo, pero el plan no afirmara que el producto es
-“100% legal” ni sustituye asesoria juridica.
+â€œ100% legalâ€ ni sustituye asesoria juridica.
 
 ### Monetizacion justa
 
@@ -954,7 +954,7 @@ Criterio:
 ### Fase 1 - Base del proyecto
 
 - [x] Crear `frontend`, `backend` y configuracion Docker inicial.
-- [x] Crear PostgreSQL, migraciones SQL y clúster local aislado.
+- [x] Crear PostgreSQL, migraciones SQL y clÃºster local aislado.
 - [x] Configurar Firebase Auth en frontend y verificacion de tokens en backend.
 - [x] Crear prototipo local de usuarios, artistas, temporadas y mercado.
 - [x] Preparar la misma interfaz para web/PWA y futura APK con Capacitor.
@@ -1285,7 +1285,9 @@ La primera vertical tecnica ya incluye:
 47. Pulso de noticias multilingue basado en GDELT, con deduplicacion,
     diversidad de medios, decaimiento temporal y sentimiento conservador.
 48. Noticias sensibles enviadas a revision sin impacto automatico y senales
-    horarias idempotentes con limite de 12 bps por senal y 15 bps diarios.
+    horarias idempotentes. El motor v2 usa perfiles de volatilidad, confianza
+    minima de 0,55, limite de 250 bps por senal, 400 bps diarios y circuit
+    breaker total de 800 bps.
 49. Vista publica de titulares enlazados a su fuente y modo sombra activado
     antes de permitir cualquier efecto real sobre precios.
 50. Notas de voz compatibles con MIME que incluye parametros de codec y
@@ -1295,15 +1297,15 @@ La primera vertical tecnica ya incluye:
 
 Siguiente bloque recomendado:
 
-1. Desplegar `da5a0c1` en el VPS, ejecutar la migracion `014_news_pulse.sql` y
-   activar `NEWS_SYNC_ENABLED=true` manteniendo el impacto en modo sombra.
+1. Observar el motor de noticias v2 en produccion y calibrar falsos positivos,
+   amplitud por perfil y rendimiento de los jugadores antes del lanzamiento.
 2. Desplegar el Worker de chat y validar notas de voz WebM desde Android, iOS y
    navegador de escritorio.
 3. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
    categorias sin guardar contenido sensible.
 4. Mostrar en la grafica que movimientos provienen de operaciones, temporadas
    o senales externas.
-5. Mantener Wikimedia y noticias en modo sombra durante 30 dias, revisar falsos
+5. Mantener Wikimedia en modo sombra durante 30 dias y revisar falsos
    positivos y aprobar umbrales antes de aplicar senales.
 6. Completar busqueda de marcas, revision juridica local e imagenes con
    evidencia fechada.
@@ -1314,3 +1316,4 @@ Siguiente bloque recomendado:
 9. Probar la beta con 20 a 50 usuarios y ajustar liquidez, limites y UX movil.
 10. Dejar referidos, premios, monetizacion y audio en vivo para despues de la
     beta y la revision juridica.
+
