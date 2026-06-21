@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { databaseConfigured, getPool } from './database.js';
 
-const ALGORITHM_VERSION = 'news-pulse-12h-v1';
+const ALGORITHM_VERSION = 'news-pulse-12h-v2';
 const NEWS_PROVIDER = 'gdelt';
 const DEFAULT_GDELT_URL = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const DEFAULT_GDELT_MIN_INTERVAL_MS = 6_000;
@@ -36,6 +36,7 @@ const reviewWords = new Set([
 const negations = new Set(['nao', 'no', 'not', 'nunca', 'sem', 'sin', 'without']);
 
 type SignalMode = 'shadow' | 'applied' | 'skipped' | 'halted';
+type VolatilityProfile = 'stable' | 'balanced' | 'volatile' | 'underdog';
 
 interface ArtistNewsTarget {
   id: string;
@@ -43,6 +44,7 @@ interface ArtistNewsTarget {
   name: string;
   category: string;
   profession: string | null;
+  volatility_profile: VolatilityProfile;
 }
 
 interface GdeltArticle {
@@ -151,7 +153,8 @@ export function analyzeNewsSentiment(title: string) {
 
 export function calculateNewsSignal(
   input: NewsSignalInput[],
-  now = new Date()
+  now = new Date(),
+  volatilityProfile: VolatilityProfile = 'balanced'
 ): CalculatedNewsSignal {
   const reviewRequiredCount = input.filter((item) => item.reviewRequired).length;
   const eligible = input.filter((item) => {
@@ -192,9 +195,26 @@ export function calculateNewsSignal(
     1
   );
   const composite = sentimentScore * 0.58 + attentionScore * 0.42;
+  const profileMultiplier: Record<VolatilityProfile, number> = {
+    stable: 0.75,
+    balanced: 1,
+    volatile: 1.35,
+    underdog: 1.5
+  };
+  const maximumSignalBps = clamp(
+    Number(process.env.NEWS_MAX_SIGNAL_BPS ?? 250),
+    25,
+    500
+  );
   const proposedDeltaBps =
     eligible.length >= 2 && sourceCount >= 2 && Math.abs(composite) >= 0.12
-      ? clamp(Math.round(composite * 12 * confidence), -12, 12)
+      ? clamp(
+          Math.round(
+            composite * 220 * confidence * profileMultiplier[volatilityProfile]
+          ),
+          -maximumSignalBps,
+          maximumSignalBps
+        )
       : 0;
 
   return {
@@ -466,20 +486,34 @@ async function applyNewsPrice(
     `,
     [artistId]
   );
-  const maximumDailyBps = clamp(Number(process.env.NEWS_MAX_DAILY_BPS ?? 15), 1, 30);
+  const maximumDailyBps = clamp(
+    Number(process.env.NEWS_MAX_DAILY_BPS ?? 400),
+    25,
+    1_000
+  );
   const remainingBps = Math.max(0, maximumDailyBps - Number(usedResult.rows[0]?.used_bps || 0));
   const requestedBps = Math.sign(proposedDeltaBps) * Math.min(Math.abs(proposedDeltaBps), remainingBps);
   if (!requestedBps) return { applied: 0, mode: 'halted' as const };
 
   const currentPrice = Number(artist.current_price);
   const anchorPrice = Number(artist.daily_anchor_price);
-  const lowerBand = anchorPrice * 0.994;
-  const upperBand = anchorPrice * 1.006;
-  const nextPrice = clamp(
-    currentPrice * (1 + requestedBps / 10_000),
-    lowerBand,
-    upperBand
+  const totalBandBps = clamp(
+    Number(process.env.NEWS_TOTAL_PRICE_BAND_BPS ?? 800),
+    100,
+    1_200
   );
+  const lowerBand = anchorPrice * (1 - totalBandBps / 10_000);
+  const upperBand = anchorPrice * (1 + totalBandBps / 10_000);
+  const unboundedNextPrice = currentPrice * (1 + requestedBps / 10_000);
+  if (
+    (currentPrice >= upperBand && requestedBps > 0) ||
+    (currentPrice <= lowerBand && requestedBps < 0)
+  ) {
+    return { applied: 0, mode: 'halted' as const };
+  }
+  const nextPrice = currentPrice > upperBand || currentPrice < lowerBand
+    ? unboundedNextPrice
+    : clamp(unboundedNextPrice, lowerBand, upperBand);
   const appliedBps = Math.round(((nextPrice / currentPrice) - 1) * 10_000);
   if (!appliedBps) return { applied: 0, mode: 'halted' as const };
 
@@ -511,7 +545,7 @@ async function persistSignal(
       desiredMode === 'applied' &&
       calculated.proposedDeltaBps !== 0 &&
       calculated.sourceCount >= 2 &&
-      calculated.confidence >= 0.4;
+      calculated.confidence >= 0.55;
     const initialMode: SignalMode = desiredMode === 'shadow'
       ? 'shadow'
       : canApply
@@ -584,7 +618,11 @@ async function syncArtistNews(artist: ArtistNewsTarget) {
   try {
     const stored = await storeArticles(artist, sourceId, fetched.articles);
     const now = new Date();
-    const calculated = calculateNewsSignal(await loadSignalInput(artist.id), now);
+    const calculated = calculateNewsSignal(
+      await loadSignalInput(artist.id),
+      now,
+      artist.volatility_profile
+    );
     const signal = await persistSignal(artist.id, calculated, now);
     await getPool().query(
       `UPDATE entity_sources SET last_synced_at = NOW(), last_error = NULL WHERE id = $1`,
@@ -604,7 +642,7 @@ export async function syncNewsPulse(artistId?: string) {
   if (!databaseConfigured()) return [];
   const result = await getPool().query<ArtistNewsTarget>(
     `
-      SELECT id, slug, name, category, profession
+      SELECT id, slug, name, category, profession, volatility_profile
       FROM artists
       WHERE status = 'active'
         AND ($1::uuid IS NULL OR id = $1)
@@ -718,3 +756,4 @@ export async function getNewsPulseBySlug(slug: string) {
     }))
   };
 }
+
