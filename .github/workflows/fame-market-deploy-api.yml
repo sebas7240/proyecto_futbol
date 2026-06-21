@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: fame-plays-api-production
@@ -119,4 +120,15 @@ jobs:
           echo "Fame Plays API did not become ready."
           exit 1
           REMOTE
+
+      - name: Report deployment result
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_STATUS: ${{ job.status }}
+        run: |
+          gh issue comment 4 \
+            --repo "${{ github.repository }}" \
+            --body "Fame Plays API deployment: **${DEPLOY_STATUS}** | commit \`${GITHUB_SHA}\` | [ver ejecucion](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
