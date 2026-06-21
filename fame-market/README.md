@@ -260,14 +260,18 @@ NEWS_SYNC_ENABLED=true
 NEWS_SYNC_INTERVAL_MINUTES=120
 NEWS_SIGNAL_MODE=shadow
 NEWS_PRICE_IMPACT_ENABLED=false
-NEWS_MAX_DAILY_BPS=15
+NEWS_MAX_SIGNAL_BPS=250
+NEWS_MAX_DAILY_BPS=400
+NEWS_TOTAL_PRICE_BAND_BPS=800
 ```
 
 En modo sombra la web muestra el pulso, pero no cambia precios. Para evitar una
 activacion accidental, el impacto exige simultaneamente
 `NEWS_SIGNAL_MODE=applied` y `NEWS_PRICE_IMPACT_ENABLED=true`. Tambien requiere
-dos medios independientes, limita cada senal a 12 puntos base y detiene temas
-sensibles para revision humana.
+dos medios independientes y confianza minima de 0,55. El impacto cambia segun
+el perfil estable, equilibrado, volatil o underdog; se limita a 250 puntos base
+por senal, 400 diarios y una banda total de 800 puntos base. Los temas sensibles
+se detienen para revision humana.
 salvo autorizacion escrita expresa.
 
 La solicitud de metricas derivadas queda aplazada hasta que el nombre y dominio
@@ -412,3 +416,4 @@ eliminan operaciones ni modifican balances automaticamente.
 
 FameCoins, precios y participaciones son ficticios. No representan acciones,
 dinero, inversiones ni activos convertibles.
+
