@@ -41,7 +41,7 @@ describe('news signal', () => {
     expect(result.proposedDeltaBps).toBe(0);
   });
 
-  it('creates a small capped proposal from diverse recent coverage', () => {
+  it('creates a visible capped proposal from diverse recent coverage', () => {
     const result = calculateNewsSignal([
       {
         publishedAt: new Date('2026-06-19T17:00:00.000Z'),
@@ -60,7 +60,25 @@ describe('news signal', () => {
       }
     ], now);
     expect(result.proposedDeltaBps).toBeGreaterThan(0);
-    expect(result.proposedDeltaBps).toBeLessThanOrEqual(12);
+    expect(result.proposedDeltaBps).toBeLessThanOrEqual(250);
+  });
+
+  it('moves volatile figures more than stable figures for the same coverage', () => {
+    const coverage = [
+      {
+        publishedAt: new Date('2026-06-19T17:00:00.000Z'),
+        sourceDomain: 'source-one.example',
+        sentimentScore: 0.8
+      },
+      {
+        publishedAt: new Date('2026-06-19T16:00:00.000Z'),
+        sourceDomain: 'source-two.example',
+        sentimentScore: 0.7
+      }
+    ];
+    const stable = calculateNewsSignal(coverage, now, 'stable');
+    const volatile = calculateNewsSignal(coverage, now, 'volatile');
+    expect(volatile.proposedDeltaBps).toBeGreaterThan(stable.proposedDeltaBps);
   });
 
   it('excludes sensitive headlines from automatic direction', () => {
@@ -83,3 +101,4 @@ describe('news signal', () => {
     expect(result.proposedDeltaBps).toBe(0);
   });
 });
+
