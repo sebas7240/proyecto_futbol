@@ -1078,11 +1078,14 @@ Criterio:
       YouTube.
 - [x] Desplegar el dominio publico con HTTPS.
 - [ ] Enviar la solicitud de metricas derivadas a YouTube.
-- [x] Agregar adaptador GDELT para titulares publicos en modo sombra.
+- [x] Agregar adaptador GDELT para titulares publicos, cola con rate limit y
+      reintentos ante respuestas 429.
 - [ ] Evaluar y autorizar adaptadores de senal para YouTube y Twitch antes de
       permitir metricas derivadas o impacto en precio.
 - [x] Crear `external_events` solo para correcciones excepcionales.
-- [ ] Aplicar automaticamente senales aprobadas respetando `+/-0,60%` diario.
+- [x] Aplicar automaticamente senales GDELT aprobadas con algoritmo v2,
+      perfiles de volatilidad, 250 bps por senal, 400 bps diarios y circuit
+      breaker total de 800 bps.
 - [x] Actualizar reglas y privacidad para el indice externo en modo sombra.
 - [x] Crear la pagina publica de metodologia y aislamiento de proveedores.
 - [x] Mostrar en la ficha publica fuentes verificadas y estado de cada fuente.
@@ -1130,14 +1133,21 @@ Proceso:
 3. Calcular cada senal contra el historial de la misma figura.
 4. Ejecutar toda fuente nueva en modo sombra.
 5. Comparar falsos positivos y estabilidad durante al menos 30 dias.
-6. Exigir dos fuentes para movimientos externos mayores a `0,15%`.
+6. Exigir al menos dos fuentes independientes y confianza de 0,55 para todo
+   movimiento automatico de noticias.
 7. Permitir aplicacion solo a reglas deterministas, versionadas y aprobadas.
 8. Poder detener una fuente sin detener el mercado.
 9. Mantener cualquier metrica derivada de YouTube aislada de fuentes externas,
    salvo permiso escrito que autorice la combinacion.
 
 ```text
-impacto_externo = limite(0.60% * senal_compuesta, -0.60%, 0.60%)
+impacto_noticias = limite(
+  senal_compuesta * confianza * perfil_volatilidad,
+  -2.50%,
+  +2.50%
+)
+limite_diario_noticias = +/-4.00%
+circuit_breaker_total = +/-8.00%
 ```
 
 No se construira sobre YouTube API sin el permiso adicional aplicable, ni
@@ -1288,32 +1298,37 @@ La primera vertical tecnica ya incluye:
     horarias idempotentes. El motor v2 usa perfiles de volatilidad, confianza
     minima de 0,55, limite de 250 bps por senal, 400 bps diarios y circuit
     breaker total de 800 bps.
-49. Vista publica de titulares enlazados a su fuente y modo sombra activado
-    antes de permitir cualquier efecto real sobre precios.
+49. Vista publica de titulares enlazados a su fuente; modo sombra validado y
+    motor GDELT v2 activado en produccion con impacto real auditable.
 50. Notas de voz compatibles con MIME que incluye parametros de codec y
     grabacion limitada a 32 kbps para evitar rechazos por tamano.
-51. Codigo de notas de voz y Pulso de noticias integrado en `main` mediante el
-    commit `da5a0c1`; falta completar su activacion operativa en Worker y VPS.
+51. Notas de voz y Pulso de noticias integrados en `main`, Worker y VPS.
+52. Despliegues automaticos de API y Worker mediante GitHub Actions, con
+    health check y registro persistente del resultado en la incidencia #4.
+53. Motor GDELT protegido con cola global, separacion de solicitudes y
+    reintentos para reducir bloqueos HTTP 429.
+54. Motor de noticias v2 en produccion con movimientos diferenciados por
+    perfil de volatilidad y limites de 2,5%, 4% y 8%.
 
 Siguiente bloque recomendado:
 
-1. Observar el motor de noticias v2 en produccion y calibrar falsos positivos,
-   amplitud por perfil y rendimiento de los jugadores antes del lanzamiento.
-2. Desplegar el Worker de chat y validar notas de voz WebM desde Android, iOS y
-   navegador de escritorio.
-3. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
+1. Mostrar en la grafica y cronologia si cada movimiento provino de compra,
+   venta, noticia, temporada o evento externo.
+2. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
    categorias sin guardar contenido sensible.
-4. Mostrar en la grafica que movimientos provienen de operaciones, temporadas
-   o senales externas.
-5. Mantener Wikimedia en modo sombra durante 30 dias y revisar falsos
+3. Validar notas de voz WebM desde Android, iOS y navegador de escritorio.
+4. Probar la beta cerrada con 20 a 50 usuarios y recoger observaciones de UX
+   movil y comprension del origen del precio.
+5. Observar el motor de noticias v2 y calibrar falsos positivos, amplitud por
+   perfil, liquidez y rendimiento de los jugadores antes del lanzamiento.
+6. Mantener Wikimedia en modo sombra durante 30 dias y revisar falsos
    positivos y aprobar umbrales antes de aplicar senales.
-6. Completar busqueda de marcas, revision juridica local e imagenes con
+7. Completar busqueda de marcas, revision juridica local e imagenes con
    evidencia fechada.
-7. Migrar internamente `artists`/`artist_id` a
+8. Migrar internamente `artists`/`artist_id` a
    `market_entities`/`entity_id` con aliases y pruebas de compatibilidad.
-8. Evaluar adaptadores adicionales por categoria y el permiso de metricas
+9. Evaluar adaptadores adicionales por categoria y el permiso de metricas
    derivadas de YouTube; Twitch permanece pendiente de autorizacion tecnica.
-9. Probar la beta con 20 a 50 usuarios y ajustar liquidez, limites y UX movil.
 10. Dejar referidos, premios, monetizacion y audio en vivo para despues de la
     beta y la revision juridica.
 
