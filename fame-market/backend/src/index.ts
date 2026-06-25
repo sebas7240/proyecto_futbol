@@ -65,6 +65,10 @@ import {
   runMonitoredJob
 } from './operations.js';
 import { PostgresMarketStore } from './postgresMarket.js';
+import {
+  getPresenceOverview,
+  recordPresenceHeartbeat
+} from './presence.js';
 import { rateLimit, requestIp } from './rateLimit.js';
 import {
   createRightsRequest,
@@ -144,6 +148,12 @@ const rightsRequestRateLimit = rateLimit({
   action: 'rights-request',
   maxRequests: 5,
   windowMs: 60 * 60 * 1000,
+  key: requestIp
+});
+const presenceRateLimit = rateLimit({
+  action: 'presence-heartbeat',
+  maxRequests: 8,
+  windowMs: 60_000,
   key: requestIp
 });
 const monitoringSecret =
@@ -235,6 +245,41 @@ app.get('/api/status', async (_request, response) => {
     now: new Date().toISOString()
   });
 });
+
+const presenceHeartbeatSchema = z.object({
+  sessionId: z
+    .string()
+    .trim()
+    .regex(/^[a-zA-Z0-9:_-]{12,96}$/),
+  path: z.string().trim().max(180).default('/')
+});
+
+app.get('/api/presence', async (_request, response, next) => {
+  try {
+    response.json({ presence: await getPresenceOverview() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post(
+  '/api/presence/heartbeat',
+  presenceRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = presenceHeartbeatSchema.parse(request.body);
+      response.json({
+        presence: await recordPresenceHeartbeat({
+          request,
+          sessionId: input.sessionId,
+          path: input.path
+        })
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 app.get('/api/legal/versions', (_request, response) => {
   response.json({

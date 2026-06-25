@@ -95,9 +95,20 @@ export class PostgresMarketStore implements MarketDataStore {
     }
 
     const [historyResult, contentItems] = await Promise.all([
-      getPool().query<{ time: Date; value: Numeric }>(
+      getPool().query<{
+        time: Date;
+        value: Numeric;
+        buy_volume: Numeric | null;
+        sell_volume: Numeric | null;
+        source_type: string;
+      }>(
         `
-          SELECT created_at AS time, price AS value
+          SELECT
+            created_at AS time,
+            price AS value,
+            buy_volume,
+            sell_volume,
+            source_type
           FROM price_ticks
           WHERE artist_id = $1
           ORDER BY created_at ASC
@@ -112,7 +123,9 @@ export class PostgresMarketStore implements MarketDataStore {
       ...this.publicArtist(artist),
       history: historyResult.rows.map((point) => ({
         time: Math.floor(new Date(point.time).getTime() / 1000),
-        value: number(point.value)
+        value: number(point.value),
+        volume: number(point.buy_volume ?? 0) + number(point.sell_volume ?? 0),
+        sourceType: point.source_type
       })),
       contentItems,
       videos: contentItems.map(contentToVideoSnapshot)

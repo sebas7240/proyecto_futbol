@@ -2,13 +2,16 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import {
   Activity,
   AreaChart,
+  BarChart2,
   ChartCandlestick,
   Crosshair,
+  Gauge,
   LineChart,
   MousePointer2,
   PencilRuler,
   RotateCcw,
   Ruler,
+  SlidersHorizontal,
   Trash2
 } from 'lucide-react';
 import {
@@ -16,6 +19,7 @@ import {
   CandlestickSeries,
   ColorType,
   LineSeries,
+  LineStyle,
   createChart,
   createSeriesMarkers,
   type IChartApi,
@@ -35,6 +39,7 @@ interface PriceChartProps {
 type ChartInterval = '15m' | '1h' | '4h' | '1d' | '1w' | 'all';
 type ChartStyle = 'candles' | 'area' | 'line';
 type ToolMode = 'cursor' | 'trend' | 'horizontal' | 'measure';
+type IndicatorId = 'ma20' | 'ma50' | 'rsi' | 'volume' | 'extremes';
 type ActiveSeries = ISeriesApi<SeriesType, UTCTimestamp>;
 
 interface CandlePoint {
@@ -43,6 +48,8 @@ interface CandlePoint {
   high: number;
   low: number;
   close: number;
+  volume: number;
+  sourceTypes: string[];
 }
 
 interface DrawingPoint {
@@ -75,10 +82,35 @@ const intervalSeconds: Record<Exclude<ChartInterval, 'all'>, number> = {
   '1w': 7 * 24 * 60 * 60
 };
 
+const indicatorOptions: Array<{
+  id: IndicatorId;
+  label: string;
+  title: string;
+}> = [
+  { id: 'ma20', label: 'MA20', title: 'Media movil de 20 velas' },
+  { id: 'ma50', label: 'MA50', title: 'Media movil de 50 velas' },
+  { id: 'rsi', label: 'RSI', title: 'Indice de fuerza relativa' },
+  { id: 'volume', label: 'Vol', title: 'Actividad y volumen' },
+  { id: 'extremes', label: 'Max/Min', title: 'Maximo y minimo visible' }
+];
+
+const numberFormat = new Intl.NumberFormat('es-CO', {
+  maximumFractionDigits: 2
+});
+
 function sortPoints(data: PricePoint[]) {
   return data
     .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.value))
     .sort((a, b) => a.time - b.time);
+}
+
+function pointActivity(point: PricePoint) {
+  const volume = Number(point.volume ?? 0);
+  if (volume > 0) return volume;
+  if (point.sourceType === 'external_event') return 10;
+  if (point.sourceType === 'news') return 8;
+  if (point.sourceType === 'trade') return 4;
+  return 1;
 }
 
 function resolveIntervalSeconds(interval: ChartInterval, points: PricePoint[]) {
@@ -133,6 +165,8 @@ function buildCandles(data: PricePoint[], seconds: number): CandlePoint[] {
       const first = ordered[0];
       const last = ordered[ordered.length - 1];
       const values = ordered.map((point) => point.value);
+      const volume = ordered.reduce((sum, point) => sum + pointActivity(point), 0);
+      const sourceTypes = [...new Set(ordered.map((point) => point.sourceType ?? 'market'))];
       const open = previousClose ?? first.value;
       const close = last.value;
       const bodyHigh = Math.max(open, close, ...values);
@@ -145,9 +179,51 @@ function buildCandles(data: PricePoint[], seconds: number): CandlePoint[] {
         open,
         high: bodyHigh + wick * wave,
         low: Math.max(0.01, bodyLow - wick * (2 - wave)),
-        close
+        close,
+        volume,
+        sourceTypes
       };
     });
+}
+
+function movingAverage(candles: CandlePoint[], period: number) {
+  return candles
+    .map((point, index) => {
+      if (index + 1 < period) return null;
+      const slice = candles.slice(index + 1 - period, index + 1);
+      const value =
+        slice.reduce((sum, candle) => sum + candle.close, 0) / slice.length;
+      return { time: point.time, value };
+    })
+    .filter((point): point is { time: UTCTimestamp; value: number } => Boolean(point));
+}
+
+function latestRsi(candles: CandlePoint[], period = 14) {
+  if (candles.length <= period) return null;
+  const closes = candles.map((point) => point.close);
+  let gains = 0;
+  let losses = 0;
+  for (let index = closes.length - period; index < closes.length; index += 1) {
+    const change = closes[index] - closes[index - 1];
+    if (change >= 0) gains += change;
+    else losses += Math.abs(change);
+  }
+  const averageGain = gains / period;
+  const averageLoss = losses / period;
+  if (averageLoss === 0) return 100;
+  const relativeStrength = averageGain / averageLoss;
+  return 100 - 100 / (1 + relativeStrength);
+}
+
+function visibleExtremes(candles: CandlePoint[]) {
+  if (!candles.length) return null;
+  return candles.reduce(
+    (current, candle) => ({
+      high: candle.high > current.high ? candle.high : current.high,
+      low: candle.low < current.low ? candle.low : current.low
+    }),
+    { high: candles[0].high, low: candles[0].low }
+  );
 }
 
 function markersFromTrades(trades: Trade[]) {
@@ -170,6 +246,13 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
   const [interval, setInterval] = useState<ChartInterval>('1h');
   const [chartStyle, setChartStyle] = useState<ChartStyle>('candles');
   const [toolMode, setToolMode] = useState<ToolMode>('cursor');
+  const [indicators, setIndicators] = useState<Record<IndicatorId, boolean>>({
+    ma20: true,
+    ma50: true,
+    rsi: true,
+    volume: true,
+    extremes: true
+  });
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [draftPoint, setDraftPoint] = useState<DrawingPoint | null>(null);
 
@@ -182,6 +265,16 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
     () => buildCandles(sortedData, candleSeconds),
     [sortedData, candleSeconds]
   );
+  const ma20 = useMemo(() => movingAverage(candles, 20), [candles]);
+  const ma50 = useMemo(() => movingAverage(candles, 50), [candles]);
+  const rsi = useMemo(() => latestRsi(candles), [candles]);
+  const extremes = useMemo(() => visibleExtremes(candles), [candles]);
+  const volumeBars = useMemo(() => candles.slice(-72), [candles]);
+  const maxVolume = useMemo(
+    () => Math.max(1, ...volumeBars.map((point) => point.volume)),
+    [volumeBars]
+  );
+  const latestVolume = volumeBars.at(-1)?.volume ?? 0;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -248,6 +341,46 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
 
     seriesRef.current = series;
     createSeriesMarkers(series, markersFromTrades(trades));
+
+    if (indicators.ma20 && ma20.length) {
+      const ma20Series = chart.addSeries(LineSeries, {
+        color: '#2866cc',
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+      ma20Series.setData(ma20);
+    }
+
+    if (indicators.ma50 && ma50.length) {
+      const ma50Series = chart.addSeries(LineSeries, {
+        color: '#8a5cf6',
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+      ma50Series.setData(ma50);
+    }
+
+    if (indicators.extremes && extremes) {
+      series.createPriceLine({
+        price: extremes.high,
+        color: '#168f5c',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'Max'
+      });
+      series.createPriceLine({
+        price: extremes.low,
+        color: '#d94b43',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'Min'
+      });
+    }
+
     chart.timeScale().fitContent();
 
     const observer = new ResizeObserver(([entry]) => {
@@ -265,7 +398,7 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [candles, chartStyle, positive, trades]);
+  }, [candles, chartStyle, extremes, indicators.extremes, indicators.ma20, indicators.ma50, ma20, ma50, positive, trades]);
 
   function resetZoom() {
     chartRef.current?.timeScale().fitContent();
@@ -274,6 +407,10 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
   function startTool(nextTool: ToolMode) {
     setToolMode(nextTool);
     setDraftPoint(null);
+  }
+
+  function toggleIndicator(id: IndicatorId) {
+    setIndicators((current) => ({ ...current, [id]: !current[id] }));
   }
 
   function pointFromEvent(event: MouseEvent<SVGSVGElement>): DrawingPoint {
@@ -396,6 +533,23 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
           </button>
         </div>
 
+        <div className="chart-control-group chart-indicators" aria-label="Indicadores tecnicos">
+          <span className="chart-control-label">
+            <SlidersHorizontal size={14} />
+          </span>
+          {indicatorOptions.map((indicator) => (
+            <button
+              key={indicator.id}
+              className={indicators[indicator.id] ? 'is-active' : ''}
+              onClick={() => toggleIndicator(indicator.id)}
+              title={indicator.title}
+              type="button"
+            >
+              {indicator.label}
+            </button>
+          ))}
+        </div>
+
         <span>
           <Activity size={15} />
           Actualizacion en vivo
@@ -476,7 +630,44 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
           )}
         </svg>
       </div>
+      <div className="indicator-readout" aria-label="Resumen de indicadores">
+        <span>
+          <LineChart size={14} />
+          MA20 {ma20.at(-1) ? numberFormat.format(ma20.at(-1)!.value) : '--'}
+        </span>
+        <span>
+          <LineChart size={14} />
+          MA50 {ma50.at(-1) ? numberFormat.format(ma50.at(-1)!.value) : '--'}
+        </span>
+        <span className={rsi !== null && rsi >= 70 ? 'is-hot' : rsi !== null && rsi <= 30 ? 'is-cold' : ''}>
+          <Gauge size={14} />
+          RSI {rsi === null ? '--' : rsi.toFixed(1)}
+        </span>
+        <span>
+          <BarChart2 size={14} />
+          Vol {numberFormat.format(latestVolume)}
+        </span>
+        <span>
+          Max {extremes ? numberFormat.format(extremes.high) : '--'} / Min{' '}
+          {extremes ? numberFormat.format(extremes.low) : '--'}
+        </span>
+      </div>
+      {indicators.volume && Boolean(volumeBars.length) && (
+        <div className="volume-strip" aria-label="Volumen reciente">
+          {volumeBars.map((bar) => (
+            <span
+              key={bar.time}
+              className={
+                bar.sourceTypes.includes('news') || bar.sourceTypes.includes('external_event')
+                  ? 'volume-strip__bar volume-strip__bar--signal'
+                  : 'volume-strip__bar'
+              }
+              style={{ height: `${Math.max(12, (bar.volume / maxVolume) * 100)}%` }}
+              title={`Volumen ${numberFormat.format(bar.volume)}`}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
-

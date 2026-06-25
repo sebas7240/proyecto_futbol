@@ -112,6 +112,29 @@ export const api = {
   async publicAttentionStatus() {
     return request<PublicAttentionStatus>('/attention/status');
   },
+  async presence() {
+    const body = await request<{
+      presence: {
+        onlineUsers: number;
+        windowSeconds: number;
+        generatedAt: string;
+      };
+    }>('/presence');
+    return body.presence;
+  },
+  async presenceHeartbeat(sessionId: string, path: string) {
+    const body = await request<{
+      presence: {
+        onlineUsers: number;
+        windowSeconds: number;
+        generatedAt: string;
+      };
+    }>('/presence/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, path })
+    });
+    return body.presence;
+  },
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');
     return body.portfolio;

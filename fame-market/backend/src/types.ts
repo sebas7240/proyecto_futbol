@@ -10,6 +10,8 @@ export interface AuthenticatedUser {
 export interface PricePoint {
   time: number;
   value: number;
+  volume?: number;
+  sourceType?: string;
 }
 
 export interface VideoSnapshot {

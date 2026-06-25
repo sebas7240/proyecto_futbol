@@ -50,6 +50,8 @@ export interface ArtistSummary {
 export interface PricePoint {
   time: number;
   value: number;
+  volume?: number;
+  sourceType?: string;
 }
 
 export interface ArtistVideo {

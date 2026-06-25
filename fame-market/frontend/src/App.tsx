@@ -27,6 +27,7 @@ import { ConsentModal } from './ConsentModal';
 import { ChatPanel } from './ChatPanel';
 import { EntityAvatar } from './EntityAvatar';
 import { NewsPulse } from './NewsPulse';
+import { OnlineCounter } from './OnlineCounter';
 import { PriceChart } from './PriceChart';
 import { RankingPanel } from './RankingPanel';
 import { TurnstileWidget } from './TurnstileWidget';
@@ -599,6 +600,7 @@ function App() {
           />
         </label>
         <div className="topbar__stats">
+          <OnlineCounter />
           <button
             className="topbar-stat-button"
             onClick={() => selectTab('ranking')}
