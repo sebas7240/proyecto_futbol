@@ -96,15 +96,16 @@ mover precios sin contar antes con permiso documentado.
 Modelo recomendado para el MVP:
 
 1. La demanda interna de compra y venta sigue siendo el motor dominante.
-2. Un `Indice Automatico de Atencion` genera variaciones externas pequenas.
-3. Wikimedia Pageviews sera la primera fuente universal para musica,
+2. Un `Mercado Vivo` genera ticks automaticos para evitar activos congelados.
+3. Un `Indice Automatico de Atencion` genera variaciones externas pequenas.
+4. Wikimedia Pageviews sera la primera fuente universal para musica,
    creadores y cine/TV.
-4. Cada senal se compara contra el historial de la misma figura. Nunca se
+5. Cada senal se compara contra el historial de la misma figura. Nunca se
    comparan volumenes brutos entre figuras diferentes.
-5. La primera implementacion se ejecuta en modo sombra y no modifica precios.
-6. YouTube se incorporara al indice cuando se apruebe la solicitud de metricas
+6. La primera implementacion se ejecuta en modo sombra y no modifica precios.
+7. YouTube se incorporara al indice cuando se apruebe la solicitud de metricas
    derivadas. Twitch y GDELT se incorporaran como adaptadores especializados.
-7. El control manual queda reservado para corregir identidades, congelar una
+8. El control manual queda reservado para corregir identidades, congelar una
    fuente o detener una automatizacion defectuosa; no sera el oraculo diario.
 
 Spotify no sera una dependencia central. En 2026 su modo de desarrollo esta
@@ -226,6 +227,31 @@ Fuentes por etapas:
 No se aplicara sentimiento automatico en la primera version. Una noticia
 negativa tambien puede aumentar la atencion, y el producto mide atencion, no
 reputacion moral.
+
+### Mercado Vivo
+
+Para que la beta se sienta jugable incluso con pocos usuarios o figuras con
+poca cobertura noticiosa, cada activo tendra un estado automatico:
+
+- `bull`: sesgo alcista por varias horas.
+- `bear`: sesgo bajista por varias horas.
+- `sideways`: movimiento lateral con ruido pequeno.
+- `volatile`: rango amplio y direccion menos estable.
+- `viral`: pulso fuerte y poco frecuente, siempre limitado.
+
+El estado se recalcula por ventanas de horas y usa memoria, perfil de
+volatilidad, riesgo, hype, holders y noticias recientes. Cada tick queda
+guardado como `source_type=market`, separado de `trade`, `news`, `season` y
+`external_event`.
+
+Reglas iniciales:
+
+- Ticks automaticos cada 15 minutos en produccion.
+- Limite por tick: hasta 0,90% solo en estados fuertes.
+- Banda total recomendada del mercado vivo: +/-10% frente al ancla de precio.
+- Si el precio toca banda, el sistema deja de empujar en esa direccion.
+- Las noticias pueden inclinar el siguiente estado, pero no sustituyen el
+  limite ni la auditoria del precio.
 
 ### Explicabilidad
 
@@ -426,7 +452,7 @@ El aviso visible sera:
 > o sus marcas.
 
 Este enfoque reduce riesgo, pero el plan no afirmara que el producto es
-â€œ100% legalâ€ ni sustituye asesoria juridica.
+“100% legal” ni sustituye asesoria juridica.
 
 ### Monetizacion justa
 
@@ -954,7 +980,7 @@ Criterio:
 ### Fase 1 - Base del proyecto
 
 - [x] Crear `frontend`, `backend` y configuracion Docker inicial.
-- [x] Crear PostgreSQL, migraciones SQL y clÃºster local aislado.
+- [x] Crear PostgreSQL, migraciones SQL y clúster local aislado.
 - [x] Configurar Firebase Auth en frontend y verificacion de tokens en backend.
 - [x] Crear prototipo local de usuarios, artistas, temporadas y mercado.
 - [x] Preparar la misma interfaz para web/PWA y futura APK con Capacitor.
@@ -1086,6 +1112,8 @@ Criterio:
 - [x] Aplicar automaticamente senales GDELT aprobadas con algoritmo v2,
       perfiles de volatilidad, 250 bps por senal, 400 bps diarios y circuit
       breaker total de 800 bps.
+- [x] Implementar `Mercado Vivo` con estados por figura, ticks cada 15 minutos,
+      hype, memoria y bandas para que todos los activos tengan movimiento.
 - [x] Actualizar reglas y privacidad para el indice externo en modo sombra.
 - [x] Crear la pagina publica de metodologia y aislamiento de proveedores.
 - [x] Mostrar en la ficha publica fuentes verificadas y estado de cada fuente.
@@ -1309,26 +1337,30 @@ La primera vertical tecnica ya incluye:
     reintentos para reducir bloqueos HTTP 429.
 54. Motor de noticias v2 en produccion con movimientos diferenciados por
     perfil de volatilidad y limites de 2,5%, 4% y 8%.
+55. Mercado Vivo con estados `bull`, `bear`, `sideways`, `volatile` y `viral`
+    para generar ticks automaticos auditables `source_type=market` en todas
+    las figuras activas.
 
 Siguiente bloque recomendado:
 
-1. Mostrar en la grafica y cronologia si cada movimiento provino de compra,
+1. Observar el Mercado Vivo durante 24 a 48 horas y calibrar volatilidad, hype,
+   bandas y frecuencia antes de compartir la beta ampliamente.
+2. Mostrar en la grafica y cronologia si cada movimiento provino de compra,
    venta, noticia, temporada o evento externo.
-2. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
+3. Instrumentar analitica de beta para retencion, operaciones, chat, voz y
    categorias sin guardar contenido sensible.
-3. Validar notas de voz WebM desde Android, iOS y navegador de escritorio.
-4. Probar la beta cerrada con 20 a 50 usuarios y recoger observaciones de UX
+4. Validar notas de voz WebM desde Android, iOS y navegador de escritorio.
+5. Probar la beta cerrada con 20 a 50 usuarios y recoger observaciones de UX
    movil y comprension del origen del precio.
-5. Observar el motor de noticias v2 y calibrar falsos positivos, amplitud por
+6. Observar el motor de noticias v2 y calibrar falsos positivos, amplitud por
    perfil, liquidez y rendimiento de los jugadores antes del lanzamiento.
-6. Mantener Wikimedia en modo sombra durante 30 dias y revisar falsos
+7. Mantener Wikimedia en modo sombra durante 30 dias y revisar falsos
    positivos y aprobar umbrales antes de aplicar senales.
-7. Completar busqueda de marcas, revision juridica local e imagenes con
+8. Completar busqueda de marcas, revision juridica local e imagenes con
    evidencia fechada.
-8. Migrar internamente `artists`/`artist_id` a
+9. Migrar internamente `artists`/`artist_id` a
    `market_entities`/`entity_id` con aliases y pruebas de compatibilidad.
-9. Evaluar adaptadores adicionales por categoria y el permiso de metricas
+10. Evaluar adaptadores adicionales por categoria y el permiso de metricas
    derivadas de YouTube; Twitch permanece pendiente de autorizacion tecnica.
-10. Dejar referidos, premios, monetizacion y audio en vivo para despues de la
+11. Dejar referidos, premios, monetizacion y audio en vivo para despues de la
     beta y la revision juridica.
-

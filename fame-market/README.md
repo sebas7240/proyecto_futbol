@@ -56,6 +56,8 @@ mismo frontend, API, autenticacion y portafolio.
   compatibilidad hacia los videos existentes de YouTube.
 - Eventos externos `external_events` para contexto excepcional revisado, sin
   aplicacion automatica de precio.
+- Mercado vivo automatico con estados por figura para que todos los precios
+  tengan ticks aun cuando no existan noticias recientes.
 - Monitor externo en Cloudflare Workers con estado en KV y alertas Telegram.
 - PWA instalable.
 - Docker Compose preparado para produccion.
@@ -271,11 +273,42 @@ activacion accidental, el impacto exige simultaneamente
 dos medios independientes y confianza minima de 0,55. El impacto cambia segun
 el perfil estable, equilibrado, volatil o underdog; se limita a 250 puntos base
 por senal, 400 diarios y una banda total de 800 puntos base. Los temas sensibles
-se detienen para revision humana.
-salvo autorizacion escrita expresa.
+se detienen para revision humana. YouTube no se mezcla con otras fuentes salvo
+autorizacion escrita expresa.
 
 La solicitud de metricas derivadas queda aplazada hasta que el nombre y dominio
 definitivos esten publicados. No bloquea el modo sombra de Wikimedia.
+
+## Mercado vivo
+
+El motor de noticias no debe ser el unico origen del precio, porque algunas
+figuras pueden pasar horas sin titulares suficientes. Para que el juego se
+sienta activo, el backend incluye un `market-maker` automatico que crea ticks
+`source_type=market` para todas las figuras activas.
+
+Cada figura mantiene un estado con memoria:
+
+- `bull`: tendencia alcista.
+- `bear`: tendencia bajista.
+- `sideways`: rango lateral.
+- `volatile`: movimiento fuerte con direccion menos estable.
+- `viral`: evento interno de alta volatilidad, limitado por bandas.
+
+La seleccion del estado usa perfil de volatilidad, riesgo, hype, cantidad de
+holders y noticias recientes, pero cada tick queda limitado por banda para no
+romper el ranking. Configuracion recomendada:
+
+```text
+MARKET_MAKER_ENABLED=true
+MARKET_MAKER_INTERVAL_MINUTES=15
+MARKET_MAKER_MIN_TICK_MINUTES=10
+MARKET_MAKER_PRICE_BAND_BPS=1000
+MARKET_MAKER_MAX_TICK_BPS=90
+```
+
+Las noticias reales siguen teniendo su propio origen `source_type=news` y pueden
+actuar como catalizador. El mercado vivo solo evita graficas congeladas y crea
+tendencias jugables con coste practicamente cero.
 
 ## Eventos externos
 
@@ -416,4 +449,3 @@ eliminan operaciones ni modifican balances automaticamente.
 
 FameCoins, precios y participaciones son ficticios. No representan acciones,
 dinero, inversiones ni activos convertibles.
-

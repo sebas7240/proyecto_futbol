@@ -104,6 +104,11 @@ jobs:
           set_env_value NEWS_MAX_SIGNAL_BPS 250
           set_env_value NEWS_MAX_DAILY_BPS 400
           set_env_value NEWS_TOTAL_PRICE_BAND_BPS 800
+          set_env_value MARKET_MAKER_ENABLED true
+          set_env_value MARKET_MAKER_INTERVAL_MINUTES 15
+          set_env_value MARKET_MAKER_MIN_TICK_MINUTES 10
+          set_env_value MARKET_MAKER_PRICE_BAND_BPS 1000
+          set_env_value MARKET_MAKER_MAX_TICK_BPS 90
 
           docker compose -p fameplays --env-file .env config --quiet
           docker compose -p fameplays --env-file .env up --build -d
@@ -131,4 +136,3 @@ jobs:
           gh issue comment 4 \
             --repo "${{ github.repository }}" \
             --body "Fame Plays API deployment: **${DEPLOY_STATUS}** | commit \`${GITHUB_SHA}\` | [ver ejecucion](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-

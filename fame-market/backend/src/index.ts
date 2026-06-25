@@ -44,6 +44,10 @@ import {
 } from './externalEvents.js';
 import { MarketError, MarketStore } from './market.js';
 import {
+  marketMakerIntervalMinutes,
+  runLiveMarketMaker
+} from './marketMaker.js';
+import {
   getUserInterests,
   listCategoryOverview,
   setUserInterests
@@ -222,6 +226,10 @@ app.get('/api/status', async (_request, response) => {
       mode: attentionMode()
     },
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    liveMarket: {
+      enabled: process.env.MARKET_MAKER_ENABLED === 'true',
+      intervalMinutes: marketMakerIntervalMinutes()
+    },
     turnstileConfigured: turnstileConfigured(),
     consentRequired: consentRequired(),
     now: new Date().toISOString()
@@ -857,6 +865,42 @@ app.post(
 );
 
 app.post(
+  '/api/admin/market-maker/run',
+  requireAdmin,
+  adminRateLimit,
+  async (_request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'El Mercado Vivo requiere PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const results = await runMonitoredJob(
+        'market-maker',
+        runLiveMarketMaker,
+        { source: 'admin' },
+        (outcomes) => ({
+          entities: outcomes.length,
+          applied: outcomes.filter((outcome) => outcome.status === 'applied').length,
+          skipped: outcomes.filter((outcome) => outcome.status === 'skipped').length,
+          halted: outcomes.filter((outcome) => outcome.status === 'halted').length,
+          failed: outcomes.filter((outcome) => outcome.status === 'failed').length,
+          totalDeltaBps: outcomes.reduce(
+            (sum, outcome) => sum + Number(outcome.appliedDeltaBps ?? 0),
+            0
+          )
+        })
+      );
+      response.json({ results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
   '/api/admin/artists/:artistId/youtube-channel',
   requireAdmin,
   adminRateLimit,
@@ -1438,6 +1482,39 @@ async function start() {
     sync().catch((error) => console.error('[News] Initial sync failed', error));
     const timer = setInterval(
       () => sync().catch((error) => console.error('[News] Scheduled sync failed', error)),
+      intervalMinutes * 60 * 1000
+    );
+    timer.unref();
+  }
+
+  if (databaseConfigured() && process.env.MARKET_MAKER_ENABLED === 'true') {
+    const intervalMinutes = marketMakerIntervalMinutes();
+    const sync = async () => {
+      const results = await runMonitoredJob(
+        'market-maker',
+        runLiveMarketMaker,
+        { source: 'scheduler', intervalMinutes },
+        (outcomes) => ({
+          entities: outcomes.length,
+          applied: outcomes.filter((outcome) => outcome.status === 'applied').length,
+          skipped: outcomes.filter((outcome) => outcome.status === 'skipped').length,
+          halted: outcomes.filter((outcome) => outcome.status === 'halted').length,
+          failed: outcomes.filter((outcome) => outcome.status === 'failed').length,
+          totalDeltaBps: outcomes.reduce(
+            (sum, outcome) => sum + Number(outcome.appliedDeltaBps ?? 0),
+            0
+          )
+        })
+      );
+      console.log(
+        `[LiveMarket] entities=${results.length} applied=${results.filter((outcome) => outcome.status === 'applied').length}`
+      );
+    };
+    sync().catch((error) =>
+      console.error('[LiveMarket] Initial market maker failed', error)
+    );
+    const timer = setInterval(
+      () => sync().catch((error) => console.error('[LiveMarket] Scheduled market maker failed', error)),
       intervalMinutes * 60 * 1000
     );
     timer.unref();

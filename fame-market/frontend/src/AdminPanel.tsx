@@ -205,6 +205,32 @@ export function AdminPanel() {
     }
   };
 
+  const runMarketMaker = async () => {
+    setBusyArtist('market-maker');
+    setMessage('');
+    try {
+      const result = await api.runMarketMaker(adminSecret);
+      const applied = result.results.filter((item) => item.status === 'applied');
+      const totalDelta = applied.reduce(
+        (sum, item) => sum + Number(item.appliedDeltaBps ?? 0),
+        0
+      );
+      setMessage(
+        `Mercado Vivo aplicado en ${applied.length}/${result.results.length} figuras. Movimiento neto: ${(totalDelta / 100).toFixed(2)}%.`
+      );
+      await operationsQuery.refetch();
+      await artistsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo ejecutar el Mercado Vivo.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
   const runSeasonAction = async (
     action: 'freeze' | 'close' | 'cycle'
   ) => {
@@ -543,6 +569,24 @@ export function AdminPanel() {
             }
           />
         </article>
+        <article>
+          <Activity size={20} />
+          <span>
+            <small>Mercado Vivo</small>
+            <strong>
+              {ageLabel(
+                operationsQuery.data?.database.lastMarketMakerAgeSeconds ?? null
+              )}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.jobs['market-maker']?.status === 'success'
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
       </section>
 
       <div className="admin-section-title attention-heading">
@@ -659,6 +703,20 @@ export function AdminPanel() {
         >
           <Newspaper size={17} />
           {busyArtist === 'news' ? 'Consultando...' : 'Sincronizar noticias'}
+        </button>
+      </div>
+
+      <div className="admin-section-title attention-heading">
+        <div>
+          <small>Ticks automaticos</small>
+          <h2>Mercado Vivo</h2>
+        </div>
+        <button
+          onClick={runMarketMaker}
+          disabled={!adminSecret || Boolean(busyArtist)}
+        >
+          <Activity size={17} />
+          {busyArtist === 'market-maker' ? 'Moviendo...' : 'Ejecutar ahora'}
         </button>
       </div>
 

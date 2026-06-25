@@ -107,19 +107,33 @@ Backend:
    salt de derechos y PostgreSQL.
 3. Levanta el backend con Docker Compose sin tocar los contenedores de Golea:
 
-Para iniciar el Pulso de noticias sin modificar precios, agrega al `.env`:
+Para iniciar el Pulso de noticias con impacto real auditado, agrega al `.env`:
 
 ```text
 NEWS_SYNC_ENABLED=true
 NEWS_SYNC_INTERVAL_MINUTES=120
 NEWS_SYNC_CONCURRENCY=3
-NEWS_SIGNAL_MODE=shadow
-NEWS_PRICE_IMPACT_ENABLED=false
-NEWS_MAX_DAILY_BPS=15
+NEWS_GDELT_MIN_INTERVAL_MS=6000
+NEWS_SIGNAL_MODE=applied
+NEWS_PRICE_IMPACT_ENABLED=true
+NEWS_MAX_SIGNAL_BPS=250
+NEWS_MAX_DAILY_BPS=400
+NEWS_TOTAL_PRICE_BAND_BPS=800
 ```
 
-`AUTO_MIGRATE=true` aplica `014_news_pulse.sql` durante el arranque. No actives
-`NEWS_PRICE_IMPACT_ENABLED` hasta completar la observacion y revision humana.
+Para que todos los activos tengan movimiento aunque GDELT no encuentre
+titulares recientes, activa tambien el Mercado Vivo:
+
+```text
+MARKET_MAKER_ENABLED=true
+MARKET_MAKER_INTERVAL_MINUTES=15
+MARKET_MAKER_MIN_TICK_MINUTES=10
+MARKET_MAKER_PRICE_BAND_BPS=1000
+MARKET_MAKER_MAX_TICK_BPS=90
+```
+
+`AUTO_MIGRATE=true` aplica las migraciones pendientes durante el arranque,
+incluyendo `014_news_pulse.sql` y `016_live_market_maker.sql`.
 
 ```bash
 docker compose --env-file .env up --build -d

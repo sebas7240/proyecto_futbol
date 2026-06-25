@@ -315,6 +315,7 @@ export interface OperationsOverview {
     lastAttentionSyncAgeSeconds: number | null;
     lastYouTubeSyncAgeSeconds: number | null;
     lastSeasonCycleAgeSeconds: number | null;
+    lastMarketMakerAgeSeconds?: number | null;
   };
   jobs: {
     'attention-sync': MaintenanceRun | null;
@@ -322,6 +323,7 @@ export interface OperationsOverview {
     'database-backup': MaintenanceRun | null;
     'youtube-sync': MaintenanceRun | null;
     'season-cycle': MaintenanceRun | null;
+    'market-maker'?: MaintenanceRun | null;
   };
   generatedAt: string;
 }

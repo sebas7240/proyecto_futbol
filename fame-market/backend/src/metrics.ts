@@ -44,6 +44,7 @@ export function prometheusMetrics(database: {
   lastAttentionSyncAgeSeconds: number | null;
   lastYouTubeSyncAgeSeconds: number | null;
   lastSeasonCycleAgeSeconds: number | null;
+  lastMarketMakerAgeSeconds?: number | null;
 }) {
   const runtime = runtimeMetrics();
   const lines = [
@@ -121,6 +122,12 @@ export function prometheusMetrics(database: {
       'Age of the last successful season cycle.',
       'gauge',
       database.lastSeasonCycleAgeSeconds ?? -1
+    ),
+    metric(
+      'fame_market_last_market_maker_age_seconds',
+      'Age of the last successful live market maker tick.',
+      'gauge',
+      database.lastMarketMakerAgeSeconds ?? -1
     )
   ];
 

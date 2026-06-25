@@ -19,7 +19,8 @@ const monitoredJobs = [
   'news-sync',
   'database-backup',
   'youtube-sync',
-  'season-cycle'
+  'season-cycle',
+  'market-maker'
 ] as const;
 
 function publicRun(row: MaintenanceRow | undefined) {
@@ -208,7 +209,8 @@ export async function getOperationalOverview() {
       lastBackupAgeSeconds: age('database-backup'),
       lastAttentionSyncAgeSeconds: age('attention-sync'),
       lastYouTubeSyncAgeSeconds: age('youtube-sync'),
-      lastSeasonCycleAgeSeconds: age('season-cycle')
+      lastSeasonCycleAgeSeconds: age('season-cycle'),
+      lastMarketMakerAgeSeconds: age('market-maker')
     },
     jobs: latestJobs,
     generatedAt: new Date().toISOString()

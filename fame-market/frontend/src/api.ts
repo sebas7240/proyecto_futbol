@@ -279,6 +279,24 @@ export const api = {
       body: JSON.stringify({ artistId })
     });
   },
+  async runMarketMaker(adminSecret: string) {
+    return request<{
+      results: Array<{
+        artistId: string;
+        artistName: string;
+        artistSlug: string;
+        state: string;
+        status: 'applied' | 'skipped' | 'halted' | 'failed';
+        appliedDeltaBps: number;
+        nextPrice: number | null;
+        reason: string | null;
+      }>;
+    }>('/admin/market-maker/run', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: '{}'
+    });
+  },
   async adminSeasonAction(
     adminSecret: string,
     seasonId: string,
