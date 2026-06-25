@@ -19,6 +19,7 @@ import type {
   Quote,
   RankingResponse,
   OperationsOverview,
+  PrizeProfile,
   SecurityReview,
   Season,
   SeasonHistory,
@@ -28,7 +29,8 @@ import type {
   ImageUsageStatus,
   RightsRequest,
   RightsRequestStatus,
-  RightsRequestType
+  RightsRequestType,
+  UserProfile
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4020/api';
@@ -138,6 +140,20 @@ export const api = {
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');
     return body.portfolio;
+  },
+  async profile() {
+    const body = await request<{ profile: UserProfile }>('/me/profile');
+    return body.profile;
+  },
+  async updatePrizeProfile(input: {
+    solanaWalletAddress: string | null;
+    prizeContactNotes: string;
+  }) {
+    const body = await request<{ profile: UserProfile }>('/me/profile/prize', {
+      method: 'PUT',
+      body: JSON.stringify(input)
+    });
+    return body.profile;
   },
   async consent() {
     return request<ConsentStatus>('/me/consent');
@@ -334,6 +350,24 @@ export const api = {
       }
     );
   },
+  async createSeason(
+    adminSecret: string,
+    input: {
+      name?: string;
+      startsAt?: string;
+      tradingClosesAt?: string;
+      endsAt?: string;
+      participationDays?: number;
+      freezeMinutes?: number;
+      startingBalance?: number;
+    }
+  ) {
+    return request<{ season: Season }>('/admin/seasons', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify(input)
+    });
+  },
   async processSeasonCycle(adminSecret: string) {
     return request<{ actions: string[]; season: Season | null }>(
       '/admin/seasons/cycle',
@@ -355,6 +389,13 @@ export const api = {
     return request<OperationsOverview>('/admin/operations', {
       headers: { 'x-admin-secret': adminSecret }
     });
+  },
+  async prizeProfiles(adminSecret: string) {
+    const body = await request<{ profiles: PrizeProfile[] }>(
+      '/admin/prize-profiles',
+      { headers: { 'x-admin-secret': adminSecret } }
+    );
+    return body.profiles;
   },
   async chatModeration(adminSecret: string, roomId: string) {
     return request<ChatModerationOverview>(

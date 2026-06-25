@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Save,
   Snowflake,
+  Trophy,
   Trash2,
   Volume2,
   Youtube
@@ -65,6 +66,15 @@ export function AdminPanel() {
   >({});
   const [chatRoom, setChatRoom] = useState('general');
   const [chatReason, setChatReason] = useState('Moderacion manual');
+  const [seasonDraft, setSeasonDraft] = useState({
+    name: '',
+    startsAt: '',
+    endsAt: '',
+    tradingClosesAt: '',
+    participationDays: '7',
+    freezeMinutes: '30',
+    startingBalance: '10000'
+  });
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminSecret],
     queryFn: () => api.securityReviews(adminSecret),
@@ -103,6 +113,12 @@ export function AdminPanel() {
     retry: false,
     refetchInterval: 15_000
   });
+  const prizeProfilesQuery = useQuery({
+    queryKey: ['prize-profiles', adminSecret],
+    queryFn: () => api.prizeProfiles(adminSecret),
+    enabled: Boolean(adminSecret),
+    retry: false
+  });
   const seasonStatus =
     seasonQuery.data?.season?.status === 'active'
       ? 'activa'
@@ -110,7 +126,9 @@ export function AdminPanel() {
         ? 'congelada'
         : seasonQuery.data?.season?.status === 'closed'
           ? 'cerrada'
-          : 'ninguna';
+          : seasonQuery.data?.season?.status === 'scheduled'
+            ? 'programada'
+            : 'ninguna';
 
   const rememberSecret = (value: string) => {
     setAdminSecret(value);
@@ -265,6 +283,45 @@ export function AdminPanel() {
         error instanceof Error
           ? error.message
           : 'No se pudo procesar la temporada.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const createManualSeason = async () => {
+    setBusyArtist('season-create');
+    setMessage('');
+    try {
+      const result = await api.createSeason(adminSecret, {
+        name: seasonDraft.name || undefined,
+        startsAt: seasonDraft.startsAt
+          ? new Date(seasonDraft.startsAt).toISOString()
+          : undefined,
+        endsAt: seasonDraft.endsAt
+          ? new Date(seasonDraft.endsAt).toISOString()
+          : undefined,
+        tradingClosesAt: seasonDraft.tradingClosesAt
+          ? new Date(seasonDraft.tradingClosesAt).toISOString()
+          : undefined,
+        participationDays: seasonDraft.participationDays
+          ? Number(seasonDraft.participationDays)
+          : undefined,
+        freezeMinutes: seasonDraft.freezeMinutes
+          ? Number(seasonDraft.freezeMinutes)
+          : undefined,
+        startingBalance: seasonDraft.startingBalance
+          ? Number(seasonDraft.startingBalance)
+          : undefined
+      });
+      setMessage(`Temporada creada: ${result.season.name}.`);
+      await seasonQuery.refetch();
+      await operationsQuery.refetch();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo crear la temporada.'
       );
     } finally {
       setBusyArtist('');
@@ -756,6 +813,155 @@ export function AdminPanel() {
             <CalendarSync size={17} /> Procesar ciclo
           </button>
         </div>
+        <form
+          className="admin-season-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createManualSeason();
+          }}
+        >
+          <label>
+            Nombre
+            <input
+              value={seasonDraft.name}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  name: event.target.value
+                }))
+              }
+              placeholder="Temporada semanal"
+            />
+          </label>
+          <label>
+            Apertura
+            <input
+              type="datetime-local"
+              value={seasonDraft.startsAt}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  startsAt: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Final
+            <input
+              type="datetime-local"
+              value={seasonDraft.endsAt}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  endsAt: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Cierre trading
+            <input
+              type="datetime-local"
+              value={seasonDraft.tradingClosesAt}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  tradingClosesAt: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Dias
+            <input
+              type="number"
+              min="1"
+              max="365"
+              value={seasonDraft.participationDays}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  participationDays: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Congelar antes
+            <input
+              type="number"
+              min="0"
+              max="10080"
+              value={seasonDraft.freezeMinutes}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  freezeMinutes: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            FameCoins iniciales
+            <input
+              type="number"
+              min="100"
+              max="1000000"
+              value={seasonDraft.startingBalance}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  startingBalance: event.target.value
+                }))
+              }
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!adminSecret || Boolean(busyArtist)}
+          >
+            <Trophy size={17} />
+            {busyArtist === 'season-create' ? 'Creando...' : 'Crear temporada'}
+          </button>
+        </form>
+      </section>
+
+      <div className="admin-section-title">
+        <small>Premiacion USDT Solana</small>
+        <h2>Wallets registradas</h2>
+      </div>
+
+      <section className="prize-wallets">
+        {!adminSecret ? (
+          <p>Ingresa el secreto para ver wallets de premiacion.</p>
+        ) : prizeProfilesQuery.isLoading ? (
+          <p>Cargando wallets...</p>
+        ) : prizeProfilesQuery.data?.length ? (
+          prizeProfilesQuery.data.map((profile) => (
+            <article className="prize-wallet-card" key={profile.userId}>
+              <header>
+                <span>
+                  <strong>{profile.displayName}</strong>
+                  <small>{profile.email ?? 'sin email publico'}</small>
+                </span>
+                <b>
+                  {profile.rank ? `#${profile.rank}` : 'Sin ranking final'}
+                </b>
+              </header>
+              <code>{profile.solanaWalletAddress}</code>
+              {profile.prizeContactNotes && <p>{profile.prizeContactNotes}</p>}
+              <small>
+                {profile.seasonName ?? 'Temporada no cerrada'} ·{' '}
+                {profile.finalValue
+                  ? `${profile.finalValue.toFixed(2)} FC`
+                  : 'sin valor final'}
+              </small>
+            </article>
+          ))
+        ) : (
+          <p>No hay wallets registradas todavia.</p>
+        )}
       </section>
 
       <div className="admin-section-title">

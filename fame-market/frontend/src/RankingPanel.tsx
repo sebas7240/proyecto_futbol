@@ -32,6 +32,15 @@ const date = new Intl.DateTimeFormat('es-CO', {
 function timeRemaining(season: Season) {
   if (season.status === 'closed') return 'Temporada finalizada';
   if (season.status === 'frozen') return 'Resultados en proceso';
+  if (season.status === 'scheduled') {
+    const milliseconds = Math.max(
+      0,
+      Date.parse(season.startsAt) - Date.now()
+    );
+    const days = Math.floor(milliseconds / 86_400_000);
+    const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000);
+    return days > 0 ? `Abre en ${days} d ${hours} h` : `Abre en ${hours} h`;
+  }
   const milliseconds = Math.max(
     0,
     Date.parse(season.tradingClosesAt) - Date.now()

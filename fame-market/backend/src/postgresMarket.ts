@@ -697,9 +697,11 @@ export class PostgresMarketStore implements MarketDataStore {
       starting_balance: Numeric;
     }>(
       `
-        SELECT id, starting_balance
+        SELECT id, starting_balance, starts_at, trading_closes_at
         FROM seasons
         WHERE status = 'active'
+          AND starts_at <= NOW()
+          AND trading_closes_at > NOW()
         ORDER BY starts_at DESC
         LIMIT 1
       `

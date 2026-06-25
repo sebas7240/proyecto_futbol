@@ -205,6 +205,8 @@ function App() {
   const [turnstilePass, setTurnstilePass] =
     useState<TurnstilePassState | null>(readStoredTurnstilePass);
   const [turnstileReset, setTurnstileReset] = useState(0);
+  const [prizeWalletDraft, setPrizeWalletDraft] = useState('');
+  const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
   const turnstileUserId = firebaseUser?.uid ?? (!firebaseReady ? 'local-demo' : '');
@@ -267,6 +269,13 @@ function App() {
   const portfolioQuery = useQuery({
     queryKey: ['portfolio', firebaseUser?.uid ?? 'local'],
     queryFn: api.portfolio,
+    enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
+    retry: false
+  });
+
+  const profileQuery = useQuery({
+    queryKey: ['profile', firebaseUser?.uid ?? 'local'],
+    queryFn: api.profile,
     enabled: authReady && (Boolean(firebaseUser) || !firebaseReady),
     retry: false
   });
@@ -425,6 +434,27 @@ function App() {
     onError: (error) => setNotice(error.message)
   });
 
+  const prizeProfileMutation = useMutation({
+    mutationFn: () => {
+      const wallet = prizeWalletDraft.trim();
+      if (wallet && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet)) {
+        throw new Error('La wallet Solana no parece valida.');
+      }
+      return api.updatePrizeProfile({
+        solanaWalletAddress: wallet || null,
+        prizeContactNotes: prizeNotesDraft
+      });
+    },
+    onSuccess: (profile) => {
+      queryClient.setQueryData(
+        ['profile', firebaseUser?.uid ?? 'local'],
+        profile
+      );
+      setNotice('Perfil de premios actualizado.');
+    },
+    onError: (error) => setNotice(error.message)
+  });
+
   const interestsMutation = useMutation({
     mutationFn: api.setInterests,
     onSuccess: (categories) => {
@@ -503,6 +533,12 @@ function App() {
       );
     }
   }, [interestsQuery.data, interestsQuery.isSuccess]);
+
+  useEffect(() => {
+    if (!profileQuery.data) return;
+    setPrizeWalletDraft(profileQuery.data.solanaWalletAddress ?? '');
+    setPrizeNotesDraft(profileQuery.data.prizeContactNotes ?? '');
+  }, [profileQuery.data]);
 
   const visibleArtists = useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase('es');
@@ -589,6 +625,8 @@ function App() {
                       ? 'en curso'
                       : currentSeason.status === 'frozen'
                         ? 'congelada'
+                        : currentSeason.status === 'scheduled'
+                          ? 'programada'
                         : 'finalizada'
                   }`
                 : 'Mercado de atencion'}
@@ -715,6 +753,8 @@ function App() {
                 ? 'Abierto'
                 : currentSeason?.status === 'frozen'
                   ? 'Congelado'
+                  : currentSeason?.status === 'scheduled'
+                    ? 'Programado'
                   : 'Cerrado'}
             </span>
           </div>
@@ -1156,6 +1196,54 @@ function App() {
                 <p className="empty-copy">Tu primera posicion aparecera aqui.</p>
               )}
             </div>
+            <form
+              className="prize-profile"
+              onSubmit={(event) => {
+                event.preventDefault();
+                prizeProfileMutation.mutate();
+              }}
+            >
+              <div className="section-heading section-heading--compact">
+                <div>
+                  <small>Premios manuales</small>
+                  <h3>Wallet USDT Solana</h3>
+                </div>
+                <WalletCards size={18} />
+              </div>
+              <label>
+                <span>Wallet Solana</span>
+                <input
+                  value={prizeWalletDraft}
+                  onChange={(event) => setPrizeWalletDraft(event.target.value)}
+                  placeholder="Ej: 7xK..."
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                <span>Nota opcional</span>
+                <textarea
+                  value={prizeNotesDraft}
+                  onChange={(event) => setPrizeNotesDraft(event.target.value)}
+                  maxLength={300}
+                  placeholder="Telegram, confirmacion o detalle para pago manual"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={
+                  prizeProfileMutation.isPending ||
+                  (firebaseReady && !firebaseUser)
+                }
+              >
+                {prizeProfileMutation.isPending
+                  ? 'Guardando...'
+                  : 'Guardar wallet'}
+              </button>
+              <small>
+                Si ganas, usaremos esta wallet para pagarte USDT en red Solana
+                de forma manual.
+              </small>
+            </form>
           </section>
         </aside>
       </main>

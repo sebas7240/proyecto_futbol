@@ -20,7 +20,7 @@ interface DbSeason {
   trading_closes_at: Date;
   ends_at: Date;
   starting_balance: Numeric;
-  status: 'active' | 'frozen' | 'closed';
+  status: 'scheduled' | 'active' | 'frozen' | 'closed';
   frozen_at: Date | null;
   closed_at: Date | null;
 }
@@ -95,7 +95,12 @@ export async function getCurrentSeason() {
     SELECT *
     FROM seasons
     ORDER BY
-      CASE status WHEN 'active' THEN 0 WHEN 'frozen' THEN 1 ELSE 2 END,
+      CASE status
+        WHEN 'active' THEN 0
+        WHEN 'frozen' THEN 1
+        WHEN 'scheduled' THEN 2
+        ELSE 3
+      END,
       starts_at DESC
     LIMIT 1
   `);
@@ -371,6 +376,13 @@ export async function freezeSeason(seasonId: string) {
         409
       );
     }
+    if (season.status === 'scheduled') {
+      throw new MarketError(
+        'La temporada programada aun no se puede congelar.',
+        'SEASON_NOT_STARTED',
+        409
+      );
+    }
     if (season.status === 'active') {
       await client.query(
         `
@@ -509,24 +521,109 @@ export async function closeSeason(seasonId: string) {
   }
 }
 
-export async function createNextSeason() {
+interface ManualSeasonInput {
+  name?: string;
+  startsAt?: string;
+  tradingClosesAt?: string;
+  endsAt?: string;
+  participationDays?: number;
+  freezeMinutes?: number;
+  startingBalance?: number;
+}
+
+function resolveManualSeasonInput(input: ManualSeasonInput = {}) {
+  const start = input.startsAt ? new Date(input.startsAt) : new Date();
+  if (!Number.isFinite(start.getTime())) {
+    throw new MarketError('La fecha de apertura no es valida.', 'INVALID_SEASON_DATE');
+  }
+  const participationDays = Math.max(
+    1,
+    Math.min(365, Math.floor(input.participationDays ?? Number(process.env.SEASON_LENGTH_DAYS ?? 7)))
+  );
+  const end = input.endsAt
+    ? new Date(input.endsAt)
+    : new Date(start.getTime() + participationDays * 24 * 60 * 60 * 1000);
+  if (!Number.isFinite(end.getTime()) || end <= start) {
+    throw new MarketError(
+      'La fecha de cierre debe ser posterior a la apertura.',
+      'INVALID_SEASON_DATE'
+    );
+  }
+  const freezeMinutes = Math.max(
+    0,
+    Math.min(7 * 24 * 60, Math.floor(input.freezeMinutes ?? Number(process.env.SEASON_FREEZE_MINUTES ?? 30)))
+  );
+  const tradingClose = input.tradingClosesAt
+    ? new Date(input.tradingClosesAt)
+    : new Date(end.getTime() - freezeMinutes * 60 * 1000);
+  if (
+    !Number.isFinite(tradingClose.getTime()) ||
+    tradingClose < start ||
+    tradingClose > end
+  ) {
+    throw new MarketError(
+      'El cierre de operaciones debe quedar entre apertura y final.',
+      'INVALID_SEASON_DATE'
+    );
+  }
+  const startingBalance = Math.max(
+    100,
+    Math.min(1_000_000, Math.round(input.startingBalance ?? Number(process.env.SEASON_STARTING_BALANCE ?? 10_000)))
+  );
+  return {
+    name: input.name?.trim().slice(0, 80) || null,
+    start,
+    tradingClose,
+    end,
+    startingBalance,
+    status:
+      start.getTime() > Date.now()
+        ? ('scheduled' as const)
+        : ('active' as const)
+  };
+}
+
+async function initializeSeasonMarket(client: PoolClient, seasonId: string) {
+  await client.query(
+    `
+      UPDATE artists
+      SET opening_price = current_price,
+        daily_anchor_price = current_price
+      WHERE status = 'active'
+    `
+  );
+  await client.query(
+    `
+      INSERT INTO price_ticks (artist_id, season_id, price, source_type)
+      SELECT id, $1, current_price, 'season'
+      FROM artists
+      WHERE status = 'active'
+    `,
+    [seasonId]
+  );
+}
+
+export async function createNextSeason(input: ManualSeasonInput = {}) {
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtext('fame-market-season-cycle'))"
     );
+    const resolved = resolveManualSeasonInput(input);
     const existing = await client.query(
       `
         SELECT 1
         FROM seasons
         WHERE status IN ('active', 'frozen')
+          OR (status = 'scheduled' AND $1::text = 'scheduled')
         LIMIT 1
-      `
+      `,
+      [resolved.status]
     );
     if (existing.rowCount) {
       throw new MarketError(
-        'Ya existe una temporada activa o congelada.',
+        'Ya existe una temporada activa, congelada o programada.',
         'SEASON_ALREADY_RUNNING',
         409
       );
@@ -535,55 +632,27 @@ export async function createNextSeason() {
       'SELECT COUNT(*) AS count FROM seasons'
     );
     const seasonNumber = Number(count.rows[0]!.count) + 1;
-    const lengthDays = Math.max(
-      1,
-      Number(process.env.SEASON_LENGTH_DAYS ?? 7)
-    );
-    const freezeMinutes = Math.max(
-      5,
-      Number(process.env.SEASON_FREEZE_MINUTES ?? 30)
-    );
-    const start = new Date();
-    const end = new Date(
-      start.getTime() + lengthDays * 24 * 60 * 60 * 1000
-    );
-    const tradingClose = new Date(
-      end.getTime() - freezeMinutes * 60 * 1000
-    );
     const result = await client.query<DbSeason>(
       `
         INSERT INTO seasons (
           name, starts_at, trading_closes_at, ends_at,
           starting_balance, status
-        ) VALUES ($1, $2, $3, $4, $5, 'active')
+        ) VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `,
       [
-        `Temporada Latina ${seasonNumber}`,
-        start,
-        tradingClose,
-        end,
-        Number(process.env.SEASON_STARTING_BALANCE ?? 10_000)
+        resolved.name ?? `Temporada Latina ${seasonNumber}`,
+        resolved.start,
+        resolved.tradingClose,
+        resolved.end,
+        resolved.startingBalance,
+        resolved.status
       ]
     );
     const season = result.rows[0]!;
-    await client.query(
-      `
-        UPDATE artists
-        SET opening_price = current_price,
-          daily_anchor_price = current_price
-        WHERE status = 'active'
-      `
-    );
-    await client.query(
-      `
-        INSERT INTO price_ticks (artist_id, season_id, price, source_type)
-        SELECT id, $1, current_price, 'season'
-        FROM artists
-        WHERE status = 'active'
-      `,
-      [season.id]
-    );
+    if (season.status === 'active') {
+      await initializeSeasonMarket(client, season.id);
+    }
     await client.query(
       `
         INSERT INTO audit_logs (
@@ -607,6 +676,32 @@ export async function processSeasonCycle() {
   let current = await getCurrentSeason();
   const now = Date.now();
 
+  if (current?.status === 'scheduled' && Date.parse(current.startsAt) <= now) {
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('fame-market-season-cycle'))"
+      );
+      await client.query(
+        `
+          UPDATE seasons
+          SET status = 'active'
+          WHERE id = $1 AND status = 'scheduled'
+        `,
+        [current.id]
+      );
+      await initializeSeasonMarket(client, current.id);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    actions.push('activated');
+    current = await getCurrentSeason();
+  }
   if (current?.status === 'active' && Date.parse(current.tradingClosesAt) <= now) {
     await freezeSeason(current.id);
     actions.push('frozen');

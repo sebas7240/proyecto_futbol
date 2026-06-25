@@ -220,9 +220,37 @@ export interface Season {
   tradingClosesAt: string;
   endsAt: string;
   startingBalance: number;
-  status: 'active' | 'frozen' | 'closed';
+  status: 'scheduled' | 'active' | 'frozen' | 'closed';
   frozenAt: string | null;
   closedAt: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  status: string;
+  solanaWalletAddress: string | null;
+  prizeContactNotes: string;
+  prizeWalletUpdatedAt: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface PrizeProfile {
+  userId: string;
+  displayName: string;
+  email: string | null;
+  solanaWalletAddress: string | null;
+  prizeContactNotes: string;
+  prizeWalletUpdatedAt: string | null;
+  seasonId: string | null;
+  seasonName: string | null;
+  rank: number | null;
+  finalValue: number | null;
+  returnPercent: number | null;
+  tradeCount: number | null;
 }
 
 export interface RankingEntry {

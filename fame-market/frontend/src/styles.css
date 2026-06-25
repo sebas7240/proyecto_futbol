@@ -1197,6 +1197,75 @@ button {
   font-size: 10px;
 }
 
+.prize-profile {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: #f6f4ed;
+  border-radius: 6px;
+}
+
+.prize-profile h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.prize-profile label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.prize-profile input,
+.prize-profile textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: 5px;
+  font: inherit;
+}
+
+.prize-profile input {
+  min-height: 42px;
+  padding: 0 11px;
+}
+
+.prize-profile textarea {
+  min-height: 78px;
+  padding: 10px 11px;
+  resize: vertical;
+}
+
+.prize-profile button {
+  min-height: 42px;
+  border: 0;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.prize-profile button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.prize-profile small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .notice {
   margin: 10px 0 0;
   color: var(--blue);
@@ -1656,6 +1725,10 @@ button {
 
 .season-status--frozen svg {
   color: var(--blue);
+}
+
+.season-status--scheduled svg {
+  color: #8a6500;
 }
 
 .podium {
@@ -2696,6 +2769,107 @@ button {
   padding: 0 12px;
 }
 
+.admin-season-form {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-season-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-season-form input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: 5px;
+  font: inherit;
+}
+
+.admin-season-form button {
+  align-self: end;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 0;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.prize-wallets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 30px;
+}
+
+.prize-wallets > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.prize-wallet-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+}
+
+.prize-wallet-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prize-wallet-card strong,
+.prize-wallet-card small {
+  display: block;
+}
+
+.prize-wallet-card small,
+.prize-wallet-card p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.prize-wallet-card code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 8px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #f6f4ed;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.prize-wallet-card p {
+  margin: 0;
+}
+
 .admin-section-title {
   margin-bottom: 12px;
 }
@@ -3672,6 +3846,11 @@ button {
   }
 
   .admin-season {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-season-form,
+  .prize-wallets {
     grid-template-columns: 1fr;
   }
 

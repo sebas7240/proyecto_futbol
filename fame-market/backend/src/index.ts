@@ -69,6 +69,11 @@ import {
   getPresenceOverview,
   recordPresenceHeartbeat
 } from './presence.js';
+import {
+  getUserProfile,
+  listPrizeProfiles,
+  updateUserPrizeProfile
+} from './profile.js';
 import { rateLimit, requestIp } from './rateLimit.js';
 import {
   createRightsRequest,
@@ -465,6 +470,35 @@ app.get('/api/seasons/current', async (_request, response, next) => {
   }
 });
 
+const prizeProfileSchema = z.object({
+  solanaWalletAddress: z.string().trim().max(60).nullable().optional(),
+  prizeContactNotes: z.string().trim().max(300).default('')
+});
+
+app.get('/api/me/profile', requireAuth, async (request, response, next) => {
+  try {
+    response.json({
+      profile: await getUserProfile(request.authenticatedUser!)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/me/profile/prize', requireAuth, async (request, response, next) => {
+  try {
+    const input = prizeProfileSchema.parse(request.body ?? {});
+    response.json({
+      profile: await updateUserPrizeProfile(request.authenticatedUser!, {
+        solanaWalletAddress: input.solanaWalletAddress ?? null,
+        prizeContactNotes: input.prizeContactNotes
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/rankings/current', async (request, response, next) => {
   try {
     const limit = Number(request.query.limit ?? 50);
@@ -782,6 +816,16 @@ const youtubeChannelSchema = z
     message: 'Envia channelId o handle.'
   });
 
+const manualSeasonSchema = z.object({
+  name: z.string().trim().min(3).max(80).optional(),
+  startsAt: z.string().datetime().optional(),
+  tradingClosesAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+  participationDays: z.coerce.number().int().min(1).max(365).optional(),
+  freezeMinutes: z.coerce.number().int().min(0).max(10080).optional(),
+  startingBalance: z.coerce.number().int().min(100).max(1000000).optional()
+});
+
 const wikimediaSourceSchema = z.object({
   project: z
     .string()
@@ -1040,9 +1084,27 @@ app.post(
   '/api/admin/seasons',
   requireAdmin,
   adminRateLimit,
-  async (_request, response, next) => {
+  async (request, response, next) => {
     try {
-      response.status(201).json({ season: await createNextSeason() });
+      const input = manualSeasonSchema.parse(request.body ?? {});
+      response.status(201).json({ season: await createNextSeason(input) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/prize-profiles',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const seasonId =
+        typeof request.query.seasonId === 'string'
+          ? request.query.seasonId
+          : undefined;
+      response.json({ profiles: await listPrizeProfiles(seasonId) });
     } catch (error) {
       next(error);
     }
