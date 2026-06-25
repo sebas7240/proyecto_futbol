@@ -485,6 +485,15 @@ function App() {
       ),
     [artist?.id, tradesQuery.data]
   );
+  const publicSources = useMemo(
+    () =>
+      (sourcesQuery.data ?? []).filter(
+        (source) =>
+          source.provider !== 'gdelt' &&
+          source.sourceType !== 'news_search'
+      ),
+    [sourcesQuery.data]
+  );
   useEffect(() => {
     if (interestsQuery.isSuccess) {
       setSelectedInterests(interestsQuery.data);
@@ -871,7 +880,7 @@ function App() {
 
               <NewsPulse data={newsQuery.data} loading={newsQuery.isLoading} />
 
-              {Boolean(sourcesQuery.data?.length) && (
+              {Boolean(publicSources.length) && (
                 <section className="source-strip">
                   <div className="section-heading section-heading--compact">
                     <div>
@@ -881,7 +890,7 @@ function App() {
                     <span>No implican afiliacion oficial</span>
                   </div>
                   <div className="source-list">
-                    {sourcesQuery.data!.map((source) => (
+                    {publicSources.map((source) => (
                       <a
                         className="source-row"
                         href={source.sourceUrl}

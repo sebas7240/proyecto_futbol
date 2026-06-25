@@ -18,6 +18,7 @@ import {
   AreaSeries,
   CandlestickSeries,
   ColorType,
+  HistogramSeries,
   LineSeries,
   LineStyle,
   createChart,
@@ -269,12 +270,7 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
   const ma50 = useMemo(() => movingAverage(candles, 50), [candles]);
   const rsi = useMemo(() => latestRsi(candles), [candles]);
   const extremes = useMemo(() => visibleExtremes(candles), [candles]);
-  const volumeBars = useMemo(() => candles.slice(-72), [candles]);
-  const maxVolume = useMemo(
-    () => Math.max(1, ...volumeBars.map((point) => point.volume)),
-    [volumeBars]
-  );
-  const latestVolume = volumeBars.at(-1)?.volume ?? 0;
+  const latestVolume = candles.at(-1)?.volume ?? 0;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -342,6 +338,34 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
     seriesRef.current = series;
     createSeriesMarkers(series, markersFromTrades(trades));
 
+    if (indicators.volume && candles.length) {
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.78,
+          bottom: 0
+        }
+      });
+      volumeSeries.setData(
+        candles.map((point) => ({
+          time: point.time,
+          value: point.volume,
+          color:
+            point.sourceTypes.includes('news') ||
+            point.sourceTypes.includes('external_event')
+              ? 'rgba(40, 102, 204, 0.35)'
+              : point.close >= point.open
+                ? 'rgba(22, 143, 92, 0.28)'
+                : 'rgba(217, 75, 67, 0.28)'
+        }))
+      );
+    }
+
     if (indicators.ma20 && ma20.length) {
       const ma20Series = chart.addSeries(LineSeries, {
         color: '#2866cc',
@@ -398,7 +422,7 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [candles, chartStyle, extremes, indicators.extremes, indicators.ma20, indicators.ma50, ma20, ma50, positive, trades]);
+  }, [candles, chartStyle, extremes, indicators.extremes, indicators.ma20, indicators.ma50, indicators.volume, ma20, ma50, positive, trades]);
 
   function resetZoom() {
     chartRef.current?.timeScale().fitContent();
@@ -652,22 +676,6 @@ export function PriceChart({ data, positive, trades = [] }: PriceChartProps) {
           {extremes ? numberFormat.format(extremes.low) : '--'}
         </span>
       </div>
-      {indicators.volume && Boolean(volumeBars.length) && (
-        <div className="volume-strip" aria-label="Volumen reciente">
-          {volumeBars.map((bar) => (
-            <span
-              key={bar.time}
-              className={
-                bar.sourceTypes.includes('news') || bar.sourceTypes.includes('external_event')
-                  ? 'volume-strip__bar volume-strip__bar--signal'
-                  : 'volume-strip__bar'
-              }
-              style={{ height: `${Math.max(12, (bar.volume / maxVolume) * 100)}%` }}
-              title={`Volumen ${numberFormat.format(bar.volume)}`}
-            />
-          ))}
-        </div>
-      )}
     </section>
   );
 }

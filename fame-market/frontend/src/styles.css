@@ -824,30 +824,6 @@ button {
   background: #eaf0ff;
 }
 
-.volume-strip {
-  height: 54px;
-  display: flex;
-  align-items: end;
-  gap: 3px;
-  margin-top: 8px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  background: #faf9f6;
-  border-radius: 6px;
-}
-
-.volume-strip__bar {
-  flex: 1 1 4px;
-  min-width: 3px;
-  max-width: 14px;
-  background: rgba(23, 23, 20, 0.24);
-  border-radius: 3px 3px 0 0;
-}
-
-.volume-strip__bar--signal {
-  background: rgba(40, 102, 204, 0.52);
-}
-
 .chart-drawing-layer {
   position: absolute;
   inset: 0;
@@ -4062,11 +4038,6 @@ button {
     min-height: 26px;
     padding: 4px 7px;
     font-size: 10px;
-  }
-
-  .volume-strip {
-    height: 44px;
-    padding: 7px;
   }
 
   .source-strip,
