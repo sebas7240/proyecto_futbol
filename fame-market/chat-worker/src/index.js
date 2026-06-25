@@ -1,7 +1,11 @@
 const DEFAULT_HISTORY_LIMIT = 120;
 const DEFAULT_MESSAGE_LIMIT = 160;
 const DEFAULT_RATE_LIMIT_SECONDS = 8;
-const DEFAULT_VOICE_MAX_BYTES = 500_000;
+const DEFAULT_MESSAGE_TTL_SECONDS = 2 * 60 * 60;
+const DEFAULT_VOICE_MAX_BYTES = 800_000;
+const DEFAULT_VOICE_RATE_LIMIT_SECONDS = 30;
+const DEFAULT_VOICE_WINDOW_SECONDS = 10 * 60;
+const DEFAULT_VOICE_WINDOW_MAX = 6;
 const MIN_VOICE_MS = 900;
 const MAX_VOICE_MS = 10_500;
 const AUTO_HIDE_REPORTS = 3;
@@ -164,6 +168,12 @@ export class ChatRoom {
         user_key TEXT PRIMARY KEY,
         last_message_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS voice_rate_limits (
+        user_key TEXT PRIMARY KEY,
+        window_started_at INTEGER NOT NULL,
+        window_count INTEGER NOT NULL,
+        last_voice_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS moderation_actions (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -266,6 +276,7 @@ export class ChatRoom {
   }
 
   historyRows(limit = this.historyLimit()) {
+    this.pruneMessages(Date.now());
     return this.ctx.storage.sql
       .exec(
         `
@@ -284,6 +295,7 @@ export class ChatRoom {
   }
 
   moderationSnapshot(roomId) {
+    this.pruneMessages(Date.now());
     return {
       roomId,
       recentMessages: this.ctx.storage.sql
@@ -439,6 +451,7 @@ export class ChatRoom {
     const attachment = ws.deserializeAttachment() || {};
     const now = Date.now();
     if (!this.canSend(ws, now)) return;
+    if (!this.canSendVoice(ws, now)) return;
     const durationMs = clampNumber(payload.durationMs, 0, 0, 60_000);
     if (durationMs < MIN_VOICE_MS || durationMs > MAX_VOICE_MS) {
       ws.send(
@@ -470,6 +483,7 @@ export class ChatRoom {
       durationMs,
       now
     });
+    this.recordVoiceSend(attachment.userId || 'anonymous', now);
   }
 
   canSend(ws, now) {
@@ -545,7 +559,8 @@ export class ChatRoom {
       userId,
       now
     );
-    this.pruneMessages();
+    this.pruneMessages(now);
+    this.scheduleCleanup(now);
     this.broadcast({
       type: 'message',
       message: {
@@ -732,7 +747,12 @@ export class ChatRoom {
     });
   }
 
-  pruneMessages() {
+  pruneMessages(now = Date.now()) {
+    const expiresBefore = now - this.messageTtlSeconds() * 1000;
+    this.ctx.storage.sql.exec(
+      'DELETE FROM messages WHERE created_at < ?',
+      expiresBefore
+    );
     this.ctx.storage.sql.exec(
       `
         DELETE FROM messages
@@ -743,6 +763,100 @@ export class ChatRoom {
         )
       `,
       this.historyLimit()
+    );
+    this.ctx.storage.sql.exec(
+      'DELETE FROM reports WHERE created_at < ?',
+      expiresBefore
+    );
+    this.ctx.storage.sql.exec(
+      'DELETE FROM rate_limits WHERE last_message_at < ?',
+      now - 24 * 60 * 60 * 1000
+    );
+    this.ctx.storage.sql.exec(
+      'DELETE FROM voice_rate_limits WHERE last_voice_at < ?',
+      now - 24 * 60 * 60 * 1000
+    );
+  }
+
+  async alarm() {
+    const now = Date.now();
+    this.pruneMessages(now);
+    this.scheduleCleanup(now);
+  }
+
+  scheduleCleanup(now = Date.now()) {
+    this.ctx.waitUntil(
+      this.ctx.storage.setAlarm(
+        now + Math.min(this.messageTtlSeconds(), 60 * 60) * 1000
+      )
+    );
+  }
+
+  canSendVoice(ws, now) {
+    const attachment = ws.deserializeAttachment() || {};
+    const key = attachment.userId || 'anonymous';
+    const current = this.ctx.storage.sql
+      .exec(
+        `SELECT window_started_at, window_count, last_voice_at
+         FROM voice_rate_limits
+         WHERE user_key = ?`,
+        key
+      )
+      .toArray()[0];
+    const cooldown = this.voiceRateLimitSeconds() * 1000;
+    if (current && now - Number(current.last_voice_at) < cooldown) {
+      ws.send(
+        JSON.stringify({
+          type: 'error',
+          message: `Espera ${this.voiceRateLimitSeconds()} segundos entre notas de voz.`
+        })
+      );
+      return false;
+    }
+    const windowMs = this.voiceWindowSeconds() * 1000;
+    if (
+      current &&
+      now - Number(current.window_started_at) < windowMs &&
+      Number(current.window_count) >= this.voiceWindowMax()
+    ) {
+      ws.send(
+        JSON.stringify({
+          type: 'error',
+          message: `Limite de ${this.voiceWindowMax()} notas de voz por ${Math.round(this.voiceWindowSeconds() / 60)} minutos.`
+        })
+      );
+      return false;
+    }
+    return true;
+  }
+
+  recordVoiceSend(userId, now) {
+    const current = this.ctx.storage.sql
+      .exec(
+        `SELECT window_started_at, window_count
+         FROM voice_rate_limits
+         WHERE user_key = ?`,
+        userId
+      )
+      .toArray()[0];
+    const windowMs = this.voiceWindowSeconds() * 1000;
+    const sameWindow = current && now - Number(current.window_started_at) < windowMs;
+    this.ctx.storage.sql.exec(
+      `
+        INSERT INTO voice_rate_limits (
+          user_key, window_started_at, window_count, last_voice_at
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_key)
+        DO UPDATE SET
+          window_started_at = excluded.window_started_at,
+          window_count = excluded.window_count,
+          last_voice_at = excluded.last_voice_at
+      `,
+      userId,
+      sameWindow ? Number(current.window_started_at) : now,
+      sameWindow ? Number(current.window_count) + 1 : 1,
+      now
     );
   }
 
@@ -767,10 +881,38 @@ export class ChatRoom {
     );
   }
 
+  messageTtlSeconds() {
+    return Math.max(
+      5 * 60,
+      Math.min(Number(this.env.CHAT_MESSAGE_TTL_SECONDS || DEFAULT_MESSAGE_TTL_SECONDS), 24 * 60 * 60)
+    );
+  }
+
   voiceMaxBytes() {
     return Math.max(
       80_000,
-      Math.min(Number(this.env.CHAT_VOICE_MAX_BYTES || DEFAULT_VOICE_MAX_BYTES), 500_000)
+      Math.min(Number(this.env.CHAT_VOICE_MAX_BYTES || DEFAULT_VOICE_MAX_BYTES), 1_000_000)
+    );
+  }
+
+  voiceRateLimitSeconds() {
+    return Math.max(
+      10,
+      Math.min(Number(this.env.CHAT_VOICE_RATE_LIMIT_SECONDS || DEFAULT_VOICE_RATE_LIMIT_SECONDS), 120)
+    );
+  }
+
+  voiceWindowSeconds() {
+    return Math.max(
+      60,
+      Math.min(Number(this.env.CHAT_VOICE_WINDOW_SECONDS || DEFAULT_VOICE_WINDOW_SECONDS), 60 * 60)
+    );
+  }
+
+  voiceWindowMax() {
+    return Math.max(
+      1,
+      Math.min(Number(this.env.CHAT_VOICE_WINDOW_MAX || DEFAULT_VOICE_WINDOW_MAX), 20)
     );
   }
 }

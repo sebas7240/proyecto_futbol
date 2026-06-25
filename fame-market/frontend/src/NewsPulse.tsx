@@ -72,7 +72,7 @@ export function NewsPulse({ data, loading = false }: NewsPulseProps) {
                 <span className="news-row__body">
                   <strong>{item.title}</strong>
                   <small>
-                    {item.sourceDomain || 'Fuente externa'} · {relativeTime(item.publishedAt)}
+                    {item.sourceDomain || 'Fuente externa'} / {relativeTime(item.publishedAt)}
                   </small>
                 </span>
                 <span className={`news-tone ${tone.className}`}>
@@ -86,13 +86,15 @@ export function NewsPulse({ data, loading = false }: NewsPulseProps) {
         </div>
       ) : (
         <p className="news-pulse__empty">
-          Aun no hay suficientes titulares verificados para calcular este pulso.
+          Estamos ampliando la busqueda a titulares de los ultimos dias. Si no
+          aparece nada, esta figura aun no tiene cobertura suficiente en fuentes
+          verificadas.
         </p>
       )}
 
       <p className="news-pulse__note">
-        La señal combina recencia, diversidad de medios y tono conservador. Los temas
-        sensibles requieren revisión y no mueven el precio automáticamente.
+        La senal combina recencia, diversidad de medios y tono conservador. Los
+        temas sensibles requieren revision y no mueven el precio automaticamente.
       </p>
     </section>
   );

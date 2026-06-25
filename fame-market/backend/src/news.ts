@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { databaseConfigured, getPool } from './database.js';
 
-const ALGORITHM_VERSION = 'news-pulse-12h-v2';
+const ALGORITHM_VERSION = 'news-pulse-7d-v3';
 const NEWS_PROVIDER = 'gdelt';
 const DEFAULT_GDELT_URL = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const DEFAULT_GDELT_MIN_INTERVAL_MS = 6_000;
 const GDELT_MAX_ATTEMPTS = 3;
+const NEWS_LOOKBACK_HOURS = 168;
 
 let nextGdeltRequestAt = 0;
 
@@ -42,6 +43,8 @@ interface ArtistNewsTarget {
   id: string;
   slug: string;
   name: string;
+  symbol: string;
+  country: string;
   category: string;
   profession: string | null;
   volatility_profile: VolatilityProfile;
@@ -159,7 +162,7 @@ export function calculateNewsSignal(
   const reviewRequiredCount = input.filter((item) => item.reviewRequired).length;
   const eligible = input.filter((item) => {
     const ageHours = (now.getTime() - item.publishedAt.getTime()) / 3_600_000;
-    return !item.reviewRequired && ageHours >= 0 && ageHours <= 48;
+    return !item.reviewRequired && ageHours >= 0 && ageHours <= NEWS_LOOKBACK_HOURS;
   });
   let recentWeight = 0;
   let baselineWeight = 0;
@@ -170,14 +173,14 @@ export function calculateNewsSignal(
   for (const item of eligible) {
     const ageHours = (now.getTime() - item.publishedAt.getTime()) / 3_600_000;
     const recencyWeight = Math.exp(-ageHours / 18);
-    if (ageHours <= 12) recentWeight += recencyWeight;
+    if (ageHours <= 24) recentWeight += recencyWeight;
     else baselineWeight += recencyWeight;
     sentimentTotal += clamp(item.sentimentScore, -1, 1) * recencyWeight;
     sentimentWeight += recencyWeight;
     if (item.sourceDomain) domains.add(item.sourceDomain.toLowerCase());
   }
 
-  const baselinePerWindow = baselineWeight / 3;
+  const baselinePerWindow = baselineWeight / 6;
   const attentionScore = eligible.length
     ? clamp(
         Math.tanh(Math.log((recentWeight + 0.75) / (baselinePerWindow + 0.75)) / 1.3),
@@ -247,17 +250,29 @@ function categoryContext(category: string) {
   return contexts[category] ?? '(celebrity OR cultura OR entertainment)';
 }
 
-function buildGdeltUrl(artist: ArtistNewsTarget) {
+function buildGdeltUrl(query: string, timespanHours = NEWS_LOOKBACK_HOURS) {
   const url = new URL(process.env.NEWS_GDELT_URL || DEFAULT_GDELT_URL);
   url.search = new URLSearchParams({
-    query: `\"${artist.name}\" ${categoryContext(artist.category)}`,
+    query,
     mode: 'ArtList',
     maxrecords: '30',
     format: 'json',
     sort: 'datedesc',
-    timespan: '48h'
+    timespan: `${timespanHours}h`
   }).toString();
   return url;
+}
+
+function artistNewsQueries(artist: ArtistNewsTarget) {
+  const exactName = `"${artist.name}"`;
+  const context = categoryContext(artist.category);
+  const country = artist.country ? `"${artist.country}"` : '';
+  const profession = artist.profession ? artist.profession : '';
+  return [
+    `${exactName} ${context}`,
+    exactName,
+    [exactName, country || profession].filter(Boolean).join(' ')
+  ].filter((query, index, queries) => query && queries.indexOf(query) === index);
 }
 
 function cleanTitle(value: string) {
@@ -296,10 +311,21 @@ function gdeltDate(value: string | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function relevantTitle(title: string, artistName: string) {
+function relevantTitle(title: string, artistName: string, symbol = '') {
   const haystack = normalizedText(title);
   const nameTokens = words(artistName).filter((token) => token.length > 2);
-  return nameTokens.length > 0 && nameTokens.every((token) => haystack.includes(token));
+  const symbolTokens = words(symbol).filter((token) => token.length > 2);
+  if (nameTokens.length > 0 && nameTokens.every((token) => haystack.includes(token))) {
+    return true;
+  }
+  if (
+    nameTokens.length > 1 &&
+    nameTokens.filter((token) => haystack.includes(token)).length >=
+      Math.max(2, nameTokens.length - 1)
+  ) {
+    return true;
+  }
+  return symbolTokens.length > 0 && symbolTokens.every((token) => haystack.includes(token));
 }
 
 async function ensureNewsSource(artist: ArtistNewsTarget, sourceUrl: string) {
@@ -330,8 +356,7 @@ async function ensureNewsSource(artist: ArtistNewsTarget, sourceUrl: string) {
   return result.rows[0]!.id;
 }
 
-async function fetchNews(artist: ArtistNewsTarget) {
-  const url = buildGdeltUrl(artist);
+async function fetchNewsUrl(url: URL) {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt += 1) {
@@ -369,6 +394,28 @@ async function fetchNews(artist: ArtistNewsTarget) {
     : new Error('No fue posible consultar GDELT.');
 }
 
+async function fetchNews(artist: ArtistNewsTarget) {
+  const queries = artistNewsQueries(artist);
+  const articles = new Map<string, GdeltArticle>();
+  const urls: string[] = [];
+
+  for (const query of queries) {
+    const fetched = await fetchNewsUrl(buildGdeltUrl(query));
+    urls.push(fetched.url);
+    for (const article of fetched.articles) {
+      const key = String(article.url || article.url_mobile || article.title || '');
+      if (key && !articles.has(key)) articles.set(key, article);
+    }
+    if (articles.size >= 12) break;
+  }
+
+  return {
+    url: urls[0] ?? buildGdeltUrl(`"${artist.name}"`).toString(),
+    articles: [...articles.values()],
+    queries
+  };
+}
+
 async function storeArticles(
   artist: ArtistNewsTarget,
   sourceId: string,
@@ -379,7 +426,7 @@ async function storeArticles(
     const title = cleanTitle(String(article.title || ''));
     const url = canonicalUrl(String(article.url || article.url_mobile || ''));
     const publishedAt = gdeltDate(article.seendate);
-    if (!title || !url || !publishedAt || !relevantTitle(title, artist.name)) continue;
+    if (!title || !url || !publishedAt || !relevantTitle(title, artist.name, artist.symbol)) continue;
     const analysis = analyzeNewsSentiment(title);
     const domain = String(article.domain || new URL(url).hostname).toLowerCase();
     const externalId = createHash('sha256')
@@ -437,7 +484,7 @@ async function loadSignalInput(artistId: string) {
       WHERE artist_id = $1
         AND provider = $2
         AND content_type = 'article'
-        AND published_at >= NOW() - INTERVAL '48 hours'
+        AND published_at >= NOW() - INTERVAL '7 days'
       ORDER BY published_at DESC
     `,
     [artistId, NEWS_PROVIDER]
@@ -642,7 +689,7 @@ export async function syncNewsPulse(artistId?: string) {
   if (!databaseConfigured()) return [];
   const result = await getPool().query<ArtistNewsTarget>(
     `
-      SELECT id, slug, name, category, profession, volatility_profile
+      SELECT id, slug, symbol, name, country, category, profession, volatility_profile
       FROM artists
       WHERE status = 'active'
         AND ($1::uuid IS NULL OR id = $1)
@@ -699,6 +746,7 @@ export async function getNewsPulseBySlug(slug: string) {
           AND provider = $2
           AND content_type = 'article'
           AND eligibility_status = 'eligible'
+          AND published_at >= NOW() - INTERVAL '14 days'
         ORDER BY published_at DESC
         LIMIT 12
       `,

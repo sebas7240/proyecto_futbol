@@ -76,6 +76,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  async status() {
+    return request<{
+      ok: boolean;
+      turnstileConfigured: boolean;
+      authMode: string;
+      now: string;
+    }>('/status');
+  },
   async artists() {
     const body = await request<{ entities: ArtistSummary[] }>('/entities');
     return body.entities;

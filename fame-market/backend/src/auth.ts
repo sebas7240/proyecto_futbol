@@ -150,7 +150,33 @@ export async function requireAuth(
   }
 }
 
-export function requireAdmin(
+function adminAllowedEmails() {
+  return (process.env.ADMIN_ALLOWED_EMAILS || 'sebas7240@gmail.com')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function requestUser(request: Request): Promise<AuthenticatedUser | null> {
+  if (request.authenticatedUser) return request.authenticatedUser;
+  if (authMode === 'development') {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_AUTH !== 'true') {
+      return null;
+    }
+    const uid = request.header('x-user-id')?.trim() || 'demo-user';
+    return {
+      uid,
+      email: request.header('x-user-email')?.trim() || `${uid}@local.fame`,
+      displayName: request.header('x-user-name')?.trim() || 'Jugador demo',
+      avatarUrl: null
+    };
+  }
+  const authorization = request.header('authorization');
+  if (!authorization?.startsWith('Bearer ')) return null;
+  return verifyFirebaseIdToken(authorization.slice(7));
+}
+
+export async function requireAdmin(
   request: Request,
   response: Response,
   next: NextFunction
@@ -166,5 +192,37 @@ export function requireAdmin(
     });
     return;
   }
+  let user: AuthenticatedUser | null = null;
+  try {
+    user = await requestUser(request);
+  } catch {
+    response.status(401).json({
+      error: {
+        code: 'INVALID_AUTH_TOKEN',
+        message: 'La sesion de administrador no es valida.'
+      }
+    });
+    return;
+  }
+  if (!user?.email) {
+    response.status(401).json({
+      error: {
+        code: 'ADMIN_LOGIN_REQUIRED',
+        message: 'Inicia sesion con una cuenta administradora.'
+      }
+    });
+    return;
+  }
+  const allowed = adminAllowedEmails();
+  if (!allowed.includes(user.email.toLowerCase())) {
+    response.status(403).json({
+      error: {
+        code: 'ADMIN_EMAIL_NOT_ALLOWED',
+        message: 'Tu cuenta no esta habilitada para administrar Fame Plays.'
+      }
+    });
+    return;
+  }
+  request.authenticatedUser = user;
   next();
 }

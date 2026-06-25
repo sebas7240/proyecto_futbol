@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { User } from 'firebase/auth';
 import {
   ArrowLeft,
   Activity,
@@ -24,7 +25,14 @@ import {
   Volume2,
   Youtube
 } from 'lucide-react';
-import { api } from './api';
+import { api, setTokenProvider } from './api';
+import {
+  currentIdToken,
+  firebaseReady,
+  loginWithGoogle,
+  logout,
+  subscribeToAuth
+} from './auth';
 import { EntityAvatar } from './EntityAvatar';
 import type {
   ArtistRightsRecord,
@@ -45,11 +53,27 @@ function bytesLabel(bytes: number) {
 }
 
 export function AdminPanel() {
-  const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
-  const seasonQuery = useQuery({ queryKey: ['ranking'], queryFn: api.ranking });
+  const allowedAdminEmails = (
+    import.meta.env.VITE_ADMIN_EMAILS || 'sebas7240@gmail.com'
+  )
+    .split(',')
+    .map((email: string) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [loginPending, setLoginPending] = useState(false);
   const [adminSecret, setAdminSecret] = useState(
     () => sessionStorage.getItem('fame-plays-admin-secret') ?? ''
   );
+  const adminEmailAllowed =
+    !firebaseReady ||
+    Boolean(
+      firebaseUser?.email &&
+        allowedAdminEmails.includes(firebaseUser.email.toLowerCase())
+    );
+  const canQueryAdmin = Boolean(adminSecret && adminEmailAllowed && authReady);
+  const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
+  const seasonQuery = useQuery({ queryKey: ['ranking'], queryFn: api.ranking });
   const [handles, setHandles] = useState<Record<string, string>>({
     '10000000-0000-4000-8000-000000000001': '@KarolG',
     '10000000-0000-4000-8000-000000000002': '@BadBunnyPR',
@@ -78,45 +102,45 @@ export function AdminPanel() {
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminSecret],
     queryFn: () => api.securityReviews(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false
   });
   const operationsQuery = useQuery({
     queryKey: ['operations', adminSecret],
     queryFn: () => api.operations(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false,
     refetchInterval: 30_000
   });
   const attentionQuery = useQuery({
     queryKey: ['attention-overview', adminSecret],
     queryFn: () => api.attentionOverview(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false
   });
   const artistRightsQuery = useQuery({
     queryKey: ['artist-rights', adminSecret],
     queryFn: () => api.artistRights(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false
   });
   const rightsRequestsQuery = useQuery({
     queryKey: ['rights-requests', adminSecret],
     queryFn: () => api.rightsRequests(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false
   });
   const chatModerationQuery = useQuery({
     queryKey: ['chat-moderation', adminSecret, chatRoom],
     queryFn: () => api.chatModeration(adminSecret, chatRoom),
-    enabled: Boolean(adminSecret && chatRoom),
+    enabled: Boolean(canQueryAdmin && chatRoom),
     retry: false,
     refetchInterval: 15_000
   });
   const prizeProfilesQuery = useQuery({
     queryKey: ['prize-profiles', adminSecret],
     queryFn: () => api.prizeProfiles(adminSecret),
-    enabled: Boolean(adminSecret),
+    enabled: canQueryAdmin,
     retry: false
   });
   const seasonStatus =
@@ -129,6 +153,26 @@ export function AdminPanel() {
           : seasonQuery.data?.season?.status === 'scheduled'
             ? 'programada'
             : 'ninguna';
+  useEffect(() => {
+    setTokenProvider(currentIdToken);
+    const unsubscribe = subscribeToAuth((user) => {
+      setFirebaseUser(user);
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const openAdminLogin = async () => {
+    setLoginPending(true);
+    setMessage('');
+    try {
+      await loginWithGoogle();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo iniciar sesion.');
+    } finally {
+      setLoginPending(false);
+    }
+  };
 
   const rememberSecret = (value: string) => {
     setAdminSecret(value);
@@ -507,6 +551,56 @@ export function AdminPanel() {
     }
   };
 
+  if (!authReady) {
+    return (
+      <main className="admin-page admin-access">
+        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <section>
+          <small>Administracion interna</small>
+          <h1>Verificando sesion...</h1>
+          <p>Estamos comprobando tu cuenta antes de abrir el panel.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (firebaseReady && !firebaseUser) {
+    return (
+      <main className="admin-page admin-access">
+        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <section>
+          <small>Acceso restringido</small>
+          <h1>Entra con tu cuenta administradora</h1>
+          <p>
+            El panel solo se abre para emails autorizados en Firebase. Luego
+            podras ingresar el secreto administrativo.
+          </p>
+          <button onClick={openAdminLogin} disabled={loginPending}>
+            {loginPending ? 'Abriendo Google...' : 'Entrar con Google'}
+          </button>
+          {message && <p className="admin-message">{message}</p>}
+        </section>
+      </main>
+    );
+  }
+
+  if (!adminEmailAllowed) {
+    return (
+      <main className="admin-page admin-access">
+        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <section>
+          <small>Acceso restringido</small>
+          <h1>Cuenta no habilitada</h1>
+          <p>
+            {firebaseUser?.email ?? 'Esta cuenta'} no tiene permisos para
+            administrar Fame Plays.
+          </p>
+          <button onClick={() => logout()}>Cerrar sesion</button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="admin-page">
       <header className="admin-header">
@@ -515,12 +609,21 @@ export function AdminPanel() {
           <small>Administracion interna</small>
           <h1>Control de Fame Plays</h1>
         </div>
-        <button onClick={syncAll} disabled={!adminSecret || Boolean(busyArtist)}>
+        <button
+          onClick={syncAll}
+          disabled={!adminSecret || Boolean(busyArtist) || !adminEmailAllowed}
+        >
           <RefreshCw size={17} /> Sincronizar todos
         </button>
       </header>
 
       <section className="admin-secret">
+        {firebaseUser?.email && (
+          <p>
+            Sesion admin: <strong>{firebaseUser.email}</strong>{' '}
+            <button type="button" onClick={() => logout()}>salir</button>
+          </p>
+        )}
         <label>
           Secreto de administrador
           <input

@@ -29,6 +29,7 @@ import { EntityAvatar } from './EntityAvatar';
 import { NewsPulse } from './NewsPulse';
 import { OnlineCounter } from './OnlineCounter';
 import { PriceChart } from './PriceChart';
+import { RadioPanel } from './RadioPanel';
 import { RankingPanel } from './RankingPanel';
 import { TurnstileWidget } from './TurnstileWidget';
 import type {
@@ -175,6 +176,11 @@ function ArtistRow({
 function App() {
   const queryClient = useQueryClient();
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
+  const statusQuery = useQuery({
+    queryKey: ['status'],
+    queryFn: api.status,
+    staleTime: 5 * 60 * 1000
+  });
   const categoriesQuery = useQuery({
     queryKey: ['market-categories'],
     queryFn: api.marketCategories
@@ -209,6 +215,8 @@ function App() {
   const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
+  const backendNeedsTurnstile =
+    statusQuery.data?.turnstileConfigured ?? Boolean(turnstileSiteKey);
   const turnstileUserId = firebaseUser?.uid ?? (!firebaseReady ? 'local-demo' : '');
   const activeTurnstilePass =
     turnstilePass?.userId === turnstileUserId &&
@@ -216,7 +224,7 @@ function App() {
       ? turnstilePass.value
       : undefined;
   const turnstileAccessReady =
-    !turnstileSiteKey || Boolean(activeTurnstilePass || turnstileToken);
+    !backendNeedsTurnstile || Boolean(activeTurnstilePass || turnstileToken);
 
   function clearTurnstilePass() {
     setTurnstilePass(null);
@@ -1082,7 +1090,8 @@ function App() {
               />
               <small>participaciones</small>
             </label>
-            {turnstileSiteKey &&
+            {backendNeedsTurnstile &&
+              turnstileSiteKey &&
               !activeTurnstilePass &&
               !quote &&
               (!firebaseReady || Boolean(firebaseUser)) &&
@@ -1129,7 +1138,8 @@ function App() {
                   !consentReady ||
                   !consentAccepted ||
                   currentSeason?.status !== 'active' ||
-                  !turnstileAccessReady
+                  !turnstileAccessReady ||
+                  (backendNeedsTurnstile && !turnstileSiteKey)
                 }
               >
                 {currentSeason?.status !== 'active'
@@ -1140,6 +1150,8 @@ function App() {
                     ? 'Cargando acceso...'
                     : !consentAccepted
                       ? 'Acepta las reglas para operar'
+                  : backendNeedsTurnstile && !turnstileSiteKey
+                    ? 'Falta configurar seguridad'
                   : quoteMutation.isPending
                     ? 'Calculando...'
                     : !turnstileAccessReady
@@ -1156,6 +1168,8 @@ function App() {
             userId={firebaseUser?.uid}
             displayName={firebaseUser?.displayName}
           />
+
+          <RadioPanel />
 
           <section className="portfolio-summary">
             <div className="section-heading section-heading--compact">
