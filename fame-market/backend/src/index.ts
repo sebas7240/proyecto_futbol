@@ -5,6 +5,10 @@ import { pinoHttp } from 'pino-http';
 import { z } from 'zod';
 import { authMode, requireAdmin, requireAuth } from './auth.js';
 import {
+  type AdminResetAction,
+  runAdminReset
+} from './adminMaintenance.js';
+import {
   attentionMode,
   getArtistAttentionBySlug,
   getAttentionEvaluation,
@@ -136,6 +140,10 @@ const adminRateLimit = rateLimit({
   maxRequests: 30,
   windowMs: 60_000,
   key: requestIp
+});
+const adminResetSchema = z.object({
+  action: z.enum(['season-activity', 'season-full', 'news-pulse']),
+  confirm: z.string()
 });
 const quoteRateLimit = rateLimit({
   action: 'trade-quote',
@@ -983,6 +991,49 @@ app.post(
         })
       );
       response.json({ results });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/reset',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      if (!databaseConfigured()) {
+        throw new MarketError(
+          'Los resets administrativos requieren PostgreSQL.',
+          'DATABASE_REQUIRED',
+          503
+        );
+      }
+      const input = adminResetSchema.parse(request.body ?? {});
+      if (input.confirm !== 'RESET') {
+        throw new MarketError(
+          'Escribe RESET para confirmar esta accion.',
+          'RESET_CONFIRMATION_REQUIRED',
+          400
+        );
+      }
+      const actor =
+        request.authenticatedUser?.email ??
+        request.authenticatedUser?.uid ??
+        'admin';
+      const result = await runMonitoredJob(
+        `admin-reset-${input.action}`,
+        () => runAdminReset(input.action as AdminResetAction, actor),
+        { source: 'admin', action: input.action, actor },
+        (summary) => ({
+          action: summary.action,
+          seasonId: summary.seasonId,
+          deleted: summary.deleted,
+          updated: summary.updated
+        })
+      );
+      response.json({ reset: result });
     } catch (error) {
       next(error);
     }

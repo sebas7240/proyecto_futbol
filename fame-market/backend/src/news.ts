@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { databaseConfigured, getPool } from './database.js';
 
-const ALGORITHM_VERSION = 'news-pulse-7d-v3';
+const ALGORITHM_VERSION = 'news-pulse-7d-v4';
 const NEWS_PROVIDER = 'gdelt';
 const DEFAULT_GDELT_URL = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const DEFAULT_GDELT_MIN_INTERVAL_MS = 6_000;
@@ -90,6 +90,18 @@ function gdeltMinimumInterval() {
     1_000,
     30_000
   );
+}
+
+function minimumNewsArticles() {
+  return clamp(Number(process.env.NEWS_MIN_ARTICLES_FOR_SIGNAL ?? 1), 1, 5);
+}
+
+function minimumNewsSources() {
+  return clamp(Number(process.env.NEWS_MIN_SOURCES_FOR_SIGNAL ?? 1), 1, 4);
+}
+
+function minimumNewsConfidence() {
+  return clamp(Number(process.env.NEWS_MIN_CONFIDENCE ?? 0.25), 0.1, 0.9);
 }
 
 async function waitForGdeltSlot() {
@@ -210,10 +222,12 @@ export function calculateNewsSignal(
     500
   );
   const proposedDeltaBps =
-    eligible.length >= 2 && sourceCount >= 2 && Math.abs(composite) >= 0.12
+    eligible.length >= minimumNewsArticles() &&
+    sourceCount >= minimumNewsSources() &&
+    Math.abs(composite) >= 0.08
       ? clamp(
           Math.round(
-            composite * 220 * confidence * profileMultiplier[volatilityProfile]
+            composite * 240 * confidence * profileMultiplier[volatilityProfile]
           ),
           -maximumSignalBps,
           maximumSignalBps
@@ -245,7 +259,8 @@ function categoryContext(category: string) {
     musica: '(music OR musica OR singer OR cantante OR album OR tour)',
     creadores: '(creator OR influencer OR youtube OR twitch OR streamer)',
     'cine-tv': '(actor OR actress OR film OR movie OR serie OR television)',
-    deportes: '(sports OR deporte OR football OR futbol OR tennis OR basketball)'
+    deportes:
+      '(sports OR deporte OR football OR futbol OR soccer OR mundial OR "world cup" OR copa OR goal OR gol OR match OR partido OR torneo)'
   };
   return contexts[category] ?? '(celebrity OR cultura OR entertainment)';
 }
@@ -264,15 +279,59 @@ function buildGdeltUrl(query: string, timespanHours = NEWS_LOOKBACK_HOURS) {
 }
 
 function artistNewsQueries(artist: ArtistNewsTarget) {
-  const exactName = `"${artist.name}"`;
+  const aliases = artistNewsAliases(artist);
   const context = categoryContext(artist.category);
   const country = artist.country ? `"${artist.country}"` : '';
   const profession = artist.profession ? artist.profession : '';
-  return [
-    `${exactName} ${context}`,
-    exactName,
-    [exactName, country || profession].filter(Boolean).join(' ')
-  ].filter((query, index, queries) => query && queries.indexOf(query) === index);
+  const queries = aliases.flatMap((alias, index) => {
+    const exactName = `"${alias}"`;
+    return index === 0
+      ? [
+          `${exactName} ${context}`,
+          exactName,
+          [exactName, country || profession].filter(Boolean).join(' ')
+        ]
+      : [
+          `${exactName} ${context}`,
+          [exactName, country || profession].filter(Boolean).join(' ')
+        ];
+  });
+  return queries.filter((query, index) => query && queries.indexOf(query) === index);
+}
+
+function artistNewsAliases(artist: ArtistNewsTarget) {
+  const normalizedName = normalizedText(artist.name)
+    .replace(/\bjr\b/g, 'junior')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const aliases = new Set<string>([artist.name]);
+  const compactName = artist.name.replace(/\bJr\.?\b/i, 'Junior').trim();
+  aliases.add(compactName);
+  aliases.add(artist.name.replace(/\bJunior\b/i, 'Jr').trim());
+
+  const tokens = words(artist.name);
+  if (tokens.length > 1) {
+    aliases.add(tokens.join(' '));
+    aliases.add(tokens.slice(0, 2).join(' '));
+  }
+
+  if (/vinicius/.test(normalizedName)) {
+    aliases.add('Vinicius Junior');
+    aliases.add('Vinicius Jr');
+    aliases.add('Vini Jr');
+    aliases.add('Vini Junior');
+  }
+  if (/mbappe/.test(normalizedName)) aliases.add('Kylian Mbappe');
+  if (/messi/.test(normalizedName)) aliases.add('Leo Messi');
+  if (/ronaldo/.test(normalizedName)) aliases.add('Cristiano Ronaldo');
+
+  const symbolAlias = artist.symbol.replace(/[^a-z0-9]+/gi, ' ').trim();
+  if (symbolAlias.length > 3) aliases.add(symbolAlias);
+
+  return [...aliases]
+    .map((alias) => alias.replace(/\s+/g, ' ').trim())
+    .filter((alias, index, list) => alias.length > 2 && list.indexOf(alias) === index)
+    .slice(0, 8);
 }
 
 function cleanTitle(value: string) {
@@ -311,20 +370,23 @@ function gdeltDate(value: string | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function relevantTitle(title: string, artistName: string, symbol = '') {
+function relevantTitle(title: string, artistName: string, symbol = '', aliases: string[] = []) {
   const haystack = normalizedText(title);
-  const nameTokens = words(artistName).filter((token) => token.length > 2);
+  const candidates = [artistName, ...aliases];
+  for (const candidate of candidates) {
+    const nameTokens = words(candidate).filter((token) => token.length > 2);
+    if (nameTokens.length > 0 && nameTokens.every((token) => haystack.includes(token))) {
+      return true;
+    }
+    if (
+      nameTokens.length > 1 &&
+      nameTokens.filter((token) => haystack.includes(token)).length >=
+        Math.max(2, nameTokens.length - 1)
+    ) {
+      return true;
+    }
+  }
   const symbolTokens = words(symbol).filter((token) => token.length > 2);
-  if (nameTokens.length > 0 && nameTokens.every((token) => haystack.includes(token))) {
-    return true;
-  }
-  if (
-    nameTokens.length > 1 &&
-    nameTokens.filter((token) => haystack.includes(token)).length >=
-      Math.max(2, nameTokens.length - 1)
-  ) {
-    return true;
-  }
   return symbolTokens.length > 0 && symbolTokens.every((token) => haystack.includes(token));
 }
 
@@ -350,7 +412,11 @@ async function ensureNewsSource(artist: ArtistNewsTarget, sourceUrl: string) {
       `Noticias sobre ${artist.name}`,
       newsSignalMode() === 'applied' ? 'price_signal' : 'shadow_signal',
       'Titulares y enlaces publicos descubiertos por GDELT. Fame Plays no republica el articulo.',
-      { queryType: 'exact-name-category-context', provider: 'GDELT DOC 2.0' }
+      {
+        queryType: 'alias-category-context',
+        aliases: artistNewsAliases(artist),
+        provider: 'GDELT DOC 2.0'
+      }
     ]
   );
   return result.rows[0]!.id;
@@ -422,11 +488,17 @@ async function storeArticles(
   articles: GdeltArticle[]
 ) {
   let stored = 0;
+  const aliases = artistNewsAliases(artist);
   for (const article of articles) {
     const title = cleanTitle(String(article.title || ''));
     const url = canonicalUrl(String(article.url || article.url_mobile || ''));
     const publishedAt = gdeltDate(article.seendate);
-    if (!title || !url || !publishedAt || !relevantTitle(title, artist.name, artist.symbol)) continue;
+    if (
+      !title ||
+      !url ||
+      !publishedAt ||
+      !relevantTitle(title, artist.name, artist.symbol, aliases)
+    ) continue;
     const analysis = analyzeNewsSentiment(title);
     const domain = String(article.domain || new URL(url).hostname).toLowerCase();
     const externalId = createHash('sha256')
@@ -591,8 +663,8 @@ async function persistSignal(
     const canApply =
       desiredMode === 'applied' &&
       calculated.proposedDeltaBps !== 0 &&
-      calculated.sourceCount >= 2 &&
-      calculated.confidence >= 0.55;
+      calculated.sourceCount >= minimumNewsSources() &&
+      calculated.confidence >= minimumNewsConfidence();
     const initialMode: SignalMode = desiredMode === 'shadow'
       ? 'shadow'
       : canApply
@@ -623,6 +695,8 @@ async function persistSignal(
           recentWeight: calculated.recentWeight,
           baselineWeight: calculated.baselineWeight,
           reviewRequiredCount: calculated.reviewRequiredCount,
+          minimumArticles: minimumNewsArticles(),
+          minimumSources: minimumNewsSources(),
           externalProvider: NEWS_PROVIDER
         }
       ]

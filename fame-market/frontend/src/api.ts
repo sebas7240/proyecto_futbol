@@ -8,6 +8,8 @@ import type {
   ConsentStatus,
   EntityCategory,
   EntitySource,
+  AdminResetAction,
+  AdminResetSummary,
   NewsPulse,
   ExternalEvent,
   ExternalEventDirection,
@@ -385,6 +387,17 @@ export const api = {
         body: '{}'
       }
     );
+  },
+  async adminReset(
+    adminSecret: string,
+    action: AdminResetAction,
+    confirm: string
+  ) {
+    return request<{ reset: AdminResetSummary }>('/admin/reset', {
+      method: 'POST',
+      headers: { 'x-admin-secret': adminSecret },
+      body: JSON.stringify({ action, confirm })
+    });
   },
   async securityReviews(adminSecret: string) {
     const body = await request<{ reviews: SecurityReview[] }>(

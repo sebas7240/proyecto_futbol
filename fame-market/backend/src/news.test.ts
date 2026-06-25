@@ -24,21 +24,26 @@ describe('news sentiment', () => {
 describe('news signal', () => {
   const now = new Date('2026-06-19T18:00:00.000Z');
 
-  it('requires at least two independent domains', () => {
-    const result = calculateNewsSignal([
-      {
-        publishedAt: new Date('2026-06-19T17:00:00.000Z'),
-        sourceDomain: 'example.com',
-        sentimentScore: 1
-      },
-      {
-        publishedAt: new Date('2026-06-19T16:00:00.000Z'),
-        sourceDomain: 'example.com',
-        sentimentScore: 1
-      }
-    ], now);
-    expect(result.sourceCount).toBe(1);
-    expect(result.proposedDeltaBps).toBe(0);
+  it('can require at least two independent domains when configured', () => {
+    process.env.NEWS_MIN_SOURCES_FOR_SIGNAL = '2';
+    try {
+      const result = calculateNewsSignal([
+        {
+          publishedAt: new Date('2026-06-19T17:00:00.000Z'),
+          sourceDomain: 'example.com',
+          sentimentScore: 1
+        },
+        {
+          publishedAt: new Date('2026-06-19T16:00:00.000Z'),
+          sourceDomain: 'example.com',
+          sentimentScore: 1
+        }
+      ], now);
+      expect(result.sourceCount).toBe(1);
+      expect(result.proposedDeltaBps).toBe(0);
+    } finally {
+      delete process.env.NEWS_MIN_SOURCES_FOR_SIGNAL;
+    }
   });
 
   it('creates a visible capped proposal from diverse recent coverage', () => {

@@ -358,6 +358,19 @@ export interface OperationsOverview {
   generatedAt: string;
 }
 
+export type AdminResetAction =
+  | 'season-activity'
+  | 'season-full'
+  | 'news-pulse';
+
+export interface AdminResetSummary {
+  action: AdminResetAction;
+  seasonId: string | null;
+  deleted: Record<string, number>;
+  updated: Record<string, number>;
+  generatedAt: string;
+}
+
 export interface AttentionSignal {
   windowEndsOn: string;
   normalizedScore: number;

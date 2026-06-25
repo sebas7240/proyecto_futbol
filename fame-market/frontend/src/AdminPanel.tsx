@@ -19,6 +19,7 @@ import {
   Radar,
   RefreshCw,
   Save,
+  Search,
   Snowflake,
   Trophy,
   Trash2,
@@ -35,6 +36,7 @@ import {
 } from './auth';
 import { EntityAvatar } from './EntityAvatar';
 import type {
+  AdminResetAction,
   ArtistRightsRecord,
   RightsRequestStatus
 } from './types';
@@ -90,6 +92,8 @@ export function AdminPanel() {
   >({});
   const [chatRoom, setChatRoom] = useState('general');
   const [chatReason, setChatReason] = useState('Moderacion manual');
+  const [adminSearch, setAdminSearch] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
   const [seasonDraft, setSeasonDraft] = useState({
     name: '',
     startsAt: '',
@@ -153,6 +157,68 @@ export function AdminPanel() {
           : seasonQuery.data?.season?.status === 'scheduled'
             ? 'programada'
             : 'ninguna';
+  const normalizedAdminSearch = adminSearch.trim().toLowerCase();
+  const matchesAdminSearch = (...values: unknown[]) =>
+    !normalizedAdminSearch ||
+    values.some((value) =>
+      String(value ?? '').toLowerCase().includes(normalizedAdminSearch)
+    );
+  const filteredArtists = (artistsQuery.data ?? []).filter((artist) =>
+    matchesAdminSearch(
+      artist.name,
+      artist.symbol,
+      artist.country,
+      artist.category,
+      artist.status
+    )
+  );
+  const filteredPrizeProfiles = (prizeProfilesQuery.data ?? []).filter((profile) =>
+    matchesAdminSearch(
+      profile.displayName,
+      profile.email,
+      profile.solanaWalletAddress,
+      profile.seasonName,
+      profile.rank
+    )
+  );
+  const filteredSecurityReviews = (securityQuery.data ?? []).filter((review) =>
+    matchesAdminSearch(
+      review.displayName,
+      review.seasonName,
+      review.rank,
+      review.reviewStatus,
+      review.userStatus,
+      review.alerts.map((alert) => alert.description).join(' ')
+    )
+  );
+  const filteredChatMessages =
+    chatModerationQuery.data?.recentMessages.filter((chatMessage) =>
+      matchesAdminSearch(
+        chatMessage.name,
+        chatMessage.userId,
+        chatMessage.body,
+        chatMessage.type,
+        chatMessage.status
+      )
+    ) ?? [];
+  const filteredRightsRequests = (rightsRequestsQuery.data ?? []).filter((request) =>
+    matchesAdminSearch(
+      request.subject,
+      request.requesterName,
+      request.requesterEmail,
+      request.status,
+      request.message
+    )
+  );
+  const filteredArtistRights = (artistRightsQuery.data ?? []).filter((record) =>
+    matchesAdminSearch(
+      record.artistName,
+      record.artistSymbol,
+      record.imageUsageStatus,
+      record.imageLicense,
+      record.rightsNotes
+    )
+  );
   useEffect(() => {
     setTokenProvider(currentIdToken);
     const unsubscribe = subscribeToAuth((user) => {
@@ -327,6 +393,46 @@ export function AdminPanel() {
         error instanceof Error
           ? error.message
           : 'No se pudo procesar la temporada.'
+      );
+    } finally {
+      setBusyArtist('');
+    }
+  };
+
+  const runAdminReset = async (action: AdminResetAction) => {
+    if (resetConfirm !== 'RESET') {
+      setMessage('Escribe RESET para confirmar el mantenimiento.');
+      return;
+    }
+    setBusyArtist(`reset-${action}`);
+    setMessage('');
+    try {
+      const result = await api.adminReset(adminSecret, action, resetConfirm);
+      const deleted = Object.entries(result.reset.deleted)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ');
+      const updated = Object.entries(result.reset.updated)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ');
+      setMessage(
+        `Reset aplicado (${action}). Eliminado: ${deleted || '0'}. Actualizado: ${updated || '0'}.`
+      );
+      setResetConfirm('');
+      await Promise.all([
+        seasonQuery.refetch(),
+        securityQuery.refetch(),
+        operationsQuery.refetch(),
+        artistsQuery.refetch(),
+        rightsRequestsQuery.refetch(),
+        prizeProfilesQuery.refetch()
+      ]);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo ejecutar el reset.'
       );
     } finally {
       setBusyArtist('');
@@ -634,6 +740,23 @@ export function AdminPanel() {
           />
         </label>
         <p>Se guarda solamente durante esta sesion del navegador.</p>
+      </section>
+
+      <section className="admin-filter-bar">
+        <label className="search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={adminSearch}
+            onChange={(event) => setAdminSearch(event.target.value)}
+            placeholder="Buscar en admin: usuario, figura, wallet, chat..."
+          />
+        </label>
+        <span>
+          {normalizedAdminSearch
+            ? `Filtro activo: ${normalizedAdminSearch}`
+            : 'Sin filtro'}
+        </span>
       </section>
 
       <div className="admin-section-title">
@@ -992,6 +1115,9 @@ export function AdminPanel() {
           </label>
           <label>
             Congelar antes
+            <small className="field-hint">
+              Minutos antes del final donde se bloquean compras y ventas.
+            </small>
             <input
               type="number"
               min="0"
@@ -1031,6 +1157,78 @@ export function AdminPanel() {
       </section>
 
       <div className="admin-section-title">
+        <small>Mantenimiento controlado</small>
+        <h2>Reset de datos</h2>
+      </div>
+
+      <section className="admin-reset-panel">
+        <div>
+          <strong>Confirmacion requerida</strong>
+          <p>
+            Escribe RESET antes de ejecutar. Estas acciones quedan registradas
+            en auditoria y solo funcionan con tu usuario administrador.
+          </p>
+          <input
+            value={resetConfirm}
+            onChange={(event) => setResetConfirm(event.target.value)}
+            placeholder="RESET"
+          />
+        </div>
+        <article>
+          <h3>Actividad de temporada</h3>
+          <p>
+            Borra operaciones, posiciones, ranking y alertas de la temporada
+            actual. No cambia precios ni figuras.
+          </p>
+          <button
+            onClick={() => runAdminReset('season-activity')}
+            disabled={
+              !adminSecret ||
+              Boolean(busyArtist) ||
+              resetConfirm !== 'RESET'
+            }
+          >
+            <Trash2 size={16} /> Resetear actividad
+          </button>
+        </article>
+        <article>
+          <h3>Temporada completa</h3>
+          <p>
+            Hace lo anterior y devuelve precios activos al precio inicial de la
+            temporada. Usalo solo si vas a reiniciar la competencia.
+          </p>
+          <button
+            className="danger-action"
+            onClick={() => runAdminReset('season-full')}
+            disabled={
+              !adminSecret ||
+              Boolean(busyArtist) ||
+              resetConfirm !== 'RESET'
+            }
+          >
+            <Trash2 size={16} /> Reset completo
+          </button>
+        </article>
+        <article>
+          <h3>Pulso de noticias</h3>
+          <p>
+            Borra titulares y senales GDELT para que la siguiente sincronizacion
+            reconstruya el pulso desde cero.
+          </p>
+          <button
+            onClick={() => runAdminReset('news-pulse')}
+            disabled={
+              !adminSecret ||
+              Boolean(busyArtist) ||
+              resetConfirm !== 'RESET'
+            }
+          >
+            <Newspaper size={16} /> Resetear noticias
+          </button>
+        </article>
+      </section>
+
+      <div className="admin-section-title">
         <small>Premiacion USDT Solana</small>
         <h2>Wallets registradas</h2>
       </div>
@@ -1040,8 +1238,8 @@ export function AdminPanel() {
           <p>Ingresa el secreto para ver wallets de premiacion.</p>
         ) : prizeProfilesQuery.isLoading ? (
           <p>Cargando wallets...</p>
-        ) : prizeProfilesQuery.data?.length ? (
-          prizeProfilesQuery.data.map((profile) => (
+        ) : filteredPrizeProfiles.length ? (
+          filteredPrizeProfiles.map((profile) => (
             <article className="prize-wallet-card" key={profile.userId}>
               <header>
                 <span>
@@ -1077,8 +1275,8 @@ export function AdminPanel() {
           <p>Ingresa el secreto para consultar la cola.</p>
         ) : securityQuery.isLoading ? (
           <p>Analizando resultados...</p>
-        ) : securityQuery.data?.length ? (
-          securityQuery.data.map((review) => {
+        ) : filteredSecurityReviews.length ? (
+          filteredSecurityReviews.map((review) => {
             const key = `${review.seasonId}:${review.userId}`;
             return (
               <article className="security-review" key={key}>
@@ -1222,8 +1420,8 @@ export function AdminPanel() {
                 <MessageCircle size={17} /> Mensajes recientes
               </h3>
               <div className="chat-moderation__messages">
-                {chatModerationQuery.data?.recentMessages.length ? (
-                  chatModerationQuery.data.recentMessages.map((chatMessage) => (
+                {filteredChatMessages.length ? (
+                  filteredChatMessages.map((chatMessage) => (
                     <article
                       className={`chat-moderation-card chat-moderation-card--${chatMessage.status}`}
                       key={chatMessage.id}
@@ -1345,8 +1543,8 @@ export function AdminPanel() {
           <p>Ingresa el secreto para consultar la bandeja.</p>
         ) : rightsRequestsQuery.isLoading ? (
           <p>Cargando solicitudes...</p>
-        ) : rightsRequestsQuery.data?.length ? (
-          rightsRequestsQuery.data.map((request) => (
+        ) : filteredRightsRequests.length ? (
+          filteredRightsRequests.map((request) => (
             <article className="rights-request-card" key={request.id}>
               <header>
                 <Inbox size={18} />
@@ -1430,8 +1628,8 @@ export function AdminPanel() {
           <p>Ingresa el secreto para revisar las licencias.</p>
         ) : artistRightsQuery.isLoading ? (
           <p>Cargando registros...</p>
-        ) : artistRightsQuery.data?.length ? (
-          artistRightsQuery.data.map((record) => {
+        ) : filteredArtistRights.length ? (
+          filteredArtistRights.map((record) => {
             const draft = rightsDraft(record);
             return (
               <article className="artist-rights-card" key={record.artistId}>
@@ -1569,7 +1767,7 @@ export function AdminPanel() {
       </div>
 
       <section className="admin-artists">
-        {(artistsQuery.data ?? []).map((artist) => (
+        {filteredArtists.map((artist) => (
           <article className="admin-artist" key={artist.id}>
             <EntityAvatar
               name={artist.name}

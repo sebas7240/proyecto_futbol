@@ -1323,9 +1323,9 @@ La primera vertical tecnica ya incluye:
 47. Pulso de noticias multilingue basado en GDELT, con deduplicacion,
     diversidad de medios, decaimiento temporal y sentimiento conservador.
 48. Noticias sensibles enviadas a revision sin impacto automatico y senales
-    horarias idempotentes. El motor v2 usa perfiles de volatilidad, confianza
-    minima de 0,55, limite de 250 bps por senal, 400 bps diarios y circuit
-    breaker total de 800 bps.
+    horarias idempotentes. El motor v4 usa perfiles de volatilidad, aliases de
+    figuras, minimos configurables, limite de 250 bps por senal, 400 bps
+    diarios y circuit breaker total de 800 bps.
 49. Vista publica de titulares enlazados a su fuente; modo sombra validado y
     motor GDELT v2 activado en produccion con impacto real auditable.
 50. Notas de voz compatibles con MIME que incluye parametros de codec y
@@ -1340,6 +1340,10 @@ La primera vertical tecnica ya incluye:
 55. Mercado Vivo con estados `bull`, `bear`, `sideways`, `volatile` y `viral`
     para generar ticks automaticos auditables `source_type=market` en todas
     las figuras activas.
+56. Admin con filtros transversales, resets auditados de actividad de temporada,
+    temporada completa y pulso GDELT.
+57. Radio colombiana curada con categorias, buscador, favoritos, resolucion de
+    streams verificados via Radio Browser y fallback a sitio oficial.
 
 Siguiente bloque recomendado:
 
