@@ -41,14 +41,6 @@ const radioBrowserServers = [
 
 const stations: CuratedStation[] = [
   {
-    id: 'antena-2',
-    name: 'Antena 2',
-    category: 'deportes',
-    tags: 'Futbol, ciclismo y deporte colombiano',
-    officialUrl: 'https://www.antena2.com/',
-    query: 'Antena 2'
-  },
-  {
     id: 'caracol-radio',
     name: 'Caracol Radio',
     category: 'noticias',
@@ -63,14 +55,6 @@ const stations: CuratedStation[] = [
     tags: 'Noticias, opinion y entrevistas',
     officialUrl: 'https://www.bluradio.com/en-vivo',
     query: 'Blu Radio'
-  },
-  {
-    id: 'rcn-radio',
-    name: 'RCN Radio',
-    category: 'noticias',
-    tags: 'Noticias nacionales y deportes',
-    officialUrl: 'https://www.rcnradio.com/en-vivo',
-    query: 'RCN Radio'
   },
   {
     id: 'w-radio',
@@ -106,28 +90,12 @@ const stations: CuratedStation[] = [
     query: 'Olimpica Stereo'
   },
   {
-    id: 'la-mega',
-    name: 'La Mega',
-    category: 'musica',
-    tags: 'Pop, urbano y entretenimiento',
-    officialUrl: 'https://www.lamega.com.co/',
-    query: ['La Mega Bogota', 'La Mega Colombia']
-  },
-  {
     id: 'tropicana',
     name: 'Tropicana',
     category: 'musica',
     tags: 'Salsa, tropical y humor',
     officialUrl: 'https://www.tropicanafm.com/',
-    query: ['Tropicana Medellin', 'Tropicana Colombia']
-  },
-  {
-    id: 'radio-uno',
-    name: 'Radio Uno',
-    category: 'musica',
-    tags: 'Popular y vallenato',
-    officialUrl: 'https://www.radiouno.com.co/',
-    query: 'Radio Uno Colombia'
+    query: 'Tropicana (Medellín) 98.9 FM'
   },
   {
     id: 'besame',
@@ -135,7 +103,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Baladas y romantica',
     officialUrl: 'https://www.besame.fm/',
-    query: ['Besame Medellin', 'Besame Colombia']
+    query: 'Bésame (Medellín) 94.9 FM'
   },
   {
     id: 'los-40',
@@ -152,22 +120,6 @@ const stations: CuratedStation[] = [
     tags: 'Rock y entretenimiento',
     officialUrl: 'https://www.radioacktiva.com/',
     query: 'Radioacktiva'
-  },
-  {
-    id: 'la-kalle',
-    name: 'La Kalle',
-    category: 'musica',
-    tags: 'Popular, regional y vallenato',
-    officialUrl: 'https://www.lakalle.com.co/',
-    query: 'La Kalle Colombia'
-  },
-  {
-    id: 'vibra',
-    name: 'Vibra',
-    category: 'musica',
-    tags: 'Pop latino y actualidad',
-    officialUrl: 'https://vibra.co/',
-    query: 'Vibra Bogota'
   },
   {
     id: 'candela',
@@ -199,7 +151,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Salsa y tropical',
     officialUrl: 'https://elsolradio.fm/',
-    query: 'El Sol Medellin'
+    query: 'El Sol (Medellín) 107.9 FM'
   },
   {
     id: 'mix-medellin',
@@ -207,7 +159,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Urbano, merengue y bachata',
     officialUrl: 'https://www.mixradio.co/',
-    query: 'Mix Medellin'
+    query: 'Mix (Medellín) 89.9 FM'
   },
   {
     id: 'colombia-salsa-dura',
@@ -239,7 +191,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Rock y pop en espanol',
     officialUrl: 'https://www.radio-browser.info/',
-    query: 'Mundo Retro Rock Pop'
+    query: 'Mundo Retro - Rock & Pop en Español'
   },
   {
     id: 'viejoteca',
@@ -249,14 +201,6 @@ const stations: CuratedStation[] = [
     officialUrl: 'https://www.radio-browser.info/',
     query: 'Viejoteca y algo mas'
   },
-  {
-    id: 'oxigeno',
-    name: 'Oxigeno',
-    category: 'musica',
-    tags: 'Urbano y reggaeton',
-    officialUrl: 'https://www.oxigeno.fm/',
-    query: 'Oxigeno Colombia'
-  }
 ];
 
 function streamUrl(station: RadioBrowserStation) {
@@ -306,6 +250,7 @@ export function RadioPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [status, setStatus] = useState('Lista');
   const [resolved, setResolved] = useState<Record<string, RadioBrowserStation | null>>({});
+  const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('fame-radio-favorites') || '[]');
@@ -318,6 +263,7 @@ export function RadioPanel() {
   const filteredStations = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return stations.filter((station) => {
+      if (unavailableIds.includes(station.id)) return false;
       const byCategory = category === 'todas' || station.category === category;
       const byQuery =
         !query ||
@@ -326,12 +272,18 @@ export function RadioPanel() {
           .includes(query);
       return byCategory && byQuery;
     });
-  }, [category, searchTerm]);
+  }, [category, searchTerm, unavailableIds]);
   const selected = useMemo(
     () => stations.find((station) => station.id === selectedId) ?? stations[0]!,
     [selectedId]
   );
   const currentStream = resolved[selected.id] ? streamUrl(resolved[selected.id]!) : '';
+
+  useEffect(() => {
+    if (!unavailableIds.includes(selectedId)) return;
+    const nextStation = filteredStations.find((station) => station.id !== selectedId);
+    if (nextStation) setSelectedId(nextStation.id);
+  }, [filteredStations, selectedId, unavailableIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -341,12 +293,22 @@ export function RadioPanel() {
       .then((station) => {
         if (cancelled) return;
         setResolved((current) => ({ ...current, [selected.id]: station }));
-        setStatus(station ? 'Lista' : 'Sitio oficial');
+        if (station) {
+          setStatus('Lista');
+          return;
+        }
+        setStatus('No disponible');
+        setUnavailableIds((current) =>
+          current.includes(selected.id) ? current : [...current, selected.id]
+        );
       })
       .catch(() => {
         if (!cancelled) {
           setResolved((current) => ({ ...current, [selected.id]: null }));
-          setStatus('Sitio oficial');
+          setStatus('No disponible');
+          setUnavailableIds((current) =>
+            current.includes(selected.id) ? current : [...current, selected.id]
+          );
         }
       });
     return () => {
@@ -391,7 +353,12 @@ export function RadioPanel() {
 
     const onPlay = () => setStatus('En vivo');
     const onPause = () => setStatus('Pausada');
-    const onError = () => setStatus('Sitio oficial');
+    const onError = () => {
+      setStatus('No disponible');
+      setUnavailableIds((current) =>
+        current.includes(selected.id) ? current : [...current, selected.id]
+      );
+    };
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('error', onError);
@@ -465,7 +432,7 @@ export function RadioPanel() {
                 <strong>{station.name}</strong>
                 <small>{station.tags}</small>
               </span>
-              <small>{stationStream ? 'stream' : 'oficial'}</small>
+              <small>{stationStream ? 'stream' : 'verificando'}</small>
               <Heart
                 aria-hidden="true"
                 className={isFavorite ? 'is-favorite' : ''}
@@ -487,7 +454,7 @@ export function RadioPanel() {
           <small>
             {currentStream
               ? 'Stream HTTPS verificado por Radio Browser.'
-              : 'Si no hay stream verificado, usa la senal oficial.'}
+              : 'Verificando stream publico para reproducir aqui.'}
           </small>
         </span>
         <button
@@ -509,14 +476,16 @@ export function RadioPanel() {
         <audio ref={audioRef} controls preload="none" />
       ) : (
         <p>
-          Fame Plays solo reproduce emisoras con stream publico y verificado. Si
-          la emisora no expone uno confiable, te enviamos a su sitio oficial.
+          Fame Plays solo muestra emisoras que puedan reproducirse dentro de la
+          web. Si una senal falla, se oculta automaticamente.
         </p>
       )}
 
-      <a href={selected.officialUrl} target="_blank" rel="noreferrer">
-        Abrir sitio oficial <ExternalLink size={14} />
-      </a>
+      {currentStream && (
+        <a href={selected.officialUrl} target="_blank" rel="noreferrer">
+          Abrir sitio oficial <ExternalLink size={14} />
+        </a>
+      )}
     </section>
   );
 }
