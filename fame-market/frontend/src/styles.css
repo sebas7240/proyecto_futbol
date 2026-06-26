@@ -1406,6 +1406,25 @@ button {
   line-height: 1.45;
 }
 
+.prize-profile__message {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 7px 9px;
+  color: #12633c;
+  background: #e5f6ed;
+  border: 1px solid #bfe5ce;
+  border-radius: 5px;
+  font-weight: 800;
+}
+
+.prize-profile__message--error {
+  color: #8d211c;
+  background: #fcebea;
+  border-color: #f2c5c1;
+}
+
 .notice {
   margin: 10px 0 0;
   color: var(--blue);
@@ -1424,6 +1443,29 @@ button {
 
 .chat-status--connected {
   color: var(--green);
+}
+
+.chat-sound-toggle {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #faf9f6;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.chat-sound-toggle.is-active {
+  color: #12633c;
+  border-color: #bfe5ce;
+  background: #e5f6ed;
 }
 
 .social-tabs {
@@ -3710,6 +3752,11 @@ button {
   cursor: wait;
 }
 
+.chat-moderation__controls .danger-action {
+  color: #8d211c;
+  background: #ffe1de;
+}
+
 .chat-moderation__grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
@@ -3827,6 +3874,27 @@ button {
 .chat-moderation-card__actions button:disabled {
   opacity: 0.55;
   cursor: wait;
+}
+
+.chat-report-summary {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 10px;
+  color: #684600;
+  background: #fff6c9;
+  border: 1px solid #eadb89;
+  border-radius: 6px;
+}
+
+.chat-report-summary strong {
+  font-size: 12px;
+}
+
+.chat-report-summary small {
+  color: #7c6820;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .chat-action-card {

@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Bell,
+  BellOff,
   Flag,
   MessageCircle,
   Mic,
@@ -9,6 +11,12 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
+
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
 
 interface ChatMessage {
   id: string;
@@ -62,6 +70,11 @@ interface HiddenEvent {
   messageId: string;
 }
 
+interface RoomResetEvent {
+  type: 'room-reset';
+  message: string;
+}
+
 interface NoticeEvent {
   type: 'error' | 'notice' | 'voice-unavailable';
   message: string;
@@ -72,10 +85,12 @@ type ChatEvent =
   | MessageEventPayload
   | PresenceEvent
   | HiddenEvent
+  | RoomResetEvent
   | NoticeEvent;
 
 const guestNameKey = 'fame-plays:chat-guest-name';
 const guestIdKey = 'fame-plays:chat-guest-id';
+const soundEnabledKey = 'fame-plays:chat-sound-enabled';
 const chatBaseUrl = (import.meta.env.VITE_CHAT_WS_URL ?? '').trim();
 const maxMessageLength = 160;
 const minVoiceMs = 1_000;
@@ -144,6 +159,37 @@ function blobToDataUrl(blob: Blob) {
   });
 }
 
+let notificationAudioContext: AudioContext | null = null;
+
+function playChatSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  notificationAudioContext ??= new AudioContextClass();
+  const context = notificationAudioContext;
+  const play = () => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(720, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(
+      520,
+      context.currentTime + 0.12
+    );
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.18);
+  };
+  if (context.state === 'suspended') {
+    context.resume().then(play).catch(() => undefined);
+    return;
+  }
+  play();
+}
+
 export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelProps) {
   const [mode, setMode] = useState<ComposerMode>('text');
   const [status, setStatus] = useState<ConnectionStatus>('idle');
@@ -153,6 +199,9 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
   const [notice, setNotice] = useState('');
   const [recorderState, setRecorderState] = useState<RecorderState>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => localStorage.getItem(soundEnabledKey) === 'true'
+  );
   const socketRef = useRef<WebSocket | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -213,6 +262,9 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         }
         if (payload.type === 'message') {
           setMessages((current) => [...current, payload.message].slice(-120));
+          if (soundEnabled && payload.message.userId !== identity.userId) {
+            playChatSound();
+          }
           return;
         }
         if (payload.type === 'message-hidden') {
@@ -223,6 +275,11 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         }
         if (payload.type === 'presence') {
           setPresence(payload.presence);
+          return;
+        }
+        if (payload.type === 'room-reset') {
+          setMessages([]);
+          setNotice(payload.message);
           return;
         }
         setNotice(payload.message);
@@ -248,7 +305,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       if (pingTimer) window.clearInterval(pingTimer);
       socketRef.current?.close();
     };
-  }, [identity.name, identity.userId, roomId]);
+  }, [identity.name, identity.userId, roomId, soundEnabled]);
 
   useEffect(() => {
     listRef.current?.scrollTo({
@@ -371,6 +428,19 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         reason: 'Reporte de usuario'
       })
     );
+    setNotice('Reporte enviado a moderacion.');
+  }
+
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem(soundEnabledKey, String(next));
+    if (next) {
+      playChatSound();
+      setNotice('Sonido del chat activado.');
+    } else {
+      setNotice('Sonido del chat desactivado.');
+    }
   }
 
   const connected = status === 'connected';
@@ -389,6 +459,15 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         </span>
       </div>
 
+      <button
+        className={`chat-sound-toggle ${soundEnabled ? 'is-active' : ''}`}
+        onClick={toggleSound}
+        type="button"
+      >
+        {soundEnabled ? <Bell size={15} /> : <BellOff size={15} />}
+        {soundEnabled ? 'Sonido activo' : 'Sonido apagado'}
+      </button>
+
       <div className="chat-body" ref={listRef}>
         {messages.length ? (
           messages.map((message) => (
@@ -406,8 +485,8 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
                     <button
                       className="chat-report"
                       onClick={() => reportMessage(message.id)}
-                      aria-label="Reportar mensaje"
-                      title="Reportar"
+                      aria-label="Reportar mensaje o nota de voz"
+                      title="Reportar mensaje o nota de voz"
                     >
                       <Flag size={12} />
                     </button>

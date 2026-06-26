@@ -428,7 +428,12 @@ export const api = {
     adminSecret: string,
     input: {
       roomId: string;
-      action: 'hide-message' | 'mute-user' | 'ban-user' | 'clear-user';
+      action:
+        | 'hide-message'
+        | 'mute-user'
+        | 'ban-user'
+        | 'clear-user'
+        | 'reset-room';
       messageId?: string;
       userId?: string;
       userName?: string;

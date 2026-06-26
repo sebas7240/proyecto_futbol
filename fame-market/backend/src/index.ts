@@ -392,7 +392,13 @@ const chatRoomSchema = z
 
 const chatModerationSchema = z.object({
   roomId: chatRoomSchema.default('general'),
-  action: z.enum(['hide-message', 'mute-user', 'ban-user', 'clear-user']),
+  action: z.enum([
+    'hide-message',
+    'mute-user',
+    'ban-user',
+    'clear-user',
+    'reset-room'
+  ]),
   messageId: z.string().trim().max(120).optional(),
   userId: z.string().trim().max(120).optional(),
   userName: z.string().trim().max(80).optional(),

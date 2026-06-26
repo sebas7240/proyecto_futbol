@@ -213,6 +213,7 @@ function App() {
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [prizeWalletDraft, setPrizeWalletDraft] = useState('');
   const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
+  const [prizeProfileMessage, setPrizeProfileMessage] = useState('');
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
   const backendNeedsTurnstile =
@@ -458,9 +459,13 @@ function App() {
         ['profile', firebaseUser?.uid ?? 'local'],
         profile
       );
+      setPrizeProfileMessage('Wallet guardada correctamente.');
       setNotice('Perfil de premios actualizado.');
     },
-    onError: (error) => setNotice(error.message)
+    onError: (error) => {
+      setPrizeProfileMessage(error.message);
+      setNotice(error.message);
+    }
   });
 
   const interestsMutation = useMutation({
@@ -1228,7 +1233,10 @@ function App() {
                 <span>Wallet Solana</span>
                 <input
                   value={prizeWalletDraft}
-                  onChange={(event) => setPrizeWalletDraft(event.target.value)}
+                  onChange={(event) => {
+                    setPrizeWalletDraft(event.target.value);
+                    setPrizeProfileMessage('');
+                  }}
                   placeholder="Ej: 7xK..."
                   autoComplete="off"
                 />
@@ -1237,7 +1245,10 @@ function App() {
                 <span>Nota opcional</span>
                 <textarea
                   value={prizeNotesDraft}
-                  onChange={(event) => setPrizeNotesDraft(event.target.value)}
+                  onChange={(event) => {
+                    setPrizeNotesDraft(event.target.value);
+                    setPrizeProfileMessage('');
+                  }}
                   maxLength={300}
                   placeholder="Telegram, confirmacion o detalle para pago manual"
                 />
@@ -1253,6 +1264,17 @@ function App() {
                   ? 'Guardando...'
                   : 'Guardar wallet'}
               </button>
+              {prizeProfileMessage && (
+                <small
+                  className={
+                    prizeProfileMutation.isError
+                      ? 'prize-profile__message prize-profile__message--error'
+                      : 'prize-profile__message'
+                  }
+                >
+                  {prizeProfileMessage}
+                </small>
+              )}
               <small>
                 Si ganas, usaremos esta wallet para pagarte USDT en red Solana
                 de forma manual.

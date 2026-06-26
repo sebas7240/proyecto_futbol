@@ -702,6 +702,18 @@ export class ChatRoom {
       return this.moderationSnapshot(roomId);
     }
 
+    if (action === 'reset-room') {
+      this.ctx.storage.sql.exec('DELETE FROM messages');
+      this.ctx.storage.sql.exec('DELETE FROM reports');
+      this.ctx.storage.sql.exec('DELETE FROM rate_limits');
+      this.ctx.storage.sql.exec('DELETE FROM voice_rate_limits');
+      this.broadcast({
+        type: 'room-reset',
+        message: 'El chat de esta sala fue reiniciado por moderacion.'
+      });
+      return this.moderationSnapshot(roomId);
+    }
+
     throw new Error('Unsupported moderation action');
   }
 

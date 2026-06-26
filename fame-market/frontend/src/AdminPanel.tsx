@@ -530,13 +530,18 @@ export function AdminPanel() {
   };
 
   const moderateChat = async (
-    action: 'hide-message' | 'mute-user' | 'ban-user' | 'clear-user',
+    action:
+      | 'hide-message'
+      | 'mute-user'
+      | 'ban-user'
+      | 'clear-user'
+      | 'reset-room',
     input: {
       messageId?: string;
       userId?: string;
       userName?: string;
       durationMinutes?: number;
-    }
+    } = {}
   ) => {
     setBusyArtist(`chat-${action}-${input.messageId ?? input.userId ?? 'room'}`);
     setMessage('');
@@ -547,7 +552,11 @@ export function AdminPanel() {
         reason: chatReason.trim() || 'Moderacion manual',
         ...input
       });
-      setMessage('Moderacion del chat aplicada.');
+      setMessage(
+        action === 'reset-room'
+          ? 'Chat y notas de voz reiniciados para esta sala.'
+          : 'Moderacion del chat aplicada.'
+      );
       await chatModerationQuery.refetch();
     } catch (error) {
       setMessage(
@@ -1402,6 +1411,14 @@ export function AdminPanel() {
           >
             <RefreshCw size={16} /> Actualizar
           </button>
+          <button
+            className="danger-action"
+            onClick={() => moderateChat('reset-room')}
+            disabled={!adminSecret || Boolean(busyArtist)}
+            title="Borra mensajes, notas de voz y reportes de la sala seleccionada"
+          >
+            <Trash2 size={16} /> Reset chat
+          </button>
         </div>
 
         {!adminSecret ? (
@@ -1491,6 +1508,14 @@ export function AdminPanel() {
               <h3>
                 <Flag size={17} /> Acciones activas
               </h3>
+              {chatModerationQuery.data?.reports.length ? (
+                <div className="chat-report-summary">
+                  <strong>{chatModerationQuery.data.reports.length} reportes recientes</strong>
+                  <small>
+                    Usa Ocultar, Silenciar o Bloquear sobre el mensaje reportado.
+                  </small>
+                </div>
+              ) : null}
               <div className="chat-moderation__actions-list">
                 {chatModerationQuery.data?.actions.filter((action) => action.active)
                   .length ? (
