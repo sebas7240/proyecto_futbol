@@ -17,7 +17,7 @@ interface CuratedStation {
   category: RadioCategory;
   tags: string;
   officialUrl: string;
-  query?: string;
+  query?: string | string[];
 }
 
 interface RadioBrowserStation {
@@ -78,7 +78,7 @@ const stations: CuratedStation[] = [
     category: 'noticias',
     tags: 'Actualidad, opinion y entrevistas',
     officialUrl: 'https://www.wradio.com.co/en-vivo/',
-    query: 'W Radio Colombia'
+    query: ['W Radio', 'WRadio Colombia', 'W Radio Colombia']
   },
   {
     id: 'la-fm',
@@ -86,7 +86,7 @@ const stations: CuratedStation[] = [
     category: 'noticias',
     tags: 'Noticias, politica y opinion',
     officialUrl: 'https://www.lafm.com.co/',
-    query: 'La FM Colombia'
+    query: ['La FM Bogota', 'La FM Colombia']
   },
   {
     id: 'radio-nacional',
@@ -111,7 +111,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Pop, urbano y entretenimiento',
     officialUrl: 'https://www.lamega.com.co/',
-    query: 'La Mega Colombia'
+    query: ['La Mega Bogota', 'La Mega Colombia']
   },
   {
     id: 'tropicana',
@@ -119,7 +119,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Salsa, tropical y humor',
     officialUrl: 'https://www.tropicanafm.com/',
-    query: 'Tropicana Colombia'
+    query: ['Tropicana Medellin', 'Tropicana Colombia']
   },
   {
     id: 'radio-uno',
@@ -135,7 +135,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Baladas y romantica',
     officialUrl: 'https://www.besame.fm/',
-    query: 'Besame Colombia'
+    query: ['Besame Medellin', 'Besame Colombia']
   },
   {
     id: 'los-40',
@@ -143,7 +143,7 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Hits, pop y urbano',
     officialUrl: 'https://los40.com.co/',
-    query: 'Los 40 Colombia'
+    query: ['LOS40 Colombia', 'Los 40 Colombia']
   },
   {
     id: 'radioacktiva',
@@ -175,7 +175,79 @@ const stations: CuratedStation[] = [
     category: 'musica',
     tags: 'Tropical y popular',
     officialUrl: 'https://www.candelaestereo.com/',
-    query: 'Candela Estereo Colombia'
+    query: ['Candela Cali', 'Candela Estereo Colombia']
+  },
+  {
+    id: 'la-x-medellin',
+    name: 'La X Medellin',
+    category: 'musica',
+    tags: 'Electronica y pop alternativo',
+    officialUrl: 'https://www.laxmasmusica.com/',
+    query: 'La X Medellin'
+  },
+  {
+    id: 'radio-tiempo-cali',
+    name: 'Radio Tiempo Cali',
+    category: 'musica',
+    tags: 'Romantica y clasicos',
+    officialUrl: 'https://radiotiempo.co/',
+    query: 'Radio Tiempo Cali'
+  },
+  {
+    id: 'el-sol-medellin',
+    name: 'El Sol Medellin',
+    category: 'musica',
+    tags: 'Salsa y tropical',
+    officialUrl: 'https://elsolradio.fm/',
+    query: 'El Sol Medellin'
+  },
+  {
+    id: 'mix-medellin',
+    name: 'Mix Medellin',
+    category: 'musica',
+    tags: 'Urbano, merengue y bachata',
+    officialUrl: 'https://www.mixradio.co/',
+    query: 'Mix Medellin'
+  },
+  {
+    id: 'colombia-salsa-dura',
+    name: 'Colombia Salsa Dura',
+    category: 'musica',
+    tags: 'Salsa clasica y tropical',
+    officialUrl: 'https://www.radio-browser.info/',
+    query: 'Colombia Salsa Dura'
+  },
+  {
+    id: 'colombia-pop-rock',
+    name: 'Colombia Pop Rock',
+    category: 'musica',
+    tags: 'Pop rock y clasicos',
+    officialUrl: 'https://www.radio-browser.info/',
+    query: 'Colombia Pop Rock'
+  },
+  {
+    id: 'colombia-urbana',
+    name: 'Colombia Urbana',
+    category: 'musica',
+    tags: 'Urbano, hip hop y pop latino',
+    officialUrl: 'https://www.radio-browser.info/',
+    query: 'Colombia Urbana'
+  },
+  {
+    id: 'mundo-retro',
+    name: 'Mundo Retro',
+    category: 'musica',
+    tags: 'Rock y pop en espanol',
+    officialUrl: 'https://www.radio-browser.info/',
+    query: 'Mundo Retro Rock Pop'
+  },
+  {
+    id: 'viejoteca',
+    name: 'Viejoteca y algo mas',
+    category: 'musica',
+    tags: 'Cumbia, tropical y clasicos',
+    officialUrl: 'https://www.radio-browser.info/',
+    query: 'Viejoteca y algo mas'
   },
   {
     id: 'oxigeno',
@@ -193,29 +265,36 @@ function streamUrl(station: RadioBrowserStation) {
 }
 
 async function resolveStation(station: CuratedStation) {
-  const query = encodeURIComponent(station.query ?? station.name);
-  for (const server of radioBrowserServers) {
-    const url =
-      `${server}/json/stations/search?name=${query}` +
-      '&countrycode=CO&hidebroken=true&limit=12&order=clickcount&reverse=true';
-    try {
-      const response = await fetch(url, {
-        headers: { accept: 'application/json' },
-        signal: AbortSignal.timeout(8_000)
-      });
-      if (!response.ok) continue;
-      const payload = (await response.json()) as RadioBrowserStation[];
-      const playable = payload
-        .filter((item) => item.lastcheckok === 1 && streamUrl(item))
-        .sort(
-          (left, right) =>
-            Number(right.votes ?? 0) - Number(left.votes ?? 0) ||
-            Number(right.clickcount ?? 0) - Number(left.clickcount ?? 0) ||
-            Number(right.bitrate ?? 0) - Number(left.bitrate ?? 0)
-        );
-      if (playable[0]) return playable[0];
-    } catch {
-      continue;
+  const queries = Array.isArray(station.query)
+    ? station.query
+    : [station.query ?? station.name];
+  for (const rawQuery of queries) {
+    const query = encodeURIComponent(rawQuery);
+    for (const countryFilter of ['&countrycode=CO', '']) {
+      for (const server of radioBrowserServers) {
+        const url =
+          `${server}/json/stations/search?name=${query}` +
+          `${countryFilter}&hidebroken=true&limit=12&order=clickcount&reverse=true`;
+        try {
+          const response = await fetch(url, {
+            headers: { accept: 'application/json' },
+            signal: AbortSignal.timeout(8_000)
+          });
+          if (!response.ok) continue;
+          const payload = (await response.json()) as RadioBrowserStation[];
+          const playable = payload
+            .filter((item) => item.lastcheckok === 1 && streamUrl(item))
+            .sort(
+              (left, right) =>
+                Number(right.votes ?? 0) - Number(left.votes ?? 0) ||
+                Number(right.clickcount ?? 0) - Number(left.clickcount ?? 0) ||
+                Number(right.bitrate ?? 0) - Number(left.bitrate ?? 0)
+            );
+          if (playable[0]) return playable[0];
+        } catch {
+          continue;
+        }
+      }
     }
   }
   return null;
