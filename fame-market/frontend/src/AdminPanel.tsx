@@ -720,9 +720,12 @@ export function AdminPanel() {
     <main className="admin-page">
       <header className="admin-header">
         <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
-        <div>
-          <small>Administracion interna</small>
-          <h1>Control de Fame Plays</h1>
+        <div className="admin-header__brand">
+          <img src="/icono_fame.png" alt="" />
+          <span>
+            <small>Administracion interna</small>
+            <h1>Control de Fame Plays</h1>
+          </span>
         </div>
         <button
           onClick={syncAll}

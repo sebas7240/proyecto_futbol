@@ -7,7 +7,6 @@ import {
   BarChart3,
   BriefcaseBusiness,
   ChevronRight,
-  Music2,
   Play,
   Search,
   Star,
@@ -628,7 +627,9 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand__mark"><Music2 size={21} /></span>
+          <span className="brand__mark">
+            <img src="/icono_fame.png" alt="" />
+          </span>
           <span>
             <strong>Fame Plays</strong>
             <small>

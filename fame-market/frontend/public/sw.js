@@ -1,5 +1,5 @@
-const CACHE_NAME = 'fame-plays-shell-v1';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
+const CACHE_NAME = 'fame-plays-shell-v2';
+const APP_SHELL = ['/', '/manifest.webmanifest', '/icono_fame.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

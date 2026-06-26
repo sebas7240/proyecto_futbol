@@ -103,6 +103,14 @@ button {
   border-radius: 6px;
 }
 
+.brand__mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .brand > span:nth-child(2),
 .topbar__stats span,
 .topbar-stat-button,
@@ -2832,6 +2840,26 @@ button {
   gap: 20px;
   padding-bottom: 22px;
   border-bottom: 1px solid var(--line);
+}
+
+.admin-header__brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-header__brand img {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 7px;
+  background: var(--ink);
+}
+
+.admin-header__brand span {
+  min-width: 0;
 }
 
 .admin-header a,
