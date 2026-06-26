@@ -157,16 +157,13 @@ export class MarketStore implements MarketDataStore {
     }
 
     if (side === 'buy') {
-      const portfolio = this.getWallet(user);
-      const resultingQuantity = (position?.quantity ?? 0) + quantity;
-      const resultingWeight =
-        (resultingQuantity * calculated.newPrice) / portfolio.portfolioValue;
-      if (resultingWeight > MAX_POSITION_SHARE) {
-        throw new MarketError(
-          'Una posicion no puede superar el 20% de tu portafolio.',
-          'POSITION_LIMIT'
-        );
-      }
+      this.assertBuyPositionLimit(wallet, {
+        currentArtistPrice: artist.currentPrice,
+        nextArtistPrice: calculated.newPrice,
+        existingQuantity: position?.quantity ?? 0,
+        buyQuantity: quantity,
+        netAmount: calculated.netAmount
+      });
     }
 
     const quote: TradeQuote = {
@@ -225,6 +222,13 @@ export class MarketStore implements MarketDataStore {
       if (wallet.balance < quote.netAmount) {
         throw new MarketError('No tienes FameCoins suficientes.', 'INSUFFICIENT_BALANCE');
       }
+      this.assertBuyPositionLimit(wallet, {
+        currentArtistPrice: artist.currentPrice,
+        nextArtistPrice: quote.newPrice,
+        existingQuantity: position.quantity,
+        buyQuantity: quote.quantity,
+        netAmount: quote.netAmount
+      });
       const previousCost = position.quantity * position.averageCost;
       wallet.balance = roundMoney(wallet.balance - quote.netAmount);
       position.quantity += quote.quantity;
@@ -288,6 +292,41 @@ export class MarketStore implements MarketDataStore {
 
   private findPosition(wallet: Wallet, artistId: string): Position | undefined {
     return wallet.positions.find((position) => position.artistId === artistId);
+  }
+
+  private assertBuyPositionLimit(
+    wallet: Wallet,
+    input: {
+      currentArtistPrice: number;
+      nextArtistPrice: number;
+      existingQuantity: number;
+      buyQuantity: number;
+      netAmount: number;
+    }
+  ) {
+    const investedValue = wallet.positions.reduce((sum, position) => {
+      if (position.quantity <= 0) return sum;
+      const artist = this.requireArtist(position.artistId);
+      return sum + roundMoney(position.quantity * artist.currentPrice);
+    }, 0);
+    const existingTargetValue =
+      input.existingQuantity * input.currentArtistPrice;
+    const otherInvestedValue = Math.max(0, investedValue - existingTargetValue);
+    const postTradeBalance = wallet.balance - input.netAmount;
+    const postTradeTargetValue =
+      (input.existingQuantity + input.buyQuantity) * input.nextArtistPrice;
+    const postTradePortfolioValue =
+      postTradeBalance + otherInvestedValue + postTradeTargetValue;
+
+    if (
+      postTradePortfolioValue <= 0 ||
+      postTradeTargetValue / postTradePortfolioValue > MAX_POSITION_SHARE
+    ) {
+      throw new MarketError(
+        'Una posicion no puede superar el 20% de tu portafolio.',
+        'POSITION_LIMIT'
+      );
+    }
   }
 
   private requireArtist(artistId: string) {

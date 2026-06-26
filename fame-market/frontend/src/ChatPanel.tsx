@@ -9,7 +9,8 @@ import {
   SmilePlus,
   Square,
   Wifi,
-  WifiOff
+  WifiOff,
+  Youtube
 } from 'lucide-react';
 
 declare global {
@@ -467,6 +468,23 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         {soundEnabled ? <Bell size={15} /> : <BellOff size={15} />}
         {soundEnabled ? 'Sonido activo' : 'Sonido apagado'}
       </button>
+
+      <div className="community-links" aria-label="Canales oficiales">
+        <a
+          href="https://www.youtube.com/@fame_plays"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Youtube size={15} /> YouTube oficial
+        </a>
+        <a
+          href="https://t.me/fameplaysoficial"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Send size={15} /> Telegram oficial
+        </a>
+      </div>
 
       <div className="chat-body" ref={listRef}>
         {messages.length ? (

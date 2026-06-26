@@ -329,16 +329,13 @@ export class PostgresMarketStore implements MarketDataStore {
       }
 
       if (side === 'buy') {
-        const portfolio = await this.walletView(client, wallet);
-        const resultingQuantity = (position?.quantity ?? 0) + quantity;
-        const resultingWeight =
-          (resultingQuantity * calculated.newPrice) / portfolio.portfolioValue;
-        if (resultingWeight > MAX_POSITION_SHARE) {
-          throw new MarketError(
-            'Una posicion no puede superar el 20% de tu portafolio.',
-            'POSITION_LIMIT'
-          );
-        }
+        await this.assertBuyPositionLimit(client, wallet, {
+          currentArtistPrice: number(artist.current_price),
+          nextArtistPrice: calculated.newPrice,
+          existingQuantity: position?.quantity ?? 0,
+          buyQuantity: quantity,
+          netAmount: calculated.netAmount
+        });
       }
 
       const expiresAt = new Date(Date.now() + QUOTE_LIFETIME_MS);
@@ -526,6 +523,13 @@ export class PostgresMarketStore implements MarketDataStore {
             'INSUFFICIENT_BALANCE'
           );
         }
+        await this.assertBuyPositionLimit(client, wallet, {
+          currentArtistPrice: number(artist.current_price),
+          nextArtistPrice: number(quote.new_price),
+          existingQuantity: position?.quantity ?? 0,
+          buyQuantity: quote.quantity,
+          netAmount: number(quote.net_amount)
+        });
         const oldQuantity = position?.quantity ?? 0;
         const oldCost = oldQuantity * number(position?.average_cost);
         const newQuantity = oldQuantity + quote.quantity;
@@ -736,6 +740,42 @@ export class PostgresMarketStore implements MarketDataStore {
       [userResult.rows[0]!.id, season.id]
     );
     return walletResult.rows[0]!;
+  }
+
+  private async assertBuyPositionLimit(
+    client: PoolClient,
+    wallet: WalletRow,
+    input: {
+      currentArtistPrice: number;
+      nextArtistPrice: number;
+      existingQuantity: number;
+      buyQuantity: number;
+      netAmount: number;
+    }
+  ) {
+    const portfolio = await this.walletView(client, wallet);
+    const existingTargetValue =
+      input.existingQuantity * input.currentArtistPrice;
+    const otherInvestedValue = Math.max(
+      0,
+      portfolio.investedValue - existingTargetValue
+    );
+    const postTradeBalance =
+      number(wallet.available_balance) - input.netAmount;
+    const postTradeTargetValue =
+      (input.existingQuantity + input.buyQuantity) * input.nextArtistPrice;
+    const postTradePortfolioValue =
+      postTradeBalance + otherInvestedValue + postTradeTargetValue;
+
+    if (
+      postTradePortfolioValue <= 0 ||
+      postTradeTargetValue / postTradePortfolioValue > MAX_POSITION_SHARE
+    ) {
+      throw new MarketError(
+        'Una posicion no puede superar el 20% de tu portafolio.',
+        'POSITION_LIMIT'
+      );
+    }
   }
 
   private async walletView(client: PoolClient, wallet: WalletRow) {

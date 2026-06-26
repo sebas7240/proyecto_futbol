@@ -603,6 +603,8 @@ button {
 }
 
 .rights-notice {
+  display: grid;
+  gap: 6px;
   padding: 14px 22px;
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -619,6 +621,15 @@ button {
 .rights-notice a {
   color: var(--ink);
   font-weight: 800;
+}
+
+.rights-notice__social {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.rights-notice__social a {
+  margin-left: 8px;
 }
 
 .artist-list__empty {
@@ -1474,6 +1485,34 @@ button {
   color: #12633c;
   border-color: #bfe5ce;
   background: #e5f6ed;
+}
+
+.community-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.community-links a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #f6f4ed;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.community-links a:hover {
+  border-color: var(--ink);
+  background: var(--paper);
 }
 
 .social-tabs {

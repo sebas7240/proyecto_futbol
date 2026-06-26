@@ -116,6 +116,7 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT ?? 4020);
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 const configuredOrigins = (
   process.env.FRONTEND_ORIGINS ??
   process.env.FRONTEND_ORIGIN ??
@@ -776,7 +777,7 @@ app.delete(
 );
 
 const quoteSchema = z.object({
-  artistId: z.string().min(1),
+  artistId: z.string().uuid(),
   side: z.enum(['buy', 'sell']),
   quantity: z.number().int().min(1).max(500),
   turnstileToken: z.string().max(2048).optional(),

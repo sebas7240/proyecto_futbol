@@ -1287,10 +1287,21 @@ function App() {
       )}
 
       <footer className="rights-notice">
-        <strong>Simulador independiente.</strong>{' '}
-        Los nombres identifican figuras publicas con fines informativos. Fame
-        Market no esta afiliado, patrocinado ni aprobado por ellas o sus marcas.{' '}
-        <a href="/derechos">Derechos y correcciones</a>
+        <span>
+          <strong>Simulador independiente.</strong>{' '}
+          Los nombres identifican figuras publicas con fines informativos. Fame
+          Market no esta afiliado, patrocinado ni aprobado por ellas o sus marcas.{' '}
+          <a href="/derechos">Derechos y correcciones</a>
+        </span>
+        <span className="rights-notice__social">
+          Comunidad oficial:{' '}
+          <a href="https://www.youtube.com/@fame_plays" target="_blank" rel="noreferrer">
+            YouTube
+          </a>{' '}
+          <a href="https://t.me/fameplaysoficial" target="_blank" rel="noreferrer">
+            Telegram
+          </a>
+        </span>
       </footer>
 
       <nav className="mobile-nav" aria-label="Navegacion principal">

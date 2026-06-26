@@ -20,12 +20,7 @@ const memoryWindows = new Map<
 >();
 
 export function requestIp(request: Request) {
-  return (
-    request.header('cf-connecting-ip')?.trim() ||
-    request.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.ip ||
-    'unknown'
-  );
+  return request.ip || request.socket.remoteAddress || 'unknown';
 }
 
 export async function consumeRateLimit(

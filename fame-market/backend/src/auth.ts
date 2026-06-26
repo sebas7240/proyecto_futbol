@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import {
   decodeProtectedHeader,
   importX509,
@@ -157,6 +158,13 @@ function adminAllowedEmails() {
     .filter(Boolean);
 }
 
+function safeEqualSecret(suppliedSecret: string | undefined, configuredSecret: string) {
+  if (!suppliedSecret) return false;
+  const supplied = Buffer.from(suppliedSecret);
+  const configured = Buffer.from(configuredSecret);
+  return supplied.length === configured.length && timingSafeEqual(supplied, configured);
+}
+
 async function requestUser(request: Request): Promise<AuthenticatedUser | null> {
   if (request.authenticatedUser) return request.authenticatedUser;
   if (authMode === 'development') {
@@ -183,7 +191,7 @@ export async function requireAdmin(
 ) {
   const configuredSecret = process.env.ADMIN_SECRET;
   const suppliedSecret = request.header('x-admin-secret');
-  if (!configuredSecret || suppliedSecret !== configuredSecret) {
+  if (!configuredSecret || !safeEqualSecret(suppliedSecret, configuredSecret)) {
     response.status(403).json({
       error: {
         code: 'ADMIN_REQUIRED',
