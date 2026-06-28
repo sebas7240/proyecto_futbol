@@ -51,7 +51,7 @@ services:
       SEASON_PRIZE_MIN_USERS: ${SEASON_PRIZE_MIN_USERS:-100}
       SEASON_PRIZE_TOP_COUNT: ${SEASON_PRIZE_TOP_COUNT:-3}
     ports:
-      - "4020:4020"
+      - "127.0.0.1:4020:4020"
     restart: unless-stopped
     healthcheck:
       test:
