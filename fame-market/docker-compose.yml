@@ -73,7 +73,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-fame_market}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fame_market}
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - fame_market_postgres:/var/lib/postgresql/data
     healthcheck:

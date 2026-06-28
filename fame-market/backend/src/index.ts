@@ -117,6 +117,55 @@ import {
 const app = express();
 const port = Number(process.env.PORT ?? 4020);
 app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
+const publicResponseCache = new Map<
+  string,
+  { expiresAt: number; statusCode: number; body: unknown }
+>();
+const publicResponseCacheLimit = 500;
+
+function publicCache(ttlSeconds: number): express.RequestHandler {
+  return (request, response, next) => {
+    if (request.method !== 'GET') {
+      next();
+      return;
+    }
+
+    const ttl = Math.max(1, Math.min(ttlSeconds, 300));
+    const cacheKey = request.originalUrl;
+    const cached = publicResponseCache.get(cacheKey);
+    const now = Date.now();
+    response.setHeader(
+      'Cache-Control',
+      `public, max-age=0, s-maxage=${ttl}, stale-while-revalidate=${ttl * 3}`
+    );
+
+    if (cached && cached.expiresAt > now) {
+      response.setHeader('X-Fame-Cache', 'HIT');
+      response.status(cached.statusCode).json(cached.body);
+      return;
+    }
+
+    if (cached) publicResponseCache.delete(cacheKey);
+    response.setHeader('X-Fame-Cache', 'MISS');
+    const originalJson = response.json.bind(response);
+    response.json = (body: unknown) => {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (publicResponseCache.size >= publicResponseCacheLimit) {
+          const oldestKey = publicResponseCache.keys().next().value;
+          if (oldestKey) publicResponseCache.delete(oldestKey);
+        }
+        publicResponseCache.set(cacheKey, {
+          expiresAt: Date.now() + ttl * 1000,
+          statusCode: response.statusCode,
+          body
+        });
+      }
+      return originalJson(body);
+    };
+    next();
+  };
+}
+
 const configuredOrigins = (
   process.env.FRONTEND_ORIGINS ??
   process.env.FRONTEND_ORIGIN ??
@@ -232,7 +281,7 @@ app.get('/api/metrics', async (request, response) => {
   response.type('text/plain; version=0.0.4').send(await operationsMetrics());
 });
 
-app.get('/api/status', async (_request, response) => {
+app.get('/api/status', publicCache(15), async (_request, response) => {
   let database = null;
   if (databaseConfigured()) {
     try {
@@ -306,7 +355,7 @@ app.get('/api/legal/versions', (_request, response) => {
   });
 });
 
-app.get('/api/attention/status', async (_request, response, next) => {
+app.get('/api/attention/status', publicCache(60), async (_request, response, next) => {
   try {
     if (!databaseConfigured()) {
       response.json({
@@ -482,7 +531,7 @@ app.post(
   }
 );
 
-app.get('/api/seasons/current', async (_request, response, next) => {
+app.get('/api/seasons/current', publicCache(15), async (_request, response, next) => {
   try {
     response.json({ season: await getCurrentSeason() });
   } catch (error) {
@@ -519,7 +568,7 @@ app.put('/api/me/profile/prize', requireAuth, async (request, response, next) =>
   }
 });
 
-app.get('/api/rankings/current', async (request, response, next) => {
+app.get('/api/rankings/current', publicCache(5), async (request, response, next) => {
   try {
     const limit = Number(request.query.limit ?? 50);
     response.json(await getSeasonRanking(Number.isFinite(limit) ? limit : 50));
@@ -528,7 +577,7 @@ app.get('/api/rankings/current', async (request, response, next) => {
   }
 });
 
-app.get('/api/artists', async (_request, response, next) => {
+app.get('/api/artists', publicCache(8), async (_request, response, next) => {
   try {
     response.json({ artists: await market.listArtists() });
   } catch (error) {
@@ -536,7 +585,7 @@ app.get('/api/artists', async (_request, response, next) => {
   }
 });
 
-app.get('/api/entities', async (_request, response, next) => {
+app.get('/api/entities', publicCache(8), async (_request, response, next) => {
   try {
     response.json({ entities: await market.listArtists() });
   } catch (error) {
@@ -544,23 +593,27 @@ app.get('/api/entities', async (_request, response, next) => {
   }
 });
 
-app.get('/api/artists/:slug', async (request, response, next) => {
+app.get('/api/artists/:slug', publicCache(8), async (request, response, next) => {
   try {
-    response.json({ artist: await market.getArtistBySlug(request.params.slug) });
+    response.json({
+      artist: await market.getArtistBySlug(String(request.params.slug))
+    });
   } catch (error) {
     next(error);
   }
 });
 
-app.get('/api/entities/:slug', async (request, response, next) => {
+app.get('/api/entities/:slug', publicCache(8), async (request, response, next) => {
   try {
-    response.json({ entity: await market.getArtistBySlug(request.params.slug) });
+    response.json({
+      entity: await market.getArtistBySlug(String(request.params.slug))
+    });
   } catch (error) {
     next(error);
   }
 });
 
-app.get('/api/artists/:slug/sources', async (request, response, next) => {
+app.get('/api/artists/:slug/sources', publicCache(120), async (request, response, next) => {
   try {
     response.json({
       sources: await listEntitySourcesBySlug(String(request.params.slug))
@@ -570,7 +623,7 @@ app.get('/api/artists/:slug/sources', async (request, response, next) => {
   }
 });
 
-app.get('/api/entities/:slug/sources', async (request, response, next) => {
+app.get('/api/entities/:slug/sources', publicCache(120), async (request, response, next) => {
   try {
     response.json({
       sources: await listEntitySourcesBySlug(String(request.params.slug))
@@ -580,7 +633,7 @@ app.get('/api/entities/:slug/sources', async (request, response, next) => {
   }
 });
 
-app.get('/api/artists/:slug/external-events', async (request, response, next) => {
+app.get('/api/artists/:slug/external-events', publicCache(30), async (request, response, next) => {
   try {
     if (!databaseConfigured()) {
       response.json({ events: [] });
@@ -594,7 +647,7 @@ app.get('/api/artists/:slug/external-events', async (request, response, next) =>
   }
 });
 
-app.get('/api/entities/:slug/external-events', async (request, response, next) => {
+app.get('/api/entities/:slug/external-events', publicCache(30), async (request, response, next) => {
   try {
     if (!databaseConfigured()) {
       response.json({ events: [] });
@@ -608,7 +661,7 @@ app.get('/api/entities/:slug/external-events', async (request, response, next) =
   }
 });
 
-app.get('/api/market/categories', async (_request, response, next) => {
+app.get('/api/market/categories', publicCache(60), async (_request, response, next) => {
   try {
     response.json({ categories: await listCategoryOverview() });
   } catch (error) {
@@ -616,7 +669,7 @@ app.get('/api/market/categories', async (_request, response, next) => {
   }
 });
 
-app.get('/api/artists/:slug/attention', async (request, response, next) => {
+app.get('/api/artists/:slug/attention', publicCache(60), async (request, response, next) => {
   try {
     if (!databaseConfigured()) {
       response.json({ attention: [] });
@@ -630,7 +683,7 @@ app.get('/api/artists/:slug/attention', async (request, response, next) => {
   }
 });
 
-app.get('/api/entities/:slug/news', async (request, response, next) => {
+app.get('/api/entities/:slug/news', publicCache(60), async (request, response, next) => {
   try {
     response.json(await getNewsPulseBySlug(String(request.params.slug)));
   } catch (error) {
