@@ -2052,6 +2052,62 @@ button {
   color: #8a6500;
 }
 
+.launch-prize {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.4fr);
+  gap: 18px;
+  align-items: center;
+  margin: 22px 0 6px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: #fffaf0;
+  border-radius: 6px;
+}
+
+.launch-prize--ready {
+  background: #effaf3;
+  border-color: rgba(18, 128, 74, 0.24);
+}
+
+.launch-prize small {
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.launch-prize h2 {
+  margin: 4px 0 6px;
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.launch-prize p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.launch-prize__meter {
+  display: grid;
+  gap: 7px;
+}
+
+.launch-prize__meter > span,
+.admin-launch-progress span {
+  height: 9px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+}
+
+.launch-prize__meter i,
+.admin-launch-progress i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+  border-radius: inherit;
+}
+
 .podium {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3225,6 +3281,35 @@ button {
   background: var(--green);
 }
 
+.admin-launch-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.42fr);
+  gap: 18px;
+  align-items: center;
+  margin: 0 0 24px;
+  padding: 16px;
+  border: 1px solid rgba(18, 128, 74, 0.2);
+  background: #effaf3;
+  border-radius: 6px;
+}
+
+.admin-launch-progress h2 {
+  margin: 3px 0 6px;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.admin-launch-progress p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.admin-launch-progress > div:last-child {
+  display: grid;
+  gap: 8px;
+}
+
 .admin-season h2,
 .admin-section-title h2 {
   margin: 3px 0 0;
@@ -3270,7 +3355,8 @@ button {
   text-transform: uppercase;
 }
 
-.admin-season-form input {
+.admin-season-form input,
+.admin-season-form textarea {
   width: 100%;
   min-height: 40px;
   padding: 0 10px;
@@ -3279,6 +3365,12 @@ button {
   background: var(--paper);
   border-radius: 5px;
   font: inherit;
+}
+
+.admin-season-form textarea {
+  min-height: 82px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .admin-season-form button {
@@ -4172,6 +4264,12 @@ button {
     min-width: 0;
   }
 
+  .launch-prize {
+    grid-template-columns: 1fr;
+    margin: 16px 0 4px;
+    padding: 14px;
+  }
+
   .podium {
     display: flex;
     width: calc(100% + 28px);
@@ -4377,7 +4475,8 @@ button {
   }
 
   .admin-filter-bar,
-  .admin-reset-panel {
+  .admin-reset-panel,
+  .admin-launch-progress {
     grid-template-columns: 1fr;
   }
 

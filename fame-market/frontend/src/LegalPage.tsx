@@ -107,12 +107,15 @@ function RulesPage() {
       <section>
         <h2>7. Premios, wallet y cambios</h2>
         <p>
-          La beta no promete premios. Si una temporada futura ofrece uno, sus
-          condiciones se publicaran por separado. La wallet Solana registrada
-          solo se usara como dato de contacto operativo para pagos manuales de
-          premios autorizados; Fame Plays nunca pedira frase semilla, llave
-          privada ni acceso a una cuenta cripto. Las reglas pueden actualizarse
-          y una version nueva requerira una aceptacion nueva antes de operar.
+          Una temporada solo tendra premio si la pantalla de ranking muestra
+          sus condiciones, la meta minima de usuarios registrados se cumple y
+          el top final supera la revision antifraude. En el lanzamiento, el
+          plan es premiar manualmente al top 3 cuando Fame Plays llegue a 100
+          usuarios registrados. La wallet Solana registrada solo se usara como
+          dato de contacto operativo para pagos manuales autorizados; Fame
+          Plays nunca pedira frase semilla, llave privada ni acceso a una
+          cuenta cripto. Las reglas pueden actualizarse y una version nueva
+          requerira una aceptacion nueva antes de operar.
         </p>
       </section>
       <section>

@@ -750,6 +750,7 @@ function App() {
       {mobileTab === 'ranking' ? (
         <RankingPanel
           season={rankingQuery.data?.season ?? null}
+          prizeStatus={rankingQuery.data?.prizeStatus ?? null}
           rankings={rankingQuery.data?.rankings ?? []}
           history={seasonHistoryQuery.data ?? []}
           signedIn={Boolean(firebaseUser) || !firebaseReady}

@@ -843,7 +843,10 @@ const manualSeasonSchema = z.object({
   endsAt: z.string().datetime().optional(),
   participationDays: z.coerce.number().int().min(1).max(365).optional(),
   freezeMinutes: z.coerce.number().int().min(0).max(10080).optional(),
-  startingBalance: z.coerce.number().int().min(100).max(1000000).optional()
+  startingBalance: z.coerce.number().int().min(100).max(1000000).optional(),
+  prizeMinUsers: z.coerce.number().int().min(1).max(100000).optional(),
+  prizeTopCount: z.coerce.number().int().min(1).max(100).optional(),
+  prizeNote: z.string().trim().max(500).optional()
 });
 
 const wikimediaSourceSchema = z.object({

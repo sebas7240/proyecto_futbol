@@ -240,9 +240,23 @@ export interface Season {
   tradingClosesAt: string;
   endsAt: string;
   startingBalance: number;
+  prizeMinUsers: number;
+  prizeTopCount: number;
+  prizeNote: string;
   status: 'scheduled' | 'active' | 'frozen' | 'closed';
   frozenAt: string | null;
   closedAt: string | null;
+}
+
+export interface SeasonPrizeStatus {
+  registeredUsers: number;
+  seasonParticipants: number;
+  minimumUsers: number;
+  remainingUsers: number;
+  topCount: number;
+  eligible: boolean;
+  note: string;
+  generatedAt: string;
 }
 
 export interface UserProfile {
@@ -289,6 +303,7 @@ export type RankingBadge = 'rookie' | 'early_discoverer';
 export interface RankingResponse {
   season: Season | null;
   rankings: RankingEntry[];
+  prizeStatus: SeasonPrizeStatus | null;
 }
 
 export interface SeasonHistory {
@@ -366,6 +381,10 @@ export interface OperationsOverview {
     lastYouTubeSyncAgeSeconds: number | null;
     lastSeasonCycleAgeSeconds: number | null;
     lastMarketMakerAgeSeconds?: number | null;
+  };
+  launch: {
+    season: Season | null;
+    prizeStatus: SeasonPrizeStatus | null;
   };
   jobs: {
     'attention-sync': MaintenanceRun | null;

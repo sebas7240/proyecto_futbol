@@ -1,5 +1,6 @@
 import { getPool } from './database.js';
 import { incrementMetric, prometheusMetrics } from './metrics.js';
+import { getCurrentSeason, getSeasonPrizeStatus } from './seasons.js';
 
 type MaintenanceStatus = 'running' | 'success' | 'failed';
 
@@ -109,7 +110,7 @@ export async function runMonitoredJob<T>(
 }
 
 export async function getOperationalOverview() {
-  const [counts, jobs, successfulJobs] = await Promise.all([
+  const [counts, jobs, successfulJobs, currentSeason] = await Promise.all([
     getPool().query<{
       users: string;
       trades: string;
@@ -176,7 +177,8 @@ export async function getOperationalOverview() {
         GROUP BY job_name
       `,
       [[...monitoredJobs]]
-    )
+    ),
+    getCurrentSeason()
   ]);
 
   const jobMap = new Map(jobs.rows.map((row) => [row.job_name, row]));
@@ -188,6 +190,9 @@ export async function getOperationalOverview() {
   );
   const row = counts.rows[0]!;
   const now = Date.now();
+  const prizeStatus = currentSeason
+    ? await getSeasonPrizeStatus(currentSeason)
+    : null;
   const age = (jobName: string) => {
     const completedAt = successfulJobMap.get(jobName);
     return completedAt
@@ -211,6 +216,10 @@ export async function getOperationalOverview() {
       lastYouTubeSyncAgeSeconds: age('youtube-sync'),
       lastSeasonCycleAgeSeconds: age('season-cycle'),
       lastMarketMakerAgeSeconds: age('market-maker')
+    },
+    launch: {
+      season: currentSeason,
+      prizeStatus
     },
     jobs: latestJobs,
     generatedAt: new Date().toISOString()
@@ -266,7 +275,8 @@ export async function operationsMetrics() {
       lastBackupAgeSeconds: null,
       lastAttentionSyncAgeSeconds: null,
       lastYouTubeSyncAgeSeconds: null,
-      lastSeasonCycleAgeSeconds: null
+      lastSeasonCycleAgeSeconds: null,
+      lastMarketMakerAgeSeconds: null
     });
   }
 }

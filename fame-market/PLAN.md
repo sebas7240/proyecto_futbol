@@ -488,9 +488,12 @@ El sistema de referidos es util, pero solo premiara usuarios reales:
 
 ### Premios por hitos
 
-Los primeros premios pueden desbloquearse al alcanzar hitos de usuarios activos
-verificados, por ejemplo 100, 500 o 1.000. El valor debe depender de ingresos
-realmente recibidos o de un patrocinador, no de una promesa fija sin respaldo.
+Los primeros premios pueden desbloquearse al alcanzar hitos de usuarios
+registrados, por ejemplo 100, 500 o 1.000. En el lanzamiento, la configuracion
+recomendada es una temporada de 30 dias con premio manual para el top 3 cuando
+Fame Plays llegue a 100 usuarios registrados. El valor debe depender de
+ingresos realmente recibidos o de un patrocinador, no de una promesa fija sin
+respaldo.
 
 Definicion inicial de usuario activo para un hito:
 
@@ -499,10 +502,11 @@ Definicion inicial de usuario activo para un hito:
 - Actividad en dos dias distintos de la temporada.
 - Sin alertas de abuso abiertas.
 
-La interfaz puede mostrar una barra de progreso, pero el hito queda sujeto a
-revision antifraude. En la primera version, el pago de cualquier premio sera
-manual y solo se pedira una billetera al ganador aprobado. No se necesita una
-billetera Web3, token ni contrato inteligente para participar.
+La interfaz muestra una barra de progreso hacia la meta configurada en la
+temporada, pero el hito queda sujeto a revision antifraude. En la primera
+version, el pago de cualquier premio sera manual y solo se pedira una billetera
+al ganador aprobado. No se necesita una billetera Web3, token ni contrato
+inteligente para participar.
 
 ## 10. Arquitectura recomendada
 
@@ -1217,9 +1221,10 @@ seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 - [ ] Crear codigos de referido unicos.
 - [ ] Calificar referidos por actividad real y controles antiabuso.
 - [ ] Entregar solo recompensas cosmeticas o sociales.
-- [ ] Definir y medir usuarios activos verificados.
-- [ ] Crear hitos de 100, 500 y 1.000 usuarios activos.
-- [ ] Mostrar barra de progreso sujeta a revision.
+- [x] Definir y medir el hito inicial por usuarios registrados.
+- [x] Crear configuracion de hito por temporada: 100, 500, 1.000 o el valor que
+      admin defina.
+- [x] Mostrar barra de progreso sujeta a revision.
 - [ ] Registrar fuente de financiacion y estado del premio.
 - [ ] Mantener pago manual al ganador aprobado durante la primera etapa.
 - [ ] Evaluar publicidad moderada y suscripcion sin ventajas competitivas.

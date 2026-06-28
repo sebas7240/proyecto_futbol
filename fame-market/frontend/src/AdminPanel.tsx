@@ -23,6 +23,7 @@ import {
   Snowflake,
   Trophy,
   Trash2,
+  Users,
   Volume2,
   Youtube
 } from 'lucide-react';
@@ -97,9 +98,13 @@ export function AdminPanel() {
     startsAt: '',
     endsAt: '',
     tradingClosesAt: '',
-    participationDays: '7',
+    participationDays: '30',
     freezeMinutes: '30',
-    startingBalance: '10000'
+    startingBalance: '10000',
+    prizeMinUsers: '100',
+    prizeTopCount: '3',
+    prizeNote:
+      'Premios manuales en USDT Solana para el top 3 cuando Fame Plays llegue a 100 usuarios registrados.'
   });
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminContext],
@@ -469,7 +474,14 @@ export function AdminPanel() {
           : undefined,
         startingBalance: seasonDraft.startingBalance
           ? Number(seasonDraft.startingBalance)
-          : undefined
+          : undefined,
+        prizeMinUsers: seasonDraft.prizeMinUsers
+          ? Number(seasonDraft.prizeMinUsers)
+          : undefined,
+        prizeTopCount: seasonDraft.prizeTopCount
+          ? Number(seasonDraft.prizeTopCount)
+          : undefined,
+        prizeNote: seasonDraft.prizeNote || undefined
       });
       setMessage(`Temporada creada: ${result.season.name}.`);
       await seasonQuery.refetch();
@@ -774,6 +786,50 @@ export function AdminPanel() {
       </div>
 
       <section className="operations-grid">
+        <article>
+          <Users size={20} />
+          <span>
+            <small>Usuarios registrados</small>
+            <strong>
+              {operationsQuery.data
+                ? operationsQuery.data.database.users.toLocaleString('es-CO')
+                : 'Esperando acceso'}
+            </strong>
+          </span>
+          <i className={operationsQuery.data ? 'is-healthy' : ''} />
+        </article>
+        <article>
+          <Trophy size={20} />
+          <span>
+            <small>Meta premio</small>
+            <strong>
+              {operationsQuery.data?.launch.prizeStatus
+                ? `${operationsQuery.data.launch.prizeStatus.registeredUsers}/${operationsQuery.data.launch.prizeStatus.minimumUsers}`
+                : 'Sin temporada'}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.launch.prizeStatus?.eligible
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
+          <Users size={20} />
+          <span>
+            <small>Participantes temporada</small>
+            <strong>
+              {operationsQuery.data?.launch.prizeStatus
+                ? operationsQuery.data.launch.prizeStatus.seasonParticipants.toLocaleString(
+                    'es-CO'
+                  )
+                : '0'}
+            </strong>
+          </span>
+          <i className={operationsQuery.data ? 'is-healthy' : ''} />
+        </article>
         <article>
           <Database size={20} />
           <span>
@@ -1155,6 +1211,52 @@ export function AdminPanel() {
               }
             />
           </label>
+          <label>
+            Usuarios para premio
+            <small className="field-hint">
+              Meta minima de cuentas registradas antes de pagar premios.
+            </small>
+            <input
+              type="number"
+              min="1"
+              max="100000"
+              value={seasonDraft.prizeMinUsers}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  prizeMinUsers: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Puestos premiados
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={seasonDraft.prizeTopCount}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  prizeTopCount: event.target.value
+                }))
+              }
+            />
+          </label>
+          <label>
+            Nota publica del premio
+            <textarea
+              maxLength={500}
+              value={seasonDraft.prizeNote}
+              onChange={(event) =>
+                setSeasonDraft((current) => ({
+                  ...current,
+                  prizeNote: event.target.value
+                }))
+              }
+            />
+          </label>
           <button
             type="submit"
             disabled={!adminContext || Boolean(busyArtist)}
@@ -1254,6 +1356,40 @@ export function AdminPanel() {
           </button>
         </article>
       </section>
+
+      {operationsQuery.data?.launch.prizeStatus && (
+        <section className="admin-launch-progress">
+          <div>
+            <small>Lanzamiento publico</small>
+            <h2>
+              Premio top {operationsQuery.data.launch.prizeStatus.topCount}
+            </h2>
+            <p>{operationsQuery.data.launch.prizeStatus.note}</p>
+          </div>
+          <div>
+            <span>
+              <i
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (operationsQuery.data.launch.prizeStatus.registeredUsers /
+                      Math.max(
+                        operationsQuery.data.launch.prizeStatus.minimumUsers,
+                        1
+                      )) *
+                      100
+                  )}%`
+                }}
+              />
+            </span>
+            <strong>
+              {operationsQuery.data.launch.prizeStatus.eligible
+                ? 'Meta lista para premiar'
+                : `Faltan ${operationsQuery.data.launch.prizeStatus.remainingUsers} usuarios`}
+            </strong>
+          </div>
+        </section>
+      )}
 
       <div className="admin-section-title">
         <small>Premiacion USDT Solana</small>

@@ -370,6 +370,9 @@ export const api = {
       participationDays?: number;
       freezeMinutes?: number;
       startingBalance?: number;
+      prizeMinUsers?: number;
+      prizeTopCount?: number;
+      prizeNote?: string;
     }
   ) {
     return request<{ season: Season }>('/admin/seasons', {

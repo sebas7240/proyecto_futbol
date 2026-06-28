@@ -23,6 +23,9 @@ interface DbSeason {
   status: 'scheduled' | 'active' | 'frozen' | 'closed';
   frozen_at: Date | null;
   closed_at: Date | null;
+  prize_min_users: number;
+  prize_top_count: number;
+  prize_note: string;
 }
 
 interface RankingRow {
@@ -51,6 +54,9 @@ function publicSeason(season: DbSeason) {
     endsAt: new Date(season.ends_at).toISOString(),
     startingBalance: number(season.starting_balance),
     status: season.status,
+    prizeMinUsers: Number(season.prize_min_users),
+    prizeTopCount: Number(season.prize_top_count),
+    prizeNote: season.prize_note,
     frozenAt: season.frozen_at
       ? new Date(season.frozen_at).toISOString()
       : null,
@@ -183,13 +189,58 @@ async function finalRanking(seasonId: string, limit: number) {
 
 export async function getSeasonRanking(limit = 50) {
   const season = await getCurrentSeason();
-  if (!season) return { season: null, rankings: [] };
+  if (!season) {
+    return {
+      season: null,
+      rankings: [],
+      prizeStatus: null
+    };
+  }
   const safeLimit = Math.max(1, Math.min(limit, 100));
-  const rankings =
+  const [rankings, prizeStatus] = await Promise.all([
     season.status === 'closed'
-      ? await finalRanking(season.id, safeLimit)
-      : await liveRanking(season.id, safeLimit);
-  return { season, rankings };
+      ? finalRanking(season.id, safeLimit)
+      : liveRanking(season.id, safeLimit),
+    getSeasonPrizeStatus(season)
+  ]);
+  return { season, rankings, prizeStatus };
+}
+
+export async function getSeasonPrizeStatus(season: {
+  id: string;
+  prizeMinUsers: number;
+  prizeTopCount: number;
+  prizeNote: string;
+}) {
+  const result = await getPool().query<{
+    registered_users: string;
+    season_participants: string;
+  }>(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM users) AS registered_users,
+        (
+          SELECT COUNT(*)
+          FROM wallets
+          WHERE season_id = $1
+        ) AS season_participants
+    `,
+    [season.id]
+  );
+  const row = result.rows[0]!;
+  const registeredUsers = Number(row.registered_users);
+  const seasonParticipants = Number(row.season_participants);
+  const minimumUsers = Math.max(1, Number(season.prizeMinUsers));
+  return {
+    registeredUsers,
+    seasonParticipants,
+    minimumUsers,
+    remainingUsers: Math.max(0, minimumUsers - registeredUsers),
+    topCount: Math.max(1, Number(season.prizeTopCount)),
+    eligible: registeredUsers >= minimumUsers,
+    note: season.prizeNote,
+    generatedAt: new Date().toISOString()
+  };
 }
 
 export async function getUserSeasonHistory(user: AuthenticatedUser) {
@@ -529,6 +580,9 @@ interface ManualSeasonInput {
   participationDays?: number;
   freezeMinutes?: number;
   startingBalance?: number;
+  prizeMinUsers?: number;
+  prizeTopCount?: number;
+  prizeNote?: string;
 }
 
 function resolveManualSeasonInput(input: ManualSeasonInput = {}) {
@@ -570,12 +624,32 @@ function resolveManualSeasonInput(input: ManualSeasonInput = {}) {
     100,
     Math.min(1_000_000, Math.round(input.startingBalance ?? Number(process.env.SEASON_STARTING_BALANCE ?? 10_000)))
   );
+  const prizeMinUsers = Math.max(
+    1,
+    Math.min(
+      100_000,
+      Math.floor(input.prizeMinUsers ?? Number(process.env.SEASON_PRIZE_MIN_USERS ?? 100))
+    )
+  );
+  const prizeTopCount = Math.max(
+    1,
+    Math.min(
+      100,
+      Math.floor(input.prizeTopCount ?? Number(process.env.SEASON_PRIZE_TOP_COUNT ?? 3))
+    )
+  );
+  const prizeNote =
+    input.prizeNote?.trim().slice(0, 500) ||
+    `Premios manuales para el top ${prizeTopCount} cuando Fame Plays llegue a ${prizeMinUsers} usuarios registrados.`;
   return {
     name: input.name?.trim().slice(0, 80) || null,
     start,
     tradingClose,
     end,
     startingBalance,
+    prizeMinUsers,
+    prizeTopCount,
+    prizeNote,
     status:
       start.getTime() > Date.now()
         ? ('scheduled' as const)
@@ -636,8 +710,8 @@ export async function createNextSeason(input: ManualSeasonInput = {}) {
       `
         INSERT INTO seasons (
           name, starts_at, trading_closes_at, ends_at,
-          starting_balance, status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          starting_balance, status, prize_min_users, prize_top_count, prize_note
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `,
       [
@@ -646,7 +720,10 @@ export async function createNextSeason(input: ManualSeasonInput = {}) {
         resolved.tradingClose,
         resolved.end,
         resolved.startingBalance,
-        resolved.status
+        resolved.status,
+        resolved.prizeMinUsers,
+        resolved.prizeTopCount,
+        resolved.prizeNote
       ]
     );
     const season = result.rows[0]!;

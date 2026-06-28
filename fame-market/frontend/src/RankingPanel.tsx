@@ -15,7 +15,8 @@ import {
 import type {
   RankingEntry,
   Season,
-  SeasonHistory
+  SeasonHistory,
+  SeasonPrizeStatus
 } from './types';
 import { api } from './api';
 import { EntityAvatar } from './EntityAvatar';
@@ -81,6 +82,7 @@ function Badges({ badges }: { badges: RankingEntry['badges'] }) {
 
 export function RankingPanel({
   season,
+  prizeStatus,
   rankings,
   history,
   signedIn,
@@ -88,6 +90,7 @@ export function RankingPanel({
   onBack
 }: {
   season: Season | null;
+  prizeStatus: SeasonPrizeStatus | null;
   rankings: RankingEntry[];
   history: SeasonHistory[];
   signedIn: boolean;
@@ -110,7 +113,7 @@ export function RankingPanel({
           <ArrowLeft size={18} /> Mercado
         </button>
         <div>
-          <small>Competencia semanal</small>
+          <small>Competencia de temporada</small>
           <h1>Ranking de Fame Plays</h1>
           <p>
             El rendimiento parte del mismo capital ficticio para todos los
@@ -128,11 +131,50 @@ export function RankingPanel({
         )}
       </header>
 
+      {season && prizeStatus && (
+        <section
+          className={`launch-prize ${
+            prizeStatus.eligible ? 'launch-prize--ready' : ''
+          }`}
+        >
+          <div>
+            <small>Temporada de lanzamiento</small>
+            <h2>
+              Premios para el top {prizeStatus.topCount}
+            </h2>
+            <p>{prizeStatus.note}</p>
+          </div>
+          <div className="launch-prize__meter">
+            <span>
+              <i
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (prizeStatus.registeredUsers /
+                      Math.max(prizeStatus.minimumUsers, 1)) *
+                      100
+                  )}%`
+                }}
+              />
+            </span>
+            <strong>
+              {prizeStatus.registeredUsers}/{prizeStatus.minimumUsers}
+              {' '}usuarios registrados
+            </strong>
+            <small>
+              {prizeStatus.eligible
+                ? 'Meta alcanzada: el premio queda habilitado.'
+                : `Faltan ${prizeStatus.remainingUsers} para habilitar premios.`}
+            </small>
+          </div>
+        </section>
+      )}
+
       {loading ? (
         <div className="ranking-empty">Calculando posiciones...</div>
       ) : rankings.length ? (
         <>
-          <section className="podium" aria-label="Podio semanal">
+          <section className="podium" aria-label="Podio de temporada">
             {podium.map((entry) => (
               <article
                 className={`podium-entry podium-entry--${entry.rank}`}
