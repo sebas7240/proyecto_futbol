@@ -64,16 +64,14 @@ export function AdminPanel() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [loginPending, setLoginPending] = useState(false);
-  const [adminSecret, setAdminSecret] = useState(
-    () => sessionStorage.getItem('fame-plays-admin-secret') ?? ''
-  );
+  const adminContext = 'firebase-rbac';
   const adminEmailAllowed =
     !firebaseReady ||
     Boolean(
       firebaseUser?.email &&
         allowedAdminEmails.includes(firebaseUser.email.toLowerCase())
     );
-  const canQueryAdmin = Boolean(adminSecret && adminEmailAllowed && authReady);
+  const canQueryAdmin = Boolean(adminEmailAllowed && authReady);
   const artistsQuery = useQuery({ queryKey: ['artists'], queryFn: api.artists });
   const seasonQuery = useQuery({ queryKey: ['ranking'], queryFn: api.ranking });
   const [handles, setHandles] = useState<Record<string, string>>({
@@ -104,46 +102,46 @@ export function AdminPanel() {
     startingBalance: '10000'
   });
   const securityQuery = useQuery({
-    queryKey: ['security-reviews', adminSecret],
-    queryFn: () => api.securityReviews(adminSecret),
+    queryKey: ['security-reviews', adminContext],
+    queryFn: () => api.securityReviews(adminContext),
     enabled: canQueryAdmin,
     retry: false
   });
   const operationsQuery = useQuery({
-    queryKey: ['operations', adminSecret],
-    queryFn: () => api.operations(adminSecret),
+    queryKey: ['operations', adminContext],
+    queryFn: () => api.operations(adminContext),
     enabled: canQueryAdmin,
     retry: false,
     refetchInterval: 30_000
   });
   const attentionQuery = useQuery({
-    queryKey: ['attention-overview', adminSecret],
-    queryFn: () => api.attentionOverview(adminSecret),
+    queryKey: ['attention-overview', adminContext],
+    queryFn: () => api.attentionOverview(adminContext),
     enabled: canQueryAdmin,
     retry: false
   });
   const artistRightsQuery = useQuery({
-    queryKey: ['artist-rights', adminSecret],
-    queryFn: () => api.artistRights(adminSecret),
+    queryKey: ['artist-rights', adminContext],
+    queryFn: () => api.artistRights(adminContext),
     enabled: canQueryAdmin,
     retry: false
   });
   const rightsRequestsQuery = useQuery({
-    queryKey: ['rights-requests', adminSecret],
-    queryFn: () => api.rightsRequests(adminSecret),
+    queryKey: ['rights-requests', adminContext],
+    queryFn: () => api.rightsRequests(adminContext),
     enabled: canQueryAdmin,
     retry: false
   });
   const chatModerationQuery = useQuery({
-    queryKey: ['chat-moderation', adminSecret, chatRoom],
-    queryFn: () => api.chatModeration(adminSecret, chatRoom),
+    queryKey: ['chat-moderation', adminContext, chatRoom],
+    queryFn: () => api.chatModeration(adminContext, chatRoom),
     enabled: Boolean(canQueryAdmin && chatRoom),
     retry: false,
     refetchInterval: 15_000
   });
   const prizeProfilesQuery = useQuery({
-    queryKey: ['prize-profiles', adminSecret],
-    queryFn: () => api.prizeProfiles(adminSecret),
+    queryKey: ['prize-profiles', adminContext],
+    queryFn: () => api.prizeProfiles(adminContext),
     enabled: canQueryAdmin,
     retry: false
   });
@@ -254,11 +252,6 @@ export function AdminPanel() {
     }
   };
 
-  const rememberSecret = (value: string) => {
-    setAdminSecret(value);
-    sessionStorage.setItem('fame-plays-admin-secret', value);
-  };
-
   const register = async (artistId: string) => {
     const handle = handles[artistId]?.trim();
     if (!handle) {
@@ -268,8 +261,8 @@ export function AdminPanel() {
     setBusyArtist(artistId);
     setMessage('');
     try {
-      await api.registerYouTubeChannel(adminSecret, artistId, handle);
-      const result = await api.syncYouTube(adminSecret, artistId);
+      await api.registerYouTubeChannel(adminContext, artistId, handle);
+      const result = await api.syncYouTube(adminContext, artistId);
       const videos = result.results.reduce(
         (sum, item) => sum + (item.videos ?? 0),
         0
@@ -286,7 +279,7 @@ export function AdminPanel() {
     setBusyArtist('all');
     setMessage('');
     try {
-      const result = await api.syncYouTube(adminSecret);
+      const result = await api.syncYouTube(adminContext);
       const successful = result.results.filter((item) => item.ok).length;
       const videos = result.results.reduce(
         (sum, item) => sum + (item.videos ?? 0),
@@ -304,7 +297,7 @@ export function AdminPanel() {
     setBusyArtist('attention');
     setMessage('');
     try {
-      const result = await api.syncAttention(adminSecret);
+      const result = await api.syncAttention(adminContext);
       const successful = result.results.filter((item) => item.ok).length;
       setMessage(
         `${successful} fuentes de atencion actualizadas en modo sombra.`
@@ -326,7 +319,7 @@ export function AdminPanel() {
     setBusyArtist('news');
     setMessage('');
     try {
-      const result = await api.syncNews(adminSecret);
+      const result = await api.syncNews(adminContext);
       const successful = result.results.filter((item) => item.ok).length;
       const stored = result.results.reduce(
         (sum, item) => sum + Number(item.stored ?? 0),
@@ -351,7 +344,7 @@ export function AdminPanel() {
     setBusyArtist('market-maker');
     setMessage('');
     try {
-      const result = await api.runMarketMaker(adminSecret);
+      const result = await api.runMarketMaker(adminContext);
       const applied = result.results.filter((item) => item.status === 'applied');
       const totalDelta = applied.reduce(
         (sum, item) => sum + Number(item.appliedDeltaBps ?? 0),
@@ -385,14 +378,14 @@ export function AdminPanel() {
     setMessage('');
     try {
       if (action === 'cycle') {
-        const result = await api.processSeasonCycle(adminSecret);
+        const result = await api.processSeasonCycle(adminContext);
         setMessage(
           result.actions.length
             ? `Ciclo procesado: ${result.actions.join(', ')}.`
             : 'La temporada ya estaba al dia.'
         );
       } else {
-        await api.adminSeasonAction(adminSecret, season!.id, action);
+        await api.adminSeasonAction(adminContext, season!.id, action);
         setMessage(
           action === 'freeze'
             ? 'Temporada congelada. Ya no acepta operaciones.'
@@ -421,7 +414,7 @@ export function AdminPanel() {
     setBusyArtist(`reset-${action}`);
     setMessage('');
     try {
-      const result = await api.adminReset(adminSecret, action, resetConfirm);
+      const result = await api.adminReset(adminContext, action, resetConfirm);
       const deleted = Object.entries(result.reset.deleted)
         .filter(([, value]) => value)
         .map(([key, value]) => `${key}: ${value}`)
@@ -457,7 +450,7 @@ export function AdminPanel() {
     setBusyArtist('season-create');
     setMessage('');
     try {
-      const result = await api.createSeason(adminSecret, {
+      const result = await api.createSeason(adminContext, {
         name: seasonDraft.name || undefined,
         startsAt: seasonDraft.startsAt
           ? new Date(seasonDraft.startsAt).toISOString()
@@ -502,7 +495,7 @@ export function AdminPanel() {
     setMessage('');
     try {
       await api.reviewRanking(
-        adminSecret,
+        adminContext,
         seasonId,
         userId,
         status,
@@ -528,7 +521,7 @@ export function AdminPanel() {
     setMessage('');
     try {
       await api.setUserStatus(
-        adminSecret,
+        adminContext,
         userId,
         frozen ? 'active' : 'frozen'
       );
@@ -560,7 +553,7 @@ export function AdminPanel() {
     setBusyArtist(`chat-${action}-${input.messageId ?? input.userId ?? 'room'}`);
     setMessage('');
     try {
-      await api.moderateChat(adminSecret, {
+      await api.moderateChat(adminContext, {
         roomId: chatRoom,
         action,
         reason: chatReason.trim() || 'Moderacion manual',
@@ -588,7 +581,7 @@ export function AdminPanel() {
     setMessage('');
     try {
       await api.setArtistStatus(
-        adminSecret,
+        adminContext,
         artistId,
         frozen ? 'active' : 'frozen'
       );
@@ -625,7 +618,7 @@ export function AdminPanel() {
     setBusyArtist(`rights-${record.artistId}`);
     setMessage('');
     try {
-      await api.updateArtistRights(adminSecret, record.artistId, {
+      await api.updateArtistRights(adminContext, record.artistId, {
         imageUrl: draft.imageUrl,
         imageUsageStatus: draft.imageUsageStatus,
         imageSourceUrl: draft.imageSourceUrl,
@@ -662,7 +655,7 @@ export function AdminPanel() {
     setMessage('');
     try {
       await api.updateRightsRequest(
-        adminSecret,
+        adminContext,
         requestId,
         status,
         rightsRequestNotes[requestId] ?? ''
@@ -701,8 +694,7 @@ export function AdminPanel() {
           <small>Acceso restringido</small>
           <h1>Entra con tu cuenta administradora</h1>
           <p>
-            El panel solo se abre para emails autorizados en Firebase. Luego
-            podras ingresar el secreto administrativo.
+            El panel solo se abre para emails autorizados en Firebase.
           </p>
           <button onClick={openAdminLogin} disabled={loginPending}>
             {loginPending ? 'Abriendo Google...' : 'Entrar con Google'}
@@ -743,7 +735,7 @@ export function AdminPanel() {
         </div>
         <button
           onClick={syncAll}
-          disabled={!adminSecret || Boolean(busyArtist) || !adminEmailAllowed}
+          disabled={Boolean(busyArtist) || !adminEmailAllowed}
         >
           <RefreshCw size={17} /> Sincronizar todos
         </button>
@@ -756,16 +748,7 @@ export function AdminPanel() {
             <button type="button" onClick={() => logout()}>salir</button>
           </p>
         )}
-        <label>
-          Secreto de administrador
-          <input
-            type="password"
-            value={adminSecret}
-            onChange={(event) => rememberSecret(event.target.value)}
-            placeholder="ADMIN_SECRET"
-          />
-        </label>
-        <p>Se guarda solamente durante esta sesion del navegador.</p>
+        <p>Autorizacion activa por Firebase y lista de emails permitidos.</p>
       </section>
 
       <section className="admin-filter-bar">
@@ -905,7 +888,7 @@ export function AdminPanel() {
         </div>
         <button
           onClick={syncAttention}
-          disabled={!adminSecret || Boolean(busyArtist)}
+          disabled={!adminContext || Boolean(busyArtist)}
         >
           <Radar size={17} />
           {busyArtist === 'attention' ? 'Calculando...' : 'Sincronizar indice'}
@@ -913,8 +896,8 @@ export function AdminPanel() {
       </div>
 
       <section className="attention-grid">
-        {!adminSecret ? (
-          <p>Ingresa el secreto para consultar las senales.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para consultar las senales.</p>
         ) : attentionQuery.isLoading ? (
           <p>Calculando el estado de las fuentes...</p>
         ) : attentionQuery.data?.sources.length ? (
@@ -1008,7 +991,7 @@ export function AdminPanel() {
         </div>
         <button
           onClick={syncNews}
-          disabled={!adminSecret || Boolean(busyArtist)}
+          disabled={!adminContext || Boolean(busyArtist)}
         >
           <Newspaper size={17} />
           {busyArtist === 'news' ? 'Consultando...' : 'Sincronizar noticias'}
@@ -1022,7 +1005,7 @@ export function AdminPanel() {
         </div>
         <button
           onClick={runMarketMaker}
-          disabled={!adminSecret || Boolean(busyArtist)}
+          disabled={!adminContext || Boolean(busyArtist)}
         >
           <Activity size={17} />
           {busyArtist === 'market-maker' ? 'Moviendo...' : 'Ejecutar ahora'}
@@ -1041,7 +1024,7 @@ export function AdminPanel() {
           <button
             onClick={() => runSeasonAction('freeze')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               seasonQuery.data?.season?.status !== 'active'
             }
@@ -1051,7 +1034,7 @@ export function AdminPanel() {
           <button
             onClick={() => runSeasonAction('close')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               seasonQuery.data?.season?.status !== 'frozen'
             }
@@ -1060,7 +1043,7 @@ export function AdminPanel() {
           </button>
           <button
             onClick={() => runSeasonAction('cycle')}
-            disabled={!adminSecret || Boolean(busyArtist)}
+            disabled={!adminContext || Boolean(busyArtist)}
           >
             <CalendarSync size={17} /> Procesar ciclo
           </button>
@@ -1174,7 +1157,7 @@ export function AdminPanel() {
           </label>
           <button
             type="submit"
-            disabled={!adminSecret || Boolean(busyArtist)}
+            disabled={!adminContext || Boolean(busyArtist)}
           >
             <Trophy size={17} />
             {busyArtist === 'season-create' ? 'Creando...' : 'Crear temporada'}
@@ -1209,7 +1192,7 @@ export function AdminPanel() {
           <button
             onClick={() => runAdminReset('season-activity')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               resetConfirm !== 'RESET'
             }
@@ -1227,7 +1210,7 @@ export function AdminPanel() {
             className="danger-action"
             onClick={() => runAdminReset('season-full')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               resetConfirm !== 'RESET'
             }
@@ -1245,7 +1228,7 @@ export function AdminPanel() {
             className="danger-action"
             onClick={() => runAdminReset('season-history')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               resetConfirm !== 'RESET'
             }
@@ -1262,7 +1245,7 @@ export function AdminPanel() {
           <button
             onClick={() => runAdminReset('news-pulse')}
             disabled={
-              !adminSecret ||
+              !adminContext ||
               Boolean(busyArtist) ||
               resetConfirm !== 'RESET'
             }
@@ -1278,8 +1261,8 @@ export function AdminPanel() {
       </div>
 
       <section className="prize-wallets">
-        {!adminSecret ? (
-          <p>Ingresa el secreto para ver wallets de premiacion.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para ver wallets de premiacion.</p>
         ) : prizeProfilesQuery.isLoading ? (
           <p>Cargando wallets...</p>
         ) : filteredPrizeProfiles.length ? (
@@ -1315,8 +1298,8 @@ export function AdminPanel() {
       </div>
 
       <section className="security-reviews">
-        {!adminSecret ? (
-          <p>Ingresa el secreto para consultar la cola.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para consultar la cola.</p>
         ) : securityQuery.isLoading ? (
           <p>Analizando resultados...</p>
         ) : filteredSecurityReviews.length ? (
@@ -1442,28 +1425,28 @@ export function AdminPanel() {
           </label>
           <button
             onClick={() => chatModerationQuery.refetch()}
-            disabled={!adminSecret || chatModerationQuery.isFetching}
+            disabled={!adminContext || chatModerationQuery.isFetching}
           >
             <RefreshCw size={16} /> Actualizar
           </button>
           <button
             className="danger-action"
             onClick={() => moderateChat('reset-room')}
-            disabled={!adminSecret || Boolean(busyArtist)}
+            disabled={!adminContext || Boolean(busyArtist)}
             title="Borra mensajes, notas de voz y reportes de la sala seleccionada"
           >
             <Trash2 size={16} /> Reset chat
           </button>
         </div>
 
-        {!adminSecret ? (
-          <p>Ingresa el secreto para controlar el chat.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para controlar el chat.</p>
         ) : chatModerationQuery.isLoading ? (
           <p>Cargando sala...</p>
         ) : chatModerationQuery.isError ? (
           <p>
             No se pudo conectar la moderacion. El backend debe apuntar al
-            Worker de chat y usar el mismo secreto administrativo.
+            Worker de chat con el secreto configurado solo en el servidor.
           </p>
         ) : (
           <div className="chat-moderation__grid">
@@ -1672,8 +1655,8 @@ export function AdminPanel() {
       </div>
 
       <section className="rights-request-list">
-        {!adminSecret ? (
-          <p>Ingresa el secreto para consultar la bandeja.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para consultar la bandeja.</p>
         ) : rightsRequestsQuery.isLoading ? (
           <p>Cargando solicitudes...</p>
         ) : filteredRightsRequests.length ? (
@@ -1757,8 +1740,8 @@ export function AdminPanel() {
       </div>
 
       <section className="artist-rights-list">
-        {!adminSecret ? (
-          <p>Ingresa el secreto para revisar las licencias.</p>
+        {!adminContext ? (
+          <p>Inicia sesion con un email administrador para revisar las licencias.</p>
         ) : artistRightsQuery.isLoading ? (
           <p>Cargando registros...</p>
         ) : filteredArtistRights.length ? (
@@ -1879,7 +1862,7 @@ export function AdminPanel() {
                 </div>
                 <button
                   onClick={() => saveArtistRights(record)}
-                  disabled={!adminSecret || Boolean(busyArtist)}
+                  disabled={!adminContext || Boolean(busyArtist)}
                 >
                   <Save size={17} />
                   {busyArtist === `rights-${record.artistId}`
@@ -1930,7 +1913,7 @@ export function AdminPanel() {
               <button
                 title="Guardar canal y sincronizar"
                 onClick={() => register(artist.id)}
-                disabled={!adminSecret || Boolean(busyArtist)}
+                disabled={!adminContext || Boolean(busyArtist)}
               >
                 <Save size={18} />
                 {busyArtist === artist.id ? 'Guardando...' : 'Guardar'}
@@ -1949,7 +1932,7 @@ export function AdminPanel() {
                 onClick={() =>
                   toggleArtist(artist.id, artist.status === 'frozen')
                 }
-                disabled={!adminSecret || Boolean(busyArtist)}
+                disabled={!adminContext || Boolean(busyArtist)}
               >
                 {artist.status === 'frozen' ? (
                   <CirclePlay size={18} />

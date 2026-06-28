@@ -9,6 +9,14 @@ const DEFAULT_VOICE_WINDOW_MAX = 6;
 const MIN_VOICE_MS = 900;
 const MAX_VOICE_MS = 10_500;
 const AUTO_HIDE_REPORTS = 3;
+const defaultAllowedOrigins = [
+  'https://www.fameplays.com',
+  'https://fameplays.com',
+  'https://fameplays.pages.dev',
+  'http://localhost:5174',
+  'http://localhost:5173',
+  'capacitor://localhost'
+];
 
 const blockedWords = [
   'whatsapp',
@@ -41,13 +49,21 @@ function json(data, init = {}) {
 }
 
 function corsHeaders(request) {
-  const origin = request?.headers.get('origin') ?? '*';
+  const origin = request?.headers.get('origin') ?? '';
+  const allowedOrigin = origin && defaultAllowedOrigins.includes(origin)
+    ? origin
+    : defaultAllowedOrigins[0];
   return {
-    'access-control-allow-origin': origin,
+    'access-control-allow-origin': allowedOrigin,
     'access-control-allow-methods': 'GET, POST, OPTIONS',
     'access-control-allow-headers': 'content-type, x-chat-admin-secret',
     vary: 'Origin'
   };
+}
+
+function requestOriginAllowed(request) {
+  const origin = request.headers.get('origin');
+  return !origin || defaultAllowedOrigins.includes(origin);
 }
 
 function cleanRoom(input) {
@@ -932,11 +948,17 @@ export class ChatRoom {
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
+      if (!requestOriginAllowed(request)) {
+        return json({ error: 'Forbidden origin' }, { status: 403, request });
+      }
       return new Response(null, { headers: corsHeaders(request) });
     }
     const url = new URL(request.url);
     if (url.pathname === '/health') {
       return json({ ok: true, service: 'fame-plays-chat' }, { request });
+    }
+    if (!requestOriginAllowed(request)) {
+      return json({ error: 'Forbidden origin' }, { status: 403, request });
     }
 
     const adminMatch = url.pathname.match(/^\/admin\/rooms\/([^/]+)\/moderation$/);

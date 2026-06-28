@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import pg from 'pg';
+import { databaseRequiresSsl } from './deployment.js';
 
 const { Pool } = pg;
 
@@ -14,6 +15,16 @@ export function databaseConfigured() {
 export function getPool() {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL no esta configurada.');
+  }
+  const deploymentEnv = process.env.DEPLOYMENT_ENV;
+  if (
+    (deploymentEnv === 'production' || deploymentEnv === 'staging') &&
+    databaseRequiresSsl(process.env.DATABASE_URL) &&
+    process.env.DATABASE_SSL !== 'true'
+  ) {
+    throw new Error(
+      `${deploymentEnv} requiere DATABASE_SSL=true para bases externas.`
+    );
   }
   if (!pool) {
     pool = new Pool({

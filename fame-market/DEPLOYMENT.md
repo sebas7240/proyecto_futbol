@@ -103,8 +103,8 @@ En Cloudflare Pages, conecta los custom domains `fameplays.com` y
 Backend:
 
 1. Copia `.env.production.example` como `.env` en el servidor.
-2. Completa secretos reales: Firebase, admin, monitoreo, Turnstile, chat,
-   salt de derechos y PostgreSQL.
+2. Completa secretos reales: Firebase, emails administradores, monitoreo,
+   Turnstile, chat, salts y PostgreSQL.
 3. Levanta el backend con Docker Compose sin tocar los contenedores de Golea:
 
 Para iniciar el Pulso de noticias con impacto real auditado, agrega al `.env`:

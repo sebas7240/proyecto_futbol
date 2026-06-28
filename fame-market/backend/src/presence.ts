@@ -11,7 +11,7 @@ const memorySessions = new Map<
 >();
 
 function hashValue(value: string) {
-  const salt = process.env.PRESENCE_HASH_SALT || process.env.ADMIN_SECRET || '';
+  const salt = process.env.PRESENCE_HASH_SALT || 'fame-plays-dev-presence';
   return createHash('sha256').update(`${salt}:${value}`).digest('hex');
 }
 

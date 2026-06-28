@@ -175,8 +175,7 @@ const presenceRateLimit = rateLimit({
   windowMs: 60_000,
   key: requestIp
 });
-const monitoringSecret =
-  process.env.MONITORING_SECRET || process.env.ADMIN_SECRET;
+const monitoringSecret = process.env.MONITORING_SECRET;
 
 app.disable('x-powered-by');
 app.use(
@@ -422,7 +421,7 @@ async function requestChatModeration(
     process.env.CHAT_WS_URL ||
     'https://fame-plays-chat.sebas7240.workers.dev'
   ).replace(/\/+$/, '');
-  const secret = process.env.CHAT_ADMIN_SECRET || process.env.ADMIN_SECRET || '';
+  const secret = process.env.CHAT_ADMIN_SECRET || '';
   if (!baseUrl || !secret) {
     throw new MarketError(
       'Configura CHAT_WORKER_ADMIN_URL y CHAT_ADMIN_SECRET para moderar el chat.',

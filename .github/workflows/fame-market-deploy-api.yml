@@ -104,14 +104,21 @@ jobs:
               printf '%s=%s\n' "$key" "$value" >> .env
             fi
           }
+          set_env_value DEPLOYMENT_ENV production
+          set_env_value AUTH_MODE firebase
           set_env_value CHAT_WORKER_ADMIN_URL https://fame-plays-chat.sebas7240.workers.dev
           if [[ -n "$CHAT_SECRET_FROM_GH" ]]; then
             set_env_value CHAT_ADMIN_SECRET "$CHAT_SECRET_FROM_GH"
-          elif ! grep -Eq '^CHAT_ADMIN_SECRET=.+$' .env; then
-            admin_secret="$(grep -E '^ADMIN_SECRET=' .env | tail -1 | cut -d= -f2- || true)"
-            if [[ -n "$admin_secret" ]]; then
-              set_env_value CHAT_ADMIN_SECRET "$admin_secret"
-            fi
+          fi
+          if ! grep -Eq '^CHAT_ADMIN_SECRET=.+$' .env; then
+            echo "CHAT_ADMIN_SECRET is missing. Add the GitHub secret or set it in fame-market/.env."
+            exit 1
+          fi
+          if ! grep -Eq '^MONITORING_SECRET=.+$' .env || grep -Eq '^MONITORING_SECRET=change-monitoring-secret$' .env; then
+            set_env_value MONITORING_SECRET "$(openssl rand -hex 32)"
+          fi
+          if ! grep -Eq '^PRESENCE_HASH_SALT=.+$' .env || grep -Eq '^PRESENCE_HASH_SALT=(change-me|development-only)$' .env; then
+            set_env_value PRESENCE_HASH_SALT "$(openssl rand -hex 32)"
           fi
           set_env_value NEWS_SIGNAL_MODE applied
           set_env_value NEWS_PRICE_IMPACT_ENABLED true

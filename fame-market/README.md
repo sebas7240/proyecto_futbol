@@ -104,8 +104,9 @@ Variables importantes:
 - `ATTENTION_SYNC_ENABLED`
 - `ATTENTION_SYNC_INTERVAL_MINUTES`
 - `ATTENTION_USER_AGENT`
-- `ADMIN_SECRET`
+- `ADMIN_ALLOWED_EMAILS`
 - `MONITORING_SECRET`
+- `PRESENCE_HASH_SALT`
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_ALLOWED_HOSTNAMES`
 - `TURNSTILE_SESSION_TTL_SECONDS`
@@ -190,7 +191,7 @@ no bloquear el desarrollo local.
 3. Guardarla como `YOUTUBE_API_KEY` en `backend/.env`.
 4. Reiniciar el backend.
 5. Abrir `/admin`.
-6. Introducir `ADMIN_SECRET`.
+6. Iniciar sesion con un email incluido en `ADMIN_ALLOWED_EMAILS`.
 7. Registrar los canales por `@handle` y sincronizar.
 
 La API obtiene metadatos y contadores publicos. No descarga videos ni guarda

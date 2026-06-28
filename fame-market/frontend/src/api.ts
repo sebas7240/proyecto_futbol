@@ -269,36 +269,36 @@ export const api = {
     return body.request;
   },
   async registerYouTubeChannel(
-    adminSecret: string,
+    _adminContext: string,
     artistId: string,
     handle: string
   ) {
     return request(`/admin/artists/${artistId}/youtube-channel`, {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ handle, isPrimary: true })
     });
   },
-  async syncYouTube(adminSecret: string, artistId?: string) {
+  async syncYouTube(_adminContext: string, artistId?: string) {
     return request<{ results: Array<{ ok: boolean; videos?: number; error?: string }> }>(
       '/admin/youtube/sync',
       {
         method: 'POST',
-        headers: { 'x-admin-secret': adminSecret },
+        headers: {},
         body: JSON.stringify({ artistId })
       }
     );
   },
-  async attentionOverview(adminSecret: string) {
+  async attentionOverview(_adminContext: string) {
     return request<{
       mode: 'shadow';
       sources: AttentionSourceOverview[];
       evaluation: AttentionEvaluationResponse;
     }>('/admin/attention', {
-      headers: { 'x-admin-secret': adminSecret }
+      headers: {}
     });
   },
-  async syncAttention(adminSecret: string, artistId?: string) {
+  async syncAttention(_adminContext: string, artistId?: string) {
     return request<{
       mode: 'shadow';
       results: Array<{
@@ -309,11 +309,11 @@ export const api = {
       }>;
     }>('/admin/attention/sync', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ artistId })
     });
   },
-  async syncNews(adminSecret: string, artistId?: string) {
+  async syncNews(_adminContext: string, artistId?: string) {
     return request<{
       mode: 'shadow' | 'applied';
       results: Array<{
@@ -324,11 +324,11 @@ export const api = {
       }>;
     }>('/admin/news/sync', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ artistId })
     });
   },
-  async runMarketMaker(adminSecret: string) {
+  async runMarketMaker(_adminContext: string) {
     return request<{
       results: Array<{
         artistId: string;
@@ -342,12 +342,12 @@ export const api = {
       }>;
     }>('/admin/market-maker/run', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: '{}'
     });
   },
   async adminSeasonAction(
-    adminSecret: string,
+    _adminContext: string,
     seasonId: string,
     action: 'freeze' | 'close'
   ) {
@@ -355,13 +355,13 @@ export const api = {
       `/admin/seasons/${seasonId}/${action}`,
       {
         method: 'POST',
-        headers: { 'x-admin-secret': adminSecret },
+        headers: {},
         body: '{}'
       }
     );
   },
   async createSeason(
-    adminSecret: string,
+    _adminContext: string,
     input: {
       name?: string;
       startsAt?: string;
@@ -374,58 +374,58 @@ export const api = {
   ) {
     return request<{ season: Season }>('/admin/seasons', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify(input)
     });
   },
-  async processSeasonCycle(adminSecret: string) {
+  async processSeasonCycle(_adminContext: string) {
     return request<{ actions: string[]; season: Season | null }>(
       '/admin/seasons/cycle',
       {
         method: 'POST',
-        headers: { 'x-admin-secret': adminSecret },
+        headers: {},
         body: '{}'
       }
     );
   },
   async adminReset(
-    adminSecret: string,
+    _adminContext: string,
     action: AdminResetAction,
     confirm: string
   ) {
     return request<{ reset: AdminResetSummary }>('/admin/reset', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ action, confirm })
     });
   },
-  async securityReviews(adminSecret: string) {
+  async securityReviews(_adminContext: string) {
     const body = await request<{ reviews: SecurityReview[] }>(
       '/admin/security/reviews',
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
     return body.reviews;
   },
-  async operations(adminSecret: string) {
+  async operations(_adminContext: string) {
     return request<OperationsOverview>('/admin/operations', {
-      headers: { 'x-admin-secret': adminSecret }
+      headers: {}
     });
   },
-  async prizeProfiles(adminSecret: string) {
+  async prizeProfiles(_adminContext: string) {
     const body = await request<{ profiles: PrizeProfile[] }>(
       '/admin/prize-profiles',
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
     return body.profiles;
   },
-  async chatModeration(adminSecret: string, roomId: string) {
+  async chatModeration(_adminContext: string, roomId: string) {
     return request<ChatModerationOverview>(
       `/admin/chat/moderation?roomId=${encodeURIComponent(roomId)}`,
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
   },
   async moderateChat(
-    adminSecret: string,
+    _adminContext: string,
     input: {
       roomId: string;
       action:
@@ -443,19 +443,19 @@ export const api = {
   ) {
     return request<ChatModerationOverview>('/admin/chat/moderation', {
       method: 'POST',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify(input)
     });
   },
-  async adminExternalEvents(adminSecret: string) {
+  async adminExternalEvents(_adminContext: string) {
     const body = await request<{ events: ExternalEvent[] }>(
       '/admin/external-events',
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
     return body.events;
   },
   async createExternalEvent(
-    adminSecret: string,
+    _adminContext: string,
     artistId: string,
     input: {
       eventType: ExternalEventType;
@@ -474,14 +474,14 @@ export const api = {
       `/admin/artists/${artistId}/external-events`,
       {
         method: 'POST',
-        headers: { 'x-admin-secret': adminSecret },
+        headers: {},
         body: JSON.stringify(input)
       }
     );
     return body.event;
   },
   async updateExternalEvent(
-    adminSecret: string,
+    _adminContext: string,
     eventId: string,
     input: Partial<{
       eventType: ExternalEventType;
@@ -500,14 +500,14 @@ export const api = {
       `/admin/external-events/${eventId}`,
       {
         method: 'PATCH',
-        headers: { 'x-admin-secret': adminSecret },
+        headers: {},
         body: JSON.stringify(input)
       }
     );
     return body.event;
   },
   async reviewRanking(
-    adminSecret: string,
+    _adminContext: string,
     seasonId: string,
     userId: string,
     status: 'approved' | 'flagged',
@@ -515,41 +515,41 @@ export const api = {
   ) {
     return request(`/admin/rankings/${seasonId}/${userId}/review`, {
       method: 'PATCH',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ status, notes: notes.trim() || null })
     });
   },
   async setUserStatus(
-    adminSecret: string,
+    _adminContext: string,
     userId: string,
     status: 'active' | 'frozen'
   ) {
     return request(`/admin/users/${userId}/status`, {
       method: 'PATCH',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ status })
     });
   },
   async setArtistStatus(
-    adminSecret: string,
+    _adminContext: string,
     artistId: string,
     status: 'active' | 'frozen'
   ) {
     return request(`/admin/artists/${artistId}/status`, {
       method: 'PATCH',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ status })
     });
   },
-  async artistRights(adminSecret: string) {
+  async artistRights(_adminContext: string) {
     const body = await request<{ artists: ArtistRightsRecord[] }>(
       '/admin/rights/artists',
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
     return body.artists;
   },
   async updateArtistRights(
-    adminSecret: string,
+    _adminContext: string,
     artistId: string,
     input: {
       imageUrl: string;
@@ -562,26 +562,26 @@ export const api = {
   ) {
     return request(`/admin/rights/artists/${artistId}`, {
       method: 'PATCH',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify(input)
     });
   },
-  async rightsRequests(adminSecret: string) {
+  async rightsRequests(_adminContext: string) {
     const body = await request<{ requests: RightsRequest[] }>(
       '/admin/rights/requests',
-      { headers: { 'x-admin-secret': adminSecret } }
+      { headers: {} }
     );
     return body.requests;
   },
   async updateRightsRequest(
-    adminSecret: string,
+    _adminContext: string,
     requestId: string,
     status: RightsRequestStatus,
     adminNotes: string
   ) {
     return request(`/admin/rights/requests/${requestId}`, {
       method: 'PATCH',
-      headers: { 'x-admin-secret': adminSecret },
+      headers: {},
       body: JSON.stringify({ status, adminNotes: adminNotes.trim() || null })
     });
   }

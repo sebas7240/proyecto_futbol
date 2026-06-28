@@ -9,6 +9,7 @@ services:
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5174,capacitor://localhost,http://localhost}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:5174}
       DATABASE_URL: ${DATABASE_URL:-postgresql://fame_market:fame_market@postgres:5432/fame_market}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
       AUTO_MIGRATE: "true"
       AUTH_MODE: ${AUTH_MODE:-development}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
@@ -37,9 +38,11 @@ services:
       CONSENT_REQUIRED: ${CONSENT_REQUIRED:-false}
       RIGHTS_CONTACT_EMAIL: ${RIGHTS_CONTACT_EMAIL:-}
       RIGHTS_IP_HASH_SALT: ${RIGHTS_IP_HASH_SALT:-development-only}
-      ADMIN_SECRET: ${ADMIN_SECRET:-change-me}
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-sebas7240@gmail.com}
       MONITORING_SECRET: ${MONITORING_SECRET:-change-monitoring-secret}
+      CHAT_WORKER_ADMIN_URL: ${CHAT_WORKER_ADMIN_URL:-}
+      CHAT_ADMIN_SECRET: ${CHAT_ADMIN_SECRET:-}
+      PRESENCE_HASH_SALT: ${PRESENCE_HASH_SALT:-development-only}
       SEASON_AUTOMATION_ENABLED: ${SEASON_AUTOMATION_ENABLED:-true}
       SEASON_CYCLE_INTERVAL_MINUTES: ${SEASON_CYCLE_INTERVAL_MINUTES:-5}
       SEASON_LENGTH_DAYS: ${SEASON_LENGTH_DAYS:-7}

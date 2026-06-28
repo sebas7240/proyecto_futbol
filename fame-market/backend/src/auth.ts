@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import { timingSafeEqual } from 'node:crypto';
 import {
   decodeProtectedHeader,
   importX509,
@@ -29,6 +28,9 @@ let certificateCacheExpiresAt = 0;
 
 function configuredAuthMode(): AuthMode {
   const requested = process.env.AUTH_MODE;
+  if (process.env.NODE_ENV === 'production' && requested === 'development') {
+    throw new Error('AUTH_MODE=development no esta permitido en produccion.');
+  }
   if (requested === 'firebase' || requested === 'development') return requested;
   return process.env.FIREBASE_PROJECT_ID ? 'firebase' : 'development';
 }
@@ -105,7 +107,7 @@ export async function requireAuth(
   next: NextFunction
 ) {
   if (authMode === 'development') {
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_AUTH !== 'true') {
+    if (process.env.NODE_ENV === 'production') {
       response.status(503).json({
         error: {
           code: 'AUTH_NOT_CONFIGURED',
@@ -158,17 +160,10 @@ function adminAllowedEmails() {
     .filter(Boolean);
 }
 
-function safeEqualSecret(suppliedSecret: string | undefined, configuredSecret: string) {
-  if (!suppliedSecret) return false;
-  const supplied = Buffer.from(suppliedSecret);
-  const configured = Buffer.from(configuredSecret);
-  return supplied.length === configured.length && timingSafeEqual(supplied, configured);
-}
-
 async function requestUser(request: Request): Promise<AuthenticatedUser | null> {
   if (request.authenticatedUser) return request.authenticatedUser;
   if (authMode === 'development') {
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_AUTH !== 'true') {
+    if (process.env.NODE_ENV === 'production') {
       return null;
     }
     const uid = request.header('x-user-id')?.trim() || 'demo-user';
@@ -189,17 +184,6 @@ export async function requireAdmin(
   response: Response,
   next: NextFunction
 ) {
-  const configuredSecret = process.env.ADMIN_SECRET;
-  const suppliedSecret = request.header('x-admin-secret');
-  if (!configuredSecret || !safeEqualSecret(suppliedSecret, configuredSecret)) {
-    response.status(403).json({
-      error: {
-        code: 'ADMIN_REQUIRED',
-        message: 'No tienes permisos para esta accion.'
-      }
-    });
-    return;
-  }
   let user: AuthenticatedUser | null = null;
   try {
     user = await requestUser(request);
