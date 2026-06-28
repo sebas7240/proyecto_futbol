@@ -419,9 +419,10 @@ async function requestChatModeration(
   const baseUrl = (
     process.env.CHAT_WORKER_ADMIN_URL ||
     process.env.CHAT_WORKER_URL ||
-    ''
+    process.env.CHAT_WS_URL ||
+    'https://fame-plays-chat.sebas7240.workers.dev'
   ).replace(/\/+$/, '');
-  const secret = process.env.CHAT_ADMIN_SECRET || '';
+  const secret = process.env.CHAT_ADMIN_SECRET || process.env.ADMIN_SECRET || '';
   if (!baseUrl || !secret) {
     throw new MarketError(
       'Configura CHAT_WORKER_ADMIN_URL y CHAT_ADMIN_SECRET para moderar el chat.',

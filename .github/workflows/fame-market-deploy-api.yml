@@ -30,6 +30,7 @@ jobs:
       VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
       VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
       VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+      CHAT_ADMIN_SECRET: ${{ secrets.CHAT_ADMIN_SECRET }}
 
     steps:
       - name: Checkout repository
@@ -67,10 +68,11 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            bash -s -- "$VPS_DEPLOY_PATH" "$GITHUB_SHA" <<'REMOTE'
+            bash -s -- "$VPS_DEPLOY_PATH" "$GITHUB_SHA" "$CHAT_ADMIN_SECRET" <<'REMOTE'
           set -Eeuo pipefail
           DEPLOY_PATH="$1"
           EXPECTED_SHA="$2"
+          CHAT_SECRET_FROM_GH="${3:-}"
 
           cd "$DEPLOY_PATH"
           if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
@@ -94,11 +96,23 @@ jobs:
             key="$1"
             value="$2"
             if grep -q "^${key}=" .env; then
-              sed -i "s/^${key}=.*/${key}=${value}/" .env
+              escaped_value="${value//\\/\\\\}"
+              escaped_value="${escaped_value//&/\\&}"
+              escaped_value="${escaped_value//|/\\|}"
+              sed -i "s|^${key}=.*|${key}=${escaped_value}|" .env
             else
               printf '%s=%s\n' "$key" "$value" >> .env
             fi
           }
+          set_env_value CHAT_WORKER_ADMIN_URL https://fame-plays-chat.sebas7240.workers.dev
+          if [[ -n "$CHAT_SECRET_FROM_GH" ]]; then
+            set_env_value CHAT_ADMIN_SECRET "$CHAT_SECRET_FROM_GH"
+          elif ! grep -Eq '^CHAT_ADMIN_SECRET=.+$' .env; then
+            admin_secret="$(grep -E '^ADMIN_SECRET=' .env | tail -1 | cut -d= -f2- || true)"
+            if [[ -n "$admin_secret" ]]; then
+              set_env_value CHAT_ADMIN_SECRET "$admin_secret"
+            fi
+          fi
           set_env_value NEWS_SIGNAL_MODE applied
           set_env_value NEWS_PRICE_IMPACT_ENABLED true
           set_env_value NEWS_MAX_SIGNAL_BPS 250

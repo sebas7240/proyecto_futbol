@@ -3886,12 +3886,14 @@ button {
 }
 
 .chat-moderation__messages,
+.chat-report-list,
 .chat-moderation__actions-list {
   display: grid;
   gap: 8px;
 }
 
 .chat-moderation__messages > p,
+.chat-report-list > p,
 .chat-moderation__actions-list > p,
 .chat-moderation > p {
   margin: 0;
@@ -3900,6 +3902,7 @@ button {
 }
 
 .chat-moderation-card,
+.chat-report-card,
 .chat-action-card {
   display: grid;
   gap: 9px;
@@ -3920,6 +3923,7 @@ button {
 }
 
 .chat-moderation-card header span,
+.chat-report-card span,
 .chat-action-card span {
   min-width: 0;
   display: grid;
@@ -3927,12 +3931,14 @@ button {
 }
 
 .chat-moderation-card small,
+.chat-report-card small,
 .chat-action-card small,
 .chat-action-card p {
   color: var(--muted);
 }
 
 .chat-moderation-card small,
+.chat-report-card small,
 .chat-action-card small {
   overflow: hidden;
   font-size: 10px;
@@ -3951,6 +3957,7 @@ button {
 }
 
 .chat-moderation-card p,
+.chat-report-card p,
 .chat-action-card p {
   margin: 0;
   overflow-wrap: anywhere;
@@ -4009,6 +4016,21 @@ button {
   color: #7c6820;
   font-size: 11px;
   line-height: 1.35;
+}
+
+.chat-report-card {
+  border-color: #eadb89;
+  background: #fffaf0;
+}
+
+.chat-report-card > span strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-moderation__subheading {
+  margin-top: 16px !important;
 }
 
 .chat-action-card {

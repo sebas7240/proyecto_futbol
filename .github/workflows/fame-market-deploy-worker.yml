@@ -26,6 +26,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CHAT_ADMIN_SECRET: ${{ secrets.CHAT_ADMIN_SECRET }}
 
     steps:
       - name: Checkout repository
@@ -42,6 +43,13 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+
+      - name: Sync chat admin secret
+        if: env.CHAT_ADMIN_SECRET != ''
+        shell: bash
+        run: |
+          printf '%s' "$CHAT_ADMIN_SECRET" | \
+            npx --yes wrangler@4.100.0 secret put CHAT_ADMIN_SECRET --config chat-worker/wrangler.jsonc
 
       - name: Deploy Durable Object Worker
         run: npx --yes wrangler@4.100.0 deploy --config chat-worker/wrangler.jsonc

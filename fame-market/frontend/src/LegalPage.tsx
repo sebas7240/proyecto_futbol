@@ -14,7 +14,7 @@ import {
 import { api } from './api';
 import type { RightsRequestType } from './types';
 
-const updatedAt = '15 de junio de 2026';
+const updatedAt = '27 de junio de 2026';
 
 function formatDate(value: string | null) {
   if (!value) return 'Pendiente';
@@ -79,7 +79,17 @@ function RulesPage() {
         </p>
       </section>
       <section>
-        <h2>5. Datos y metodologia</h2>
+        <h2>5. Comunidad y chat</h2>
+        <p>
+          El chat y las notas de voz cortas son funciones comunitarias. No se
+          permiten insultos graves, acoso, spam, enlaces peligrosos, suplantacion
+          ni contenido ilegal. Los usuarios pueden reportar mensajes o notas de
+          voz; el equipo puede ocultar contenido, silenciar, bloquear o reiniciar
+          una sala para proteger la experiencia.
+        </p>
+      </section>
+      <section>
+        <h2>6. Datos y metodologia</h2>
         <p>
           Las estadisticas de YouTube se muestran como informacion publica para
           ayudar a tomar decisiones y actualmente no afectan el precio. El
@@ -89,15 +99,18 @@ function RulesPage() {
         </p>
       </section>
       <section>
-        <h2>6. Premios y cambios</h2>
+        <h2>7. Premios, wallet y cambios</h2>
         <p>
           La beta no promete premios. Si una temporada futura ofrece uno, sus
-          condiciones se publicaran por separado. Las reglas pueden actualizarse
+          condiciones se publicaran por separado. La wallet Solana registrada
+          solo se usara como dato de contacto operativo para pagos manuales de
+          premios autorizados; Fame Plays nunca pedira frase semilla, llave
+          privada ni acceso a una cuenta cripto. Las reglas pueden actualizarse
           y una version nueva requerira una aceptacion nueva antes de operar.
         </p>
       </section>
       <section>
-        <h2>7. Figuras publicas y marcas</h2>
+        <h2>8. Figuras publicas y marcas</h2>
         <p>
           Los nombres se usan para identificar figuras publicas dentro de un
           indice informativo y un juego ficticio. Esa referencia no implica
@@ -128,8 +141,9 @@ function PrivacyPage() {
         <p>
           Al iniciar sesion recibimos de Firebase el identificador de cuenta,
           nombre, correo y avatar disponibles. Guardamos favoritos, operaciones,
-          posiciones, ranking, aceptaciones legales y eventos necesarios para
-          seguridad y prevencion de fraude.
+          posiciones, ranking, wallet publica de premios si decides registrarla,
+          aceptaciones legales y eventos necesarios para seguridad y prevencion
+          de fraude.
         </p>
       </section>
       <section>
@@ -146,7 +160,9 @@ function PrivacyPage() {
           La operacion puede involucrar Firebase para autenticacion, Cloudflare
           para entrega y seguridad, Hetzner para infraestructura, PostgreSQL
           para persistencia, Wikimedia para pageviews agregadas y YouTube API
-          Services para metadatos y estadisticas publicas. Cada proveedor trata
+          Services para metadatos y estadisticas publicas. El chat usa Workers
+          y Durable Objects de Cloudflare; la seccion de radio puede consultar
+          directorios o streams publicos de terceros. Cada proveedor trata
           informacion bajo sus propios terminos y medidas de seguridad.
         </p>
       </section>
@@ -157,6 +173,12 @@ function PrivacyPage() {
           activas y durante el tiempo razonable necesario para auditoria. Las
           copias operativas se rotan normalmente a los 14 dias. Los registros
           de temporadas pueden conservarse para mantener rankings historicos.
+        </p>
+        <p>
+          Los mensajes de chat, reportes y notas de voz se conservan de forma
+          limitada dentro de la sala correspondiente y pueden eliminarse
+          automaticamente por volumen, antiguedad o decision de moderacion.
+          No estan pensados como almacenamiento permanente.
         </p>
         <p>
           Los metadatos obtenidos de YouTube se actualizan o eliminan conforme
@@ -170,9 +192,10 @@ function PrivacyPage() {
         <h2>5. Seguridad y decisiones</h2>
         <p>
           Aplicamos autenticacion, limites de solicitudes, verificacion
-          antifraude, cifrado de respaldos y revision administrativa. Las
-          alertas automaticas apoyan una revision humana; no entregan premios ni
-          imponen sanciones definitivas por si solas.
+          antifraude, limites de mensajes y notas de voz, cifrado de respaldos
+          y revision administrativa. Las alertas automaticas apoyan una revision
+          humana; no entregan premios ni imponen sanciones definitivas por si
+          solas.
         </p>
       </section>
       <section>
@@ -192,7 +215,16 @@ function PrivacyPage() {
         </p>
       </section>
       <section>
-        <h2>7. Solicitudes</h2>
+        <h2>7. Wallet de premios</h2>
+        <p>
+          Si registras una wallet Solana, se almacena como direccion publica
+          para contactarte o realizar una transferencia manual si una temporada
+          validada incluye premio. No conectamos tu wallet, no firmamos
+          transacciones y nunca solicitamos claves privadas.
+        </p>
+      </section>
+      <section>
+        <h2>8. Solicitudes</h2>
         <p>
           Puedes solicitar correccion o eliminacion mediante el formulario de
           derechos. Para tramitarlo guardamos el nombre, correo, contenido de
@@ -230,28 +262,29 @@ function MethodologyPage() {
       <section>
         <h2>1. Estado actual</h2>
         <p>
-          El indice se encuentra en modo sombra. Las senales se guardan y
-          evaluan durante 30 ventanas diarias, pero el ajuste aplicado al precio
-          permanece siempre en cero hasta completar revision tecnica, humana y
-          de permisos.
+          El indice externo ya puede proponer ajustes controlados al precio
+          cuando existen fuentes suficientes y la configuracion de mercado lo
+          permite. Cada ajuste queda limitado por bandas diarias, versionado y
+          revision operativa para evitar movimientos extremos o manipulables.
         </p>
       </section>
       <section>
-        <h2>2. Fuente activa</h2>
+        <h2>2. Fuentes activas</h2>
         <p>
-          La primera fuente es Wikimedia Pageviews. Se utilizan visitas diarias
-          agregadas de usuarios y se compara cada figura solamente contra su
-          propio historial. Los totales de figuras distintas nunca se comparan
-          directamente.
+          Fame Plays puede combinar fuentes publicas autorizadas o permitidas
+          por sus terminos, como actividad de noticias y pageviews agregadas.
+          Cada figura se compara principalmente contra su propio historial; los
+          totales de figuras distintas no se usan como una comparacion directa
+          de valor.
         </p>
       </section>
       <section>
         <h2>3. Calculo</h2>
         <p>
-          Se compara el promedio de los siete dias recientes contra los 21 dias
-          anteriores. El crecimiento logaritmico se suaviza con una funcion
-          acotada, incorpora una zona neutral y propone como maximo 15 puntos
-          basicos, equivalentes a 0,15%, cuando existe una sola fuente.
+          El motor normaliza cambios recientes contra una linea base, aplica
+          suavizado, deduplicacion, zonas neutrales y limites por fuente. Las
+          compras y ventas del juego siguen influyendo mediante el mercado
+          ficticio; las senales externas solo agregan una variacion controlada.
         </p>
       </section>
       <section>
@@ -282,7 +315,7 @@ function MethodologyPage() {
             <h2>6. Estado vivo del indice</h2>
             <p>
               Esta vista se alimenta de la API publica y confirma que las
-              fuentes externas siguen en modo sombra.
+              fuentes externas se estan observando con limites de seguridad.
             </p>
           </div>
           <span>{status?.mode ?? 'shadow'}</span>
@@ -308,14 +341,14 @@ function MethodologyPage() {
                 <span>Cobertura promedio</span>
               </article>
               <article>
-                <strong>0 bps</strong>
+                <strong>Limitado</strong>
                 <span>Impacto aplicado</span>
               </article>
             </div>
             <p className="methodology-status__note">
               Ultima sincronizacion:{' '}
-              {formatDate(status.summary.lastSyncedAt)}. Activacion de precios:
-              detenida hasta completar revision humana.
+              {formatDate(status.summary.lastSyncedAt)}. Los ajustes publicos
+              se muestran de forma agregada y pueden pausarse manualmente.
             </p>
             <div className="methodology-source-list">
               {status.sources.map((source) => (

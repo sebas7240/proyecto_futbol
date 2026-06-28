@@ -201,6 +201,20 @@ export function AdminPanel() {
         chatMessage.status
       )
     ) ?? [];
+  const filteredChatReports =
+    chatModerationQuery.data?.reports.filter((report) => {
+      const reportedMessage = chatModerationQuery.data?.recentMessages.find(
+        (chatMessage) => chatMessage.id === report.messageId
+      );
+      return matchesAdminSearch(
+        report.reason,
+        report.userId,
+        report.messageId,
+        reportedMessage?.name,
+        reportedMessage?.body,
+        reportedMessage?.type
+      );
+    }) ?? [];
   const filteredRightsRequests = (rightsRequestsQuery.data ?? []).filter((request) =>
     matchesAdminSearch(
       request.subject,
@@ -1448,8 +1462,8 @@ export function AdminPanel() {
           <p>Cargando sala...</p>
         ) : chatModerationQuery.isError ? (
           <p>
-            No se pudo conectar la moderacion. Revisa CHAT_WORKER_ADMIN_URL y
-            CHAT_ADMIN_SECRET.
+            No se pudo conectar la moderacion. El backend debe apuntar al
+            Worker de chat y usar el mismo secreto administrativo.
           </p>
         ) : (
           <div className="chat-moderation__grid">
@@ -1527,16 +1541,89 @@ export function AdminPanel() {
 
             <div>
               <h3>
-                <Flag size={17} /> Acciones activas
+                <Flag size={17} /> Reportes recientes
               </h3>
-              {chatModerationQuery.data?.reports.length ? (
-                <div className="chat-report-summary">
-                  <strong>{chatModerationQuery.data.reports.length} reportes recientes</strong>
-                  <small>
-                    Usa Ocultar, Silenciar o Bloquear sobre el mensaje reportado.
-                  </small>
-                </div>
-              ) : null}
+              <div className="chat-report-list">
+                {filteredChatReports.length ? (
+                  filteredChatReports.map((report) => {
+                    const reportedMessage =
+                      chatModerationQuery.data?.recentMessages.find(
+                        (chatMessage) => chatMessage.id === report.messageId
+                      );
+                    return (
+                      <article className="chat-report-card" key={report.id}>
+                        <span>
+                          <strong>
+                            {reportedMessage?.name ?? 'Mensaje ya retirado'}
+                          </strong>
+                          <small>
+                            Reportado por {report.userId} -{' '}
+                            {new Date(report.createdAt).toLocaleTimeString(
+                              'es-CO',
+                              { hour: '2-digit', minute: '2-digit' }
+                            )}
+                          </small>
+                        </span>
+                        <p>
+                          {reportedMessage
+                            ? reportedMessage.type === 'voice'
+                              ? `Nota de voz ${Math.round(
+                                  reportedMessage.durationMs / 1000
+                                )}s`
+                              : reportedMessage.body || 'Mensaje vacio'
+                            : 'El mensaje no aparece entre los recientes.'}
+                        </p>
+                        {report.reason && <small>Motivo: {report.reason}</small>}
+                        {reportedMessage ? (
+                          <div className="chat-moderation-card__actions">
+                            <button
+                              onClick={() =>
+                                moderateChat('hide-message', {
+                                  messageId: reportedMessage.id
+                                })
+                              }
+                              disabled={Boolean(busyArtist)}
+                            >
+                              <Trash2 size={15} /> Ocultar
+                            </button>
+                            <button
+                              onClick={() =>
+                                moderateChat('mute-user', {
+                                  userId: reportedMessage.userId,
+                                  userName: reportedMessage.name,
+                                  durationMinutes: 15
+                                })
+                              }
+                              disabled={Boolean(busyArtist)}
+                            >
+                              <Volume2 size={15} /> Silenciar
+                            </button>
+                            <button
+                              className="danger-action"
+                              onClick={() =>
+                                moderateChat('ban-user', {
+                                  userId: reportedMessage.userId,
+                                  userName: reportedMessage.name,
+                                  durationMinutes: 1440
+                                })
+                              }
+                              disabled={Boolean(busyArtist)}
+                            >
+                              <Ban size={15} /> Bloquear
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })
+                ) : (
+                  <p>No hay reportes recientes en esta sala.</p>
+                )}
+              </div>
+
+              <h3 className="chat-moderation__subheading">
+                <Ban size={17} /> Acciones activas
+              </h3>
               <div className="chat-moderation__actions-list">
                 {chatModerationQuery.data?.actions.filter((action) => action.active)
                   .length ? (

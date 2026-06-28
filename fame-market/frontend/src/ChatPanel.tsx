@@ -230,17 +230,22 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     let retryTimer: number | undefined;
     let pingTimer: number | undefined;
     let closedByEffect = false;
+    let reconnectAttempt = 0;
 
     const connect = () => {
       setStatus('connecting');
-      setNotice('');
+      if (reconnectAttempt === 0) setNotice('');
       const socket = new WebSocket(
         buildRoomUrl(chatBaseUrl, roomId, identity.userId, identity.name)
       );
       socketRef.current = socket;
+      let opened = false;
 
       socket.addEventListener('open', () => {
+        opened = true;
+        reconnectAttempt = 0;
         setStatus('connected');
+        setNotice('');
         pingTimer = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'ping' }));
@@ -290,11 +295,18 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         if (pingTimer) window.clearInterval(pingTimer);
         if (closedByEffect) return;
         setStatus('disconnected');
-        retryTimer = window.setTimeout(connect, 3500);
+        reconnectAttempt += 1;
+        if (opened) {
+          setNotice('Reconectando chat...');
+        }
+        const delay = Math.min(2500 + reconnectAttempt * 1000, 9000);
+        retryTimer = window.setTimeout(connect, delay);
       });
 
       socket.addEventListener('error', () => {
-        setNotice('No se pudo conectar el chat en este momento.');
+        if (!opened) {
+          setNotice('Reconectando chat...');
+        }
       });
     };
 
