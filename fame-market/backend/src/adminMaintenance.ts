@@ -5,6 +5,7 @@ import { MarketError } from './market.js';
 export type AdminResetAction =
   | 'season-activity'
   | 'season-full'
+  | 'season-history'
   | 'news-pulse';
 
 export interface AdminResetSummary {
@@ -228,6 +229,112 @@ async function resetNewsPulse(
   };
 }
 
+async function resetSeasonHistory(
+  client: PoolClient,
+  actor: string
+): Promise<AdminResetSummary> {
+  const seasonResult = await client.query<{ id: string }>(
+    `
+      SELECT id
+      FROM seasons
+      WHERE status = 'closed'
+      FOR UPDATE
+    `
+  );
+  const seasonIds = seasonResult.rows.map((season) => season.id);
+  if (!seasonIds.length) {
+    return {
+      action: 'season-history',
+      seasonId: null,
+      deleted: {},
+      updated: {},
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  const deleted: Record<string, number> = {};
+  const updated: Record<string, number> = {};
+
+  deleted.ledgerEntries = await deleteCount(
+    client,
+    `
+      DELETE FROM ledger_entries entry
+      WHERE entry.wallet_id IN (
+        SELECT id FROM wallets WHERE season_id = ANY($1::uuid[])
+      )
+      OR entry.trade_id IN (
+        SELECT trade.id
+        FROM trades trade
+        JOIN wallets wallet ON wallet.id = trade.wallet_id
+        WHERE wallet.season_id = ANY($1::uuid[])
+      )
+    `,
+    [seasonIds]
+  );
+  deleted.tradeQuotes = await deleteCount(
+    client,
+    `
+      DELETE FROM trade_quotes quote
+      USING wallets wallet
+      WHERE quote.wallet_id = wallet.id
+        AND wallet.season_id = ANY($1::uuid[])
+    `,
+    [seasonIds]
+  );
+  deleted.trades = await deleteCount(
+    client,
+    `
+      DELETE FROM trades trade
+      USING wallets wallet
+      WHERE trade.wallet_id = wallet.id
+        AND wallet.season_id = ANY($1::uuid[])
+    `,
+    [seasonIds]
+  );
+  deleted.positions = await deleteCount(
+    client,
+    `
+      DELETE FROM positions position
+      USING wallets wallet
+      WHERE position.wallet_id = wallet.id
+        AND wallet.season_id = ANY($1::uuid[])
+    `,
+    [seasonIds]
+  );
+  deleted.rankings = await deleteCount(
+    client,
+    'DELETE FROM rankings WHERE season_id = ANY($1::uuid[])',
+    [seasonIds]
+  );
+  deleted.fraudAlerts = await deleteCount(
+    client,
+    'DELETE FROM fraud_alerts WHERE season_id = ANY($1::uuid[])',
+    [seasonIds]
+  );
+  deleted.wallets = await deleteCount(
+    client,
+    'DELETE FROM wallets WHERE season_id = ANY($1::uuid[])',
+    [seasonIds]
+  );
+
+  await client.query(
+    `
+      INSERT INTO audit_logs (
+        actor_id, action, entity_type, entity_id, metadata
+      ) VALUES ($1, 'admin.reset.season-history', 'season', NULL, $2)
+    `,
+    [actor, { deleted, updated, seasonIds }]
+  );
+
+  return {
+    action: 'season-history',
+    seasonId: null,
+    deleted,
+    updated,
+    generatedAt: new Date().toISOString()
+  };
+}
+
 export async function runAdminReset(
   action: AdminResetAction,
   actor = 'admin'
@@ -241,7 +348,9 @@ export async function runAdminReset(
     const summary =
       action === 'news-pulse'
         ? await resetNewsPulse(client, actor)
-        : await resetSeasonActivity(client, action, actor);
+        : action === 'season-history'
+          ? await resetSeasonHistory(client, actor)
+          : await resetSeasonActivity(client, action, actor);
     await client.query('COMMIT');
     return summary;
   } catch (error) {

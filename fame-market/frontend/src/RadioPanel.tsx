@@ -17,6 +17,8 @@ interface CuratedStation {
   category: RadioCategory;
   tags: string;
   officialUrl: string;
+  country?: string;
+  countryCode?: string;
   query?: string | string[];
 }
 
@@ -201,6 +203,306 @@ const stations: CuratedStation[] = [
     officialUrl: 'https://www.radio-browser.info/',
     query: 'Viejoteca y algo mas'
   },
+  {
+    id: 'pr-radio-isla',
+    name: 'Radio Isla 1320',
+    category: 'noticias',
+    tags: 'Puerto Rico, noticias y actualidad',
+    officialUrl: 'https://radioisla.tv/',
+    country: 'Puerto Rico',
+    countryCode: 'PR',
+    query: 'Radio Isla 1320'
+  },
+  {
+    id: 'pr-wkaq',
+    name: 'WKAQ 580',
+    category: 'noticias',
+    tags: 'Puerto Rico, noticias y opinion',
+    officialUrl: 'https://wkaq580.com/',
+    country: 'Puerto Rico',
+    countryCode: 'PR',
+    query: 'WKAQ 580'
+  },
+  {
+    id: 'pr-zeta-93',
+    name: 'Zeta 93',
+    category: 'musica',
+    tags: 'Puerto Rico, salsa y tropical',
+    officialUrl: 'https://zeta93.fm/',
+    country: 'Puerto Rico',
+    countryCode: 'PR',
+    query: 'Zeta 93'
+  },
+  {
+    id: 'mx-radio-formula',
+    name: 'Radio Formula',
+    category: 'noticias',
+    tags: 'Mexico, noticias y opinion',
+    officialUrl: 'https://www.radioformula.com.mx/',
+    country: 'Mexico',
+    countryCode: 'MX',
+    query: 'Radio Formula'
+  },
+  {
+    id: 'mx-alfa',
+    name: 'Alfa 91.3',
+    category: 'musica',
+    tags: 'Mexico, pop y hits',
+    officialUrl: 'https://alfaenlinea.com/',
+    country: 'Mexico',
+    countryCode: 'MX',
+    query: 'Alfa 91.3'
+  },
+  {
+    id: 'mx-radio-felicidad',
+    name: 'Radio Felicidad',
+    category: 'musica',
+    tags: 'Mexico, clasicos y romantica',
+    officialUrl: 'https://www.radiofelicidad.mx/',
+    country: 'Mexico',
+    countryCode: 'MX',
+    query: 'Radio Felicidad'
+  },
+  {
+    id: 'br-cbn-sao-paulo',
+    name: 'CBN Sao Paulo',
+    category: 'noticias',
+    tags: 'Brasil, noticias y actualidad',
+    officialUrl: 'https://cbn.globoradio.globo.com/',
+    country: 'Brasil',
+    countryCode: 'BR',
+    query: 'CBN Sao Paulo'
+  },
+  {
+    id: 'br-jovem-pan',
+    name: 'Jovem Pan',
+    category: 'noticias',
+    tags: 'Brasil, noticias y entretenimiento',
+    officialUrl: 'https://jovempan.com.br/',
+    country: 'Brasil',
+    countryCode: 'BR',
+    query: 'Jovem Pan'
+  },
+  {
+    id: 'br-radio-gaucha',
+    name: 'Radio Gaucha',
+    category: 'deportes',
+    tags: 'Brasil, deportes y actualidad',
+    officialUrl: 'https://gauchazh.clicrbs.com.br/',
+    country: 'Brasil',
+    countryCode: 'BR',
+    query: 'Radio Gaucha'
+  },
+  {
+    id: 'uk-bbc-world-service',
+    name: 'BBC World Service',
+    category: 'noticias',
+    tags: 'Reino Unido, noticias globales',
+    officialUrl: 'https://www.bbc.co.uk/worldserviceradio',
+    country: 'Reino Unido',
+    countryCode: 'GB',
+    query: 'BBC World Service'
+  },
+  {
+    id: 'uk-classic-fm',
+    name: 'Classic FM',
+    category: 'musica',
+    tags: 'Reino Unido, clasica',
+    officialUrl: 'https://www.classicfm.com/',
+    country: 'Reino Unido',
+    countryCode: 'GB',
+    query: 'Classic FM'
+  },
+  {
+    id: 'uk-lbc-news',
+    name: 'LBC News',
+    category: 'noticias',
+    tags: 'Reino Unido, noticias',
+    officialUrl: 'https://www.lbc.co.uk/',
+    country: 'Reino Unido',
+    countryCode: 'GB',
+    query: 'LBC'
+  },
+  {
+    id: 'us-npr',
+    name: 'NPR',
+    category: 'noticias',
+    tags: 'USA, noticias publicas',
+    officialUrl: 'https://www.npr.org/',
+    country: 'USA',
+    countryCode: 'US',
+    query: 'NPR'
+  },
+  {
+    id: 'us-kexp',
+    name: 'KEXP',
+    category: 'musica',
+    tags: 'USA, alternativa e independiente',
+    officialUrl: 'https://www.kexp.org/',
+    country: 'USA',
+    countryCode: 'US',
+    query: 'KEXP'
+  },
+  {
+    id: 'us-espn-radio',
+    name: 'ESPN Radio',
+    category: 'deportes',
+    tags: 'USA, deportes',
+    officialUrl: 'https://www.espn.com/radio/',
+    country: 'USA',
+    countryCode: 'US',
+    query: 'ESPN Radio'
+  },
+  {
+    id: 'ca-cbc-radio-one',
+    name: 'CBC Radio One',
+    category: 'noticias',
+    tags: 'Canada, noticias publicas',
+    officialUrl: 'https://www.cbc.ca/listen/live-radio',
+    country: 'Canada',
+    countryCode: 'CA',
+    query: 'CBC Radio One'
+  },
+  {
+    id: 'ca-cbc-music',
+    name: 'CBC Music',
+    category: 'musica',
+    tags: 'Canada, musica',
+    officialUrl: 'https://www.cbc.ca/listen/live-radio',
+    country: 'Canada',
+    countryCode: 'CA',
+    query: 'CBC Music'
+  },
+  {
+    id: 'ca-cjad-800',
+    name: 'CJAD 800',
+    category: 'noticias',
+    tags: 'Canada, noticias y conversacion',
+    officialUrl: 'https://www.iheartradio.ca/cjad',
+    country: 'Canada',
+    countryCode: 'CA',
+    query: 'CJAD 800'
+  },
+  {
+    id: 'es-cadena-ser',
+    name: 'Cadena SER',
+    category: 'noticias',
+    tags: 'Espana, noticias y deportes',
+    officialUrl: 'https://cadenaser.com/',
+    country: 'Espana',
+    countryCode: 'ES',
+    query: 'Cadena SER'
+  },
+  {
+    id: 'es-los40',
+    name: 'LOS40 Espana',
+    category: 'musica',
+    tags: 'Espana, hits y pop',
+    officialUrl: 'https://los40.com/',
+    country: 'Espana',
+    countryCode: 'ES',
+    query: 'Los 40 Principales Espana'
+  },
+  {
+    id: 'es-kiss-fm',
+    name: 'Kiss FM',
+    category: 'musica',
+    tags: 'Espana, pop y clasicos',
+    officialUrl: 'https://www.kissfm.es/',
+    country: 'Espana',
+    countryCode: 'ES',
+    query: 'Kiss FM'
+  },
+  {
+    id: 'ar-aspen',
+    name: 'Aspen 102.3',
+    category: 'musica',
+    tags: 'Argentina, clasicos y pop',
+    officialUrl: 'https://fmaspen.com/',
+    country: 'Argentina',
+    countryCode: 'AR',
+    query: 'Aspen 102.3'
+  },
+  {
+    id: 'ar-la100',
+    name: 'La 100',
+    category: 'musica',
+    tags: 'Argentina, pop y actualidad',
+    officialUrl: 'https://la100.cienradios.com/',
+    country: 'Argentina',
+    countryCode: 'AR',
+    query: 'La 100'
+  },
+  {
+    id: 'ar-la-red',
+    name: 'La Red AM 910',
+    category: 'deportes',
+    tags: 'Argentina, deportes y futbol',
+    officialUrl: 'https://www.radiolared.com.ar/',
+    country: 'Argentina',
+    countryCode: 'AR',
+    query: 'La Red AM 910'
+  },
+  {
+    id: 'pt-antena-1',
+    name: 'Antena 1',
+    category: 'noticias',
+    tags: 'Portugal, noticias publicas',
+    officialUrl: 'https://www.rtp.pt/play/direto/antena1',
+    country: 'Portugal',
+    countryCode: 'PT',
+    query: 'Antena 1'
+  },
+  {
+    id: 'pt-radio-comercial',
+    name: 'Radio Comercial',
+    category: 'musica',
+    tags: 'Portugal, pop y entretenimiento',
+    officialUrl: 'https://radiocomercial.pt/',
+    country: 'Portugal',
+    countryCode: 'PT',
+    query: 'Radio Comercial'
+  },
+  {
+    id: 'pt-tsf',
+    name: 'TSF Radio Noticias',
+    category: 'noticias',
+    tags: 'Portugal, noticias',
+    officialUrl: 'https://www.tsf.pt/',
+    country: 'Portugal',
+    countryCode: 'PT',
+    query: 'TSF Radio Noticias'
+  },
+  {
+    id: 'cl-bio-bio',
+    name: 'Radio Bio Bio',
+    category: 'noticias',
+    tags: 'Chile, noticias y actualidad',
+    officialUrl: 'https://www.biobiochile.cl/',
+    country: 'Chile',
+    countryCode: 'CL',
+    query: 'Radio Bio Bio'
+  },
+  {
+    id: 'cl-cooperativa',
+    name: 'Cooperativa',
+    category: 'noticias',
+    tags: 'Chile, noticias y deportes',
+    officialUrl: 'https://www.cooperativa.cl/',
+    country: 'Chile',
+    countryCode: 'CL',
+    query: 'Cooperativa'
+  },
+  {
+    id: 'cl-play-fm',
+    name: 'Play FM',
+    category: 'musica',
+    tags: 'Chile, musica y actualidad',
+    officialUrl: 'https://www.playfm.cl/',
+    country: 'Chile',
+    countryCode: 'CL',
+    query: 'Play FM'
+  },
 ];
 
 function streamUrl(station: RadioBrowserStation) {
@@ -212,9 +514,14 @@ async function resolveStation(station: CuratedStation) {
   const queries = Array.isArray(station.query)
     ? station.query
     : [station.query ?? station.name];
+  const countryCode = station.countryCode ?? 'CO';
+  const countryFilters = [
+    `&countrycode=${encodeURIComponent(countryCode)}`,
+    ''
+  ];
   for (const rawQuery of queries) {
     const query = encodeURIComponent(rawQuery);
-    for (const countryFilter of ['&countrycode=CO', '']) {
+    for (const countryFilter of countryFilters) {
       for (const server of radioBrowserServers) {
         const url =
           `${server}/json/stations/search?name=${query}` +
@@ -247,6 +554,7 @@ async function resolveStation(station: CuratedStation) {
 export function RadioPanel() {
   const [selectedId, setSelectedId] = useState(stations[0]!.id);
   const [category, setCategory] = useState<'todas' | RadioCategory>('todas');
+  const [country, setCountry] = useState('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [status, setStatus] = useState('Lista');
   const [resolved, setResolved] = useState<Record<string, RadioBrowserStation | null>>({});
@@ -259,20 +567,28 @@ export function RadioPanel() {
     }
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const countries = useMemo(
+    () =>
+      Array.from(new Set(stations.map((station) => station.country ?? 'Colombia')))
+        .sort((left, right) => left.localeCompare(right, 'es')),
+    []
+  );
 
   const filteredStations = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return stations.filter((station) => {
       if (unavailableIds.includes(station.id)) return false;
+      const stationCountry = station.country ?? 'Colombia';
+      const byCountry = country === 'todas' || stationCountry === country;
       const byCategory = category === 'todas' || station.category === category;
       const byQuery =
         !query ||
-        `${station.name} ${station.tags} ${station.category}`
+        `${station.name} ${station.tags} ${station.category} ${stationCountry}`
           .toLowerCase()
           .includes(query);
-      return byCategory && byQuery;
+      return byCountry && byCategory && byQuery;
     });
-  }, [category, searchTerm, unavailableIds]);
+  }, [category, country, searchTerm, unavailableIds]);
   const selected = useMemo(
     () => stations.find((station) => station.id === selectedId) ?? stations[0]!,
     [selectedId]
@@ -284,6 +600,13 @@ export function RadioPanel() {
     const nextStation = filteredStations.find((station) => station.id !== selectedId);
     if (nextStation) setSelectedId(nextStation.id);
   }, [filteredStations, selectedId, unavailableIds]);
+
+  useEffect(() => {
+    if (!filteredStations.length) return;
+    if (!filteredStations.some((station) => station.id === selectedId)) {
+      setSelectedId(filteredStations[0]!.id);
+    }
+  }, [filteredStations, selectedId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,7 +706,7 @@ export function RadioPanel() {
     <section className="radio-panel">
       <div className="section-heading section-heading--compact">
         <div>
-          <small>Radio colombiana</small>
+          <small>Radio internacional</small>
           <h3>En vivo</h3>
         </div>
         <span>
@@ -413,6 +736,18 @@ export function RadioPanel() {
             </button>
           ))}
         </div>
+        <div className="radio-countries" role="tablist" aria-label="Filtrar por pais">
+          {['todas', ...countries].map((item) => (
+            <button
+              className={country === item ? 'is-active' : ''}
+              key={item}
+              onClick={() => setCountry(item)}
+              type="button"
+            >
+              {item === 'todas' ? 'Paises' : item}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="radio-stations" role="list">
@@ -430,7 +765,7 @@ export function RadioPanel() {
             >
               <span>
                 <strong>{station.name}</strong>
-                <small>{station.tags}</small>
+                <small>{station.country ?? 'Colombia'} - {station.tags}</small>
               </span>
               <small>{stationStream ? 'stream' : 'verificando'}</small>
               <Heart

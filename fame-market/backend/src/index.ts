@@ -143,7 +143,12 @@ const adminRateLimit = rateLimit({
   key: requestIp
 });
 const adminResetSchema = z.object({
-  action: z.enum(['season-activity', 'season-full', 'news-pulse']),
+  action: z.enum([
+    'season-activity',
+    'season-full',
+    'season-history',
+    'news-pulse'
+  ]),
   confirm: z.string()
 });
 const quoteRateLimit = rateLimit({

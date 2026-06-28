@@ -361,6 +361,7 @@ export interface OperationsOverview {
 export type AdminResetAction =
   | 'season-activity'
   | 'season-full'
+  | 'season-history'
   | 'news-pulse';
 
 export interface AdminResetSummary {

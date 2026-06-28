@@ -213,6 +213,7 @@ function App() {
   const [prizeWalletDraft, setPrizeWalletDraft] = useState('');
   const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
   const [prizeProfileMessage, setPrizeProfileMessage] = useState('');
+  const [prizeWalletEditing, setPrizeWalletEditing] = useState(true);
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
   const backendNeedsTurnstile =
@@ -459,6 +460,7 @@ function App() {
         profile
       );
       setPrizeProfileMessage('Wallet guardada correctamente.');
+      setPrizeWalletEditing(false);
       setNotice('Perfil de premios actualizado.');
     },
     onError: (error) => {
@@ -514,6 +516,8 @@ function App() {
   );
   const favoriteIds = favoritesQuery.data ?? [];
   const categories = categoriesQuery.data ?? [];
+  const hasStoredPrizeWallet = Boolean(profileQuery.data?.solanaWalletAddress);
+  const walletInputLocked = hasStoredPrizeWallet && !prizeWalletEditing;
   const consentAccepted =
     !consentQuery.data?.required || Boolean(consentQuery.data.accepted);
   const consentReady =
@@ -550,6 +554,7 @@ function App() {
     if (!profileQuery.data) return;
     setPrizeWalletDraft(profileQuery.data.solanaWalletAddress ?? '');
     setPrizeNotesDraft(profileQuery.data.prizeContactNotes ?? '');
+    setPrizeWalletEditing(!profileQuery.data.solanaWalletAddress);
   }, [profileQuery.data]);
 
   const visibleArtists = useMemo(() => {
@@ -1231,7 +1236,21 @@ function App() {
                 <WalletCards size={18} />
               </div>
               <label>
-                <span>Wallet Solana</span>
+                <span className="prize-profile__label-row">
+                  Wallet Solana
+                  {hasStoredPrizeWallet && (
+                    <button
+                      className="prize-profile__edit"
+                      type="button"
+                      onClick={() => {
+                        setPrizeWalletEditing((current) => !current);
+                        setPrizeProfileMessage('');
+                      }}
+                    >
+                      {prizeWalletEditing ? 'Bloquear' : 'Editar'}
+                    </button>
+                  )}
+                </span>
                 <input
                   value={prizeWalletDraft}
                   onChange={(event) => {
@@ -1240,6 +1259,7 @@ function App() {
                   }}
                   placeholder="Ej: 7xK..."
                   autoComplete="off"
+                  readOnly={walletInputLocked}
                 />
               </label>
               <label>
@@ -1258,12 +1278,15 @@ function App() {
                 type="submit"
                 disabled={
                   prizeProfileMutation.isPending ||
-                  (firebaseReady && !firebaseUser)
+                  (firebaseReady && !firebaseUser) ||
+                  walletInputLocked
                 }
               >
                 {prizeProfileMutation.isPending
                   ? 'Guardando...'
-                  : 'Guardar wallet'}
+                  : walletInputLocked
+                    ? 'Wallet protegida'
+                    : 'Guardar wallet'}
               </button>
               {prizeProfileMessage && (
                 <small

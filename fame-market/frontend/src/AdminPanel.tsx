@@ -1222,6 +1222,24 @@ export function AdminPanel() {
           </button>
         </article>
         <article>
+          <h3>Historial jugado</h3>
+          <p>
+            Borra registros de temporadas cerradas: wallets, operaciones,
+            posiciones, rankings y alertas. No toca la temporada actual.
+          </p>
+          <button
+            className="danger-action"
+            onClick={() => runAdminReset('season-history')}
+            disabled={
+              !adminSecret ||
+              Boolean(busyArtist) ||
+              resetConfirm !== 'RESET'
+            }
+          >
+            <Trash2 size={16} /> Borrar historial
+          </button>
+        </article>
+        <article>
           <h3>Pulso de noticias</h3>
           <p>
             Borra titulares y senales GDELT para que la siguiente sincronizacion

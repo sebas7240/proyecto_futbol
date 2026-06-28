@@ -1170,13 +1170,24 @@ button {
   margin: 0;
 }
 
-.radio-categories {
+.radio-categories,
+.radio-countries {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
 }
 
+.radio-categories {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.radio-countries {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-height: 112px;
+  overflow: auto;
+}
+
 .radio-categories button,
+.radio-countries button,
 .radio-now button {
   min-width: 0;
   height: 34px;
@@ -1190,7 +1201,8 @@ button {
   cursor: pointer;
 }
 
-.radio-categories button.is-active {
+.radio-categories button.is-active,
+.radio-countries button.is-active {
   border-color: var(--ink);
   background: var(--paper);
 }
@@ -1399,6 +1411,12 @@ button {
   padding: 0 11px;
 }
 
+.prize-profile input[readonly] {
+  color: #5c5a53;
+  background: #ecebe6;
+  cursor: default;
+}
+
 .prize-profile textarea {
   min-height: 78px;
   padding: 10px 11px;
@@ -1423,6 +1441,23 @@ button {
 .prize-profile small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.prize-profile__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prize-profile .prize-profile__edit {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: 5px;
+  font-size: 10px;
 }
 
 .prize-profile__message {
@@ -1508,6 +1543,18 @@ button {
   font-size: 11px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.community-links a:first-child {
+  border-color: #f2b5b5;
+  color: #8d211c;
+  background: #ffe8e8;
+}
+
+.community-links a:nth-child(2) {
+  border-color: #a9d4f5;
+  color: #145782;
+  background: #e7f4ff;
 }
 
 .community-links a:hover {
@@ -3454,7 +3501,7 @@ button {
 
 .news-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto 16px;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
   align-items: center;
   gap: 10px;
   min-height: 64px;
