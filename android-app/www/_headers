@@ -1,7 +1,0 @@
-/*
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
-  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://formssternlystately.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' blob: https://api.goleafutbol.com; connect-src 'self' https://api.goleafutbol.com https://golea-chat.sebas7240.workers.dev wss://golea-chat.sebas7240.workers.dev; frame-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
