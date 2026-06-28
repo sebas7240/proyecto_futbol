@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BadgeInfo,
+  BookOpenText,
   CircleDollarSign,
   Database,
   FileCheck2,
@@ -15,6 +16,34 @@ import { api } from './api';
 import type { RightsRequestType } from './types';
 
 const updatedAt = '28 de junio de 2026';
+
+const guideArticles = [
+  {
+    title: 'Como se juega una temporada de Fame Plays',
+    body:
+      'Cada temporada empieza con el mismo saldo ficticio para todos. Tu meta es formar un equipo de figuras publicas antes de que su atencion suba dentro del juego. El ranking compara rendimiento porcentual, no dinero real, y todos parten con las mismas reglas.'
+  },
+  {
+    title: 'Que significan los FameCoins',
+    body:
+      'Los FameCoins son puntos internos de entretenimiento. Sirven para medir tus jugadas dentro de una temporada, pero no se compran, no se retiran, no se venden y no pueden convertirse en criptomonedas, dinero ni activos digitales.'
+  },
+  {
+    title: 'Como leer la grafica sin confundirla con inversion',
+    body:
+      'La grafica muestra una dinamica ficticia de popularidad. Puede moverse por actividad del juego, noticias publicas revisadas y estados internos controlados. No representa valor economico real de una persona, marca, cancion, carrera deportiva ni empresa.'
+  },
+  {
+    title: 'Premios promocionales y revision antifraude',
+    body:
+      'Algunas temporadas pueden ofrecer recompensas promocionales manuales si se alcanza una meta publica de usuarios. Ganar el ranking no garantiza pago automatico: el top pasa por revision antifraude y la recompensa no convierte FameCoins en dinero.'
+  },
+  {
+    title: 'Comunidad, chat y juego responsable',
+    body:
+      'El chat existe para comentar tendencias y compartir estrategias sanas. Los reportes, limites de mensajes y moderacion ayudan a evitar spam, acoso o abuso. No publiques claves privadas, datos sensibles ni enlaces sospechosos.'
+  }
+];
 
 function formatDate(value: string | null) {
   if (!value) return 'Pendiente';
@@ -38,8 +67,8 @@ function RulesPage() {
         <h1>Un juego sobre la economia de la atencion</h1>
         <p>
           Fame Plays usa monedas, precios y participaciones completamente
-          ficticios. Participar no constituye una inversion ni genera derechos
-          sobre artistas, canciones o ingresos reales.
+          ficticios. Participar no constituye una inversion, apuesta ni genera
+          derechos sobre artistas, canciones o ingresos reales.
         </p>
       </header>
 
@@ -52,7 +81,7 @@ function RulesPage() {
         </p>
       </section>
       <section>
-        <h2>2. FameCoins y mercado</h2>
+        <h2>2. FameCoins y liga de atencion</h2>
         <p>
           Cada temporada comienza con el mismo saldo ficticio. Los FameCoins no
           se compran, venden, retiran, convierten ni transfieren. Los precios se
@@ -66,12 +95,11 @@ function RulesPage() {
       <section>
         <h2>3. Ranking</h2>
         <p>
-          La clasificacion usa el rendimiento porcentual del portafolio. Para
-          ser elegible se requieren al menos tres operaciones, actividad en dos
+          La clasificacion usa el rendimiento porcentual de tu equipo ficticio.
+          Para ser elegible se requieren al menos tres jugadas, actividad en dos
           dias distintos y una cuenta sin alertas de abuso pendientes. Las
-          recompensas diarias cuentan dentro del portafolio porque son parte del
-          juego, pero no sustituyen los requisitos de actividad ni la revision
-          antifraude.
+          recompensas diarias cuentan dentro del juego, pero no sustituyen los
+          requisitos de actividad ni la revision antifraude.
         </p>
       </section>
       <section>
@@ -91,7 +119,9 @@ function RulesPage() {
           permiten insultos graves, acoso, spam, enlaces peligrosos, suplantacion
           ni contenido ilegal. Los usuarios pueden reportar mensajes o notas de
           voz; el equipo puede ocultar contenido, silenciar, bloquear o reiniciar
-          una sala para proteger la experiencia.
+          una sala para proteger la experiencia. Durante revisiones publicitarias
+          o campañas sensibles, Fame Plays puede evitar anuncios dentro o junto
+          al chat para no monetizar contenido generado por usuarios sin contexto.
         </p>
       </section>
       <section>
@@ -107,15 +137,16 @@ function RulesPage() {
       <section>
         <h2>7. Premios, wallet y cambios</h2>
         <p>
-          Una temporada solo tendra premio si la pantalla de ranking muestra
-          sus condiciones, la meta minima de usuarios registrados se cumple y
-          el top final supera la revision antifraude. En el lanzamiento, el
-          plan es premiar manualmente al top 3 cuando Fame Plays llegue a 100
-          usuarios registrados. La wallet Solana registrada solo se usara como
-          dato de contacto operativo para pagos manuales autorizados; Fame
-          Plays nunca pedira frase semilla, llave privada ni acceso a una
-          cuenta cripto. Las reglas pueden actualizarse y una version nueva
-          requerira una aceptacion nueva antes de operar.
+          Una temporada solo tendra recompensa promocional si la pantalla de
+          ranking muestra sus condiciones, la meta minima de usuarios registrados
+          se cumple y el top final supera la revision antifraude. En el
+          lanzamiento, el plan es premiar manualmente al top 3 cuando Fame Plays
+          llegue a 100 usuarios registrados. Esa recompensa no es apuesta, no es
+          retiro, no es conversion de FameCoins y no exige deposito. La wallet
+          Solana registrada solo se usara como dato operativo para pagos manuales
+          autorizados; Fame Plays nunca pedira frase semilla, llave privada ni
+          acceso a una cuenta cripto. Las reglas pueden actualizarse y una
+          version nueva requerira una aceptacion nueva antes de jugar.
         </p>
       </section>
       <section>
@@ -140,8 +171,8 @@ function PrivacyPage() {
         <h1>Datos necesarios, sin adornos</h1>
         <p>
           Esta politica explica que informacion usa Fame Plays durante la beta
-          y por que. No vendemos datos personales ni usamos el portafolio
-          ficticio para evaluar credito o inversiones reales.
+          y por que. No vendemos datos personales ni usamos tu equipo ficticio
+          para evaluar credito, inversiones reales o productos financieros.
         </p>
       </header>
 
@@ -149,8 +180,8 @@ function PrivacyPage() {
         <h2>1. Informacion que tratamos</h2>
         <p>
           Al iniciar sesion recibimos de Firebase el identificador de cuenta,
-          nombre, correo y avatar disponibles. Guardamos favoritos, operaciones,
-          posiciones, ranking, wallet publica de premios si decides registrarla,
+          nombre, correo y avatar disponibles. Guardamos favoritos, jugadas,
+          posiciones, ranking, wallet publica de recompensas si decides registrarla,
           recompensas diarias reclamadas, aceptaciones legales y eventos
           necesarios para seguridad y prevencion de fraude.
         </p>
@@ -158,7 +189,7 @@ function PrivacyPage() {
       <section>
         <h2>2. Para que se utiliza</h2>
         <p>
-          Usamos estos datos para autenticar la cuenta, mantener el portafolio,
+          Usamos estos datos para autenticar la cuenta, mantener tu equipo,
           calcular rankings, atender errores, prevenir abuso y conservar la
           integridad de las temporadas.
         </p>
@@ -166,7 +197,7 @@ function PrivacyPage() {
       <section>
         <h2>3. Proveedores</h2>
         <p>
-          La operacion puede involucrar Firebase para autenticacion, Cloudflare
+          La operacion tecnica puede involucrar Firebase para autenticacion, Cloudflare
           para entrega y seguridad, Hetzner para infraestructura, PostgreSQL
           para persistencia, Wikimedia para pageviews agregadas y YouTube API
           Services para metadatos y estadisticas publicas. El chat usa Workers
@@ -224,11 +255,11 @@ function PrivacyPage() {
         </p>
       </section>
       <section>
-        <h2>7. Wallet de premios</h2>
+        <h2>7. Wallet de recompensas</h2>
         <p>
           Si registras una wallet Solana, se almacena como direccion publica
           para contactarte o realizar una transferencia manual si una temporada
-          validada incluye premio. No conectamos tu wallet, no firmamos
+          validada incluye recompensa promocional. No conectamos tu wallet, no firmamos
           transacciones y nunca solicitamos claves privadas.
         </p>
       </section>
@@ -272,7 +303,7 @@ function MethodologyPage() {
         <h2>1. Estado actual</h2>
         <p>
           El indice externo ya puede proponer ajustes controlados al precio
-          cuando existen fuentes suficientes y la configuracion de mercado lo
+          cuando existen fuentes suficientes y la configuracion de la liga lo
           permite. Cada ajuste queda limitado por bandas diarias, versionado y
           revision operativa para evitar movimientos extremos o manipulables.
         </p>
@@ -292,8 +323,8 @@ function MethodologyPage() {
         <p>
           El motor normaliza cambios recientes contra una linea base, aplica
           suavizado, deduplicacion, zonas neutrales y limites por fuente. Las
-          compras y ventas del juego siguen influyendo mediante el mercado
-          ficticio; las senales externas solo agregan una variacion controlada.
+          apoyos y retiros del juego siguen influyendo mediante la liga
+          ficticia; las senales externas solo agregan una variacion controlada.
         </p>
       </section>
       <section>
@@ -303,7 +334,7 @@ function MethodologyPage() {
           o atrasada no produce una caida artificial. Cada algoritmo tiene
           version, las ventanas son idempotentes y toda activacion futura
           requerira auditoria, limites diarios y posibilidad de detener una
-          fuente sin detener el mercado.
+          fuente sin detener el juego.
         </p>
       </section>
       <section>
@@ -660,15 +691,48 @@ function RightsPage() {
   );
 }
 
+function GuidesPage() {
+  return (
+    <>
+      <header className="legal-heading">
+        <span><BookOpenText size={20} /> Guias de juego</span>
+        <h1>Aprende a competir sin confundirlo con inversion</h1>
+        <p>
+          Estas guias explican Fame Plays como lo que es: un juego gratuito de
+          popularidad con puntos ficticios, reglas visibles y recompensas
+          promocionales manuales cuando una temporada lo permita.
+        </p>
+      </header>
+
+      {guideArticles.map((article, index) => (
+        <section key={article.title}>
+          <h2>{index + 1}. {article.title}</h2>
+          <p>{article.body}</p>
+        </section>
+      ))}
+
+      <section>
+        <h2>6. Antes de compartir Fame Plays</h2>
+        <p>
+          Revisa que las reglas, privacidad, metodologia, derechos y ranking de
+          la temporada esten visibles. Si existe recompensa, debe aparecer la
+          meta de usuarios, el numero de puestos, la revision antifraude y la
+          aclaracion de que no hay compra de entrada ni conversion de FameCoins.
+        </p>
+      </section>
+    </>
+  );
+}
+
 export function LegalPage({
   page
 }: {
-  page: 'rules' | 'privacy' | 'methodology' | 'rights';
+  page: 'rules' | 'privacy' | 'methodology' | 'rights' | 'guides';
 }) {
   return (
     <main className="legal-page">
       <nav>
-        <a href="/"><ArrowLeft size={17} /> Volver al mercado</a>
+        <a href="/"><ArrowLeft size={17} /> Volver a la liga</a>
         <span>Actualizado: {updatedAt}</span>
       </nav>
       {page === 'rules' ? (
@@ -677,6 +741,8 @@ export function LegalPage({
         <PrivacyPage />
       ) : page === 'methodology' ? (
         <MethodologyPage />
+      ) : page === 'guides' ? (
+        <GuidesPage />
       ) : (
         <RightsPage />
       )}

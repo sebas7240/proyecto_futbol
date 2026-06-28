@@ -4,7 +4,7 @@
 
 Crear un juego social sobre la economia de la atencion donde todos los
 jugadores reciben la misma cantidad de monedas ficticias al comenzar una
-temporada y compran o venden participaciones ficticias de figuras publicas.
+temporada y suman o retiran apoyo ficticio a figuras publicas.
 
 El universo puede mezclar:
 
@@ -16,12 +16,12 @@ El universo puede mezclar:
   confiables y reglas comparables.
 
 El objetivo no es ganar dinero real ni invertir. El objetivo es detectar antes
-que otros que figura ganara atencion, hacer crecer un portafolio ficticio y
-subir en el ranking.
+que otros que figura ganara atencion, hacer crecer un equipo ficticio y subir
+en el ranking.
 
 Propuesta de valor:
 
-> No inviertes dinero. Inviertes intuicion sobre quien capturara la atencion.
+> No inviertes dinero. Juegas con intuicion sobre quien capturara la atencion.
 
 Nombre definitivo para web y app: `Fame Plays`.
 
@@ -1194,7 +1194,7 @@ Proceso:
 6. Exigir al menos dos fuentes independientes y confianza de 0,55 para todo
    movimiento automatico de noticias.
 7. Permitir aplicacion solo a reglas deterministas, versionadas y aprobadas.
-8. Poder detener una fuente sin detener el mercado.
+8. Poder detener una fuente sin detener la liga.
 9. Mantener cualquier metrica derivada de YouTube aislada de fuentes externas,
    salvo permiso escrito que autorice la combinacion.
 
@@ -1216,7 +1216,7 @@ La solicitud de metricas derivadas de YouTube queda preparada pero aplazada.
 No es un bloqueo para la beta: Wikimedia continuara en modo sombra y YouTube
 seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 
-### Fase 10 - Crecimiento y premios sostenibles
+### Fase 10 - Crecimiento y recompensas sostenibles
 
 - [ ] Crear codigos de referido unicos.
 - [ ] Calificar referidos por actividad real y controles antiabuso.
@@ -1225,7 +1225,7 @@ seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 - [x] Crear configuracion de hito por temporada: 100, 500, 1.000 o el valor que
       admin defina.
 - [x] Mostrar barra de progreso sujeta a revision.
-- [ ] Registrar fuente de financiacion y estado del premio.
+- [ ] Registrar fuente de financiacion y estado de la recompensa.
 - [ ] Mantener pago manual al ganador aprobado durante la primera etapa.
 - [ ] Evaluar publicidad moderada y suscripcion sin ventajas competitivas.
 - [ ] Preparar estrategia editorial de YouTube: movimientos semanales,
@@ -1233,16 +1233,28 @@ seguira limitado a contenido y estadisticas permitidas, sin mover precios.
 - [ ] Evaluar audio chat por salas con TURN, moderacion y limites antes de
       abrirlo al publico.
 
+### Fase 11 - Preparacion publicitaria responsable
+
+- [x] Aislar Fame Plays de proyectos previos, IPTV, scrapers y activos de Golea.
+- [x] Suavizar lenguaje publico hacia juego, liga, apoyo, equipo y recompensas.
+- [x] Crear pagina publica de guias originales para reducir contenido delgado.
+- [x] Documentar que las recompensas USDT son promocionales, manuales y no
+      convierten FameCoins.
+- [x] Documentar que no deben colocarse anuncios dentro o encima del chat.
+- [ ] Revisar con una cuenta de Google AdSense/AdMob antes de activar anuncios
+      a gran escala.
+- [ ] Crear calendario editorial de resumenes semanales y guias nuevas.
+
 Criterio:
 
-- El crecimiento puede financiar premios sin prometer dinero no recibido ni
+- El crecimiento puede financiar recompensas sin prometer dinero no recibido ni
   romper la igualdad competitiva.
 
 ## 16. Pruebas imprescindibles
 
 - El saldo nunca puede ser negativo.
-- Un usuario nunca puede vender mas de lo que posee.
-- Repetir una misma solicitud no duplica una compra.
+- Un usuario nunca puede retirar mas apoyo del que posee.
+- Repetir una misma solicitud no duplica una jugada.
 - Una operacion concurrente conserva balance y posicion correctos.
 - El cierre de temporada usa un precio congelado.
 - Una figura pausada no acepta operaciones.

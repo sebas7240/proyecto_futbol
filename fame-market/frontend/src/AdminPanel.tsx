@@ -104,7 +104,7 @@ export function AdminPanel() {
     prizeMinUsers: '100',
     prizeTopCount: '3',
     prizeNote:
-      'Premios manuales en USDT Solana para el top 3 cuando Fame Plays llegue a 100 usuarios registrados.'
+      'Recompensa promocional manual en USDT Solana para el top 3 cuando Fame Plays llegue a 100 usuarios registrados. No es retiro ni conversion de FameCoins.'
   });
   const securityQuery = useQuery({
     queryKey: ['security-reviews', adminContext],
@@ -356,7 +356,7 @@ export function AdminPanel() {
         0
       );
       setMessage(
-        `Mercado Vivo aplicado en ${applied.length}/${result.results.length} figuras. Movimiento neto: ${(totalDelta / 100).toFixed(2)}%.`
+        `Liga Viva aplicada en ${applied.length}/${result.results.length} figuras. Movimiento neto: ${(totalDelta / 100).toFixed(2)}%.`
       );
       await operationsQuery.refetch();
       await artistsQuery.refetch();
@@ -364,7 +364,7 @@ export function AdminPanel() {
       setMessage(
         error instanceof Error
           ? error.message
-          : 'No se pudo ejecutar el Mercado Vivo.'
+          : 'No se pudo ejecutar la Liga Viva.'
       );
     } finally {
       setBusyArtist('');
@@ -393,7 +393,7 @@ export function AdminPanel() {
         await api.adminSeasonAction(adminContext, season!.id, action);
         setMessage(
           action === 'freeze'
-            ? 'Temporada congelada. Ya no acepta operaciones.'
+            ? 'Temporada congelada. Ya no acepta jugadas.'
             : 'Temporada cerrada y ranking final guardado.'
         );
       }
@@ -688,7 +688,7 @@ export function AdminPanel() {
   if (!authReady) {
     return (
       <main className="admin-page admin-access">
-        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <a href="/"><ArrowLeft size={18} /> Volver a la liga</a>
         <section>
           <small>Administracion interna</small>
           <h1>Verificando sesion...</h1>
@@ -701,7 +701,7 @@ export function AdminPanel() {
   if (firebaseReady && !firebaseUser) {
     return (
       <main className="admin-page admin-access">
-        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <a href="/"><ArrowLeft size={18} /> Volver a la liga</a>
         <section>
           <small>Acceso restringido</small>
           <h1>Entra con tu cuenta administradora</h1>
@@ -720,7 +720,7 @@ export function AdminPanel() {
   if (!adminEmailAllowed) {
     return (
       <main className="admin-page admin-access">
-        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <a href="/"><ArrowLeft size={18} /> Volver a la liga</a>
         <section>
           <small>Acceso restringido</small>
           <h1>Cuenta no habilitada</h1>
@@ -737,7 +737,7 @@ export function AdminPanel() {
   return (
     <main className="admin-page">
       <header className="admin-header">
-        <a href="/"><ArrowLeft size={18} /> Volver al mercado</a>
+        <a href="/"><ArrowLeft size={18} /> Volver a la liga</a>
         <div className="admin-header__brand">
           <img src="/icono_fame.png" alt="" />
           <span>
@@ -920,7 +920,7 @@ export function AdminPanel() {
         <article>
           <Activity size={20} />
           <span>
-            <small>Mercado Vivo</small>
+            <small>Liga Viva</small>
             <strong>
               {ageLabel(
                 operationsQuery.data?.database.lastMarketMakerAgeSeconds ?? null
@@ -1057,7 +1057,7 @@ export function AdminPanel() {
       <div className="admin-section-title attention-heading">
         <div>
           <small>Ticks automaticos</small>
-          <h2>Mercado Vivo</h2>
+          <h2>Liga Viva</h2>
         </div>
         <button
           onClick={runMarketMaker}
@@ -1151,7 +1151,7 @@ export function AdminPanel() {
             />
           </label>
           <label>
-            Cierre trading
+            Cierre de jugadas
             <input
               type="datetime-local"
               value={seasonDraft.tradingClosesAt}
@@ -1181,7 +1181,7 @@ export function AdminPanel() {
           <label>
             Congelar antes
             <small className="field-hint">
-              Minutos antes del final donde se bloquean compras y ventas.
+              Minutos antes del final donde se bloquean nuevos apoyos y retiros.
             </small>
             <input
               type="number"
@@ -1214,7 +1214,7 @@ export function AdminPanel() {
           <label>
             Usuarios para premio
             <small className="field-hint">
-              Meta minima de cuentas registradas antes de pagar premios.
+              Meta minima de cuentas registradas antes de habilitar recompensas.
             </small>
             <input
               type="number"
@@ -1288,7 +1288,7 @@ export function AdminPanel() {
         <article>
           <h3>Actividad de temporada</h3>
           <p>
-            Borra operaciones, posiciones, ranking y alertas de la temporada
+            Borra jugadas, posiciones, ranking y alertas de la temporada
             actual. No cambia precios ni figuras.
           </p>
           <button
@@ -1323,7 +1323,7 @@ export function AdminPanel() {
         <article>
           <h3>Historial jugado</h3>
           <p>
-            Borra registros de temporadas cerradas: wallets, operaciones,
+            Borra registros de temporadas cerradas: wallets, jugadas,
             posiciones, rankings y alertas. No toca la temporada actual.
           </p>
           <button
@@ -1392,7 +1392,7 @@ export function AdminPanel() {
       )}
 
       <div className="admin-section-title">
-        <small>Premiacion USDT Solana</small>
+        <small>Recompensas promocionales USDT Solana</small>
         <h2>Wallets registradas</h2>
       </div>
 
@@ -1452,7 +1452,7 @@ export function AdminPanel() {
                   </span>
                   <span>
                     <strong>{review.returnPercent.toFixed(2)}%</strong>
-                    <small>{review.tradeCount} operaciones</small>
+                    <small>{review.tradeCount} jugadas</small>
                   </span>
                   <span
                     className={`review-pill review-pill--${review.reviewStatus}`}

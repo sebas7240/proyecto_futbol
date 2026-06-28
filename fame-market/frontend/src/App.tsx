@@ -411,7 +411,7 @@ function App() {
     mutationFn: () => api.execute(quote!.id),
     onSuccess: async () => {
       setQuote(null);
-      setNotice('Operacion registrada correctamente.');
+      setNotice('Jugada registrada correctamente.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['artists'] }),
         queryClient.invalidateQueries({ queryKey: ['artist', selectedSlug] }),
@@ -430,7 +430,7 @@ function App() {
   const loginMutation = useMutation({
     mutationFn: loginWithGoogle,
     onSuccess: () => {
-      setNotice('Sesion iniciada. Tu portafolio se sincronizara.');
+      setNotice('Sesion iniciada. Tu equipo se sincronizara.');
     },
     onError: (error) => setNotice(error.message)
   });
@@ -442,7 +442,7 @@ function App() {
         ['consent', firebaseUser?.uid ?? 'local'],
         consent
       );
-      setNotice('Reglas aceptadas. Ya puedes operar.');
+      setNotice('Reglas aceptadas. Ya puedes jugar.');
     },
     onError: (error) => setNotice(error.message)
   });
@@ -465,7 +465,7 @@ function App() {
       );
       setPrizeProfileMessage('Wallet guardada correctamente.');
       setPrizeWalletEditing(false);
-      setNotice('Perfil de premios actualizado.');
+      setNotice('Perfil de recompensas actualizado.');
     },
     onError: (error) => {
       setPrizeProfileMessage(error.message);
@@ -652,7 +652,7 @@ function App() {
                           ? 'programada'
                         : 'finalizada'
                   }`
-                : 'Mercado de atencion'}
+                : 'Liga de atencion'}
             </small>
           </span>
           {appEnvironment === 'staging' && (
@@ -730,10 +730,10 @@ function App() {
             <ol>
               <li><strong>1</strong><span>Elige una figura.</span></li>
               <li><strong>2</strong><span>Revisa su tendencia y contenido reciente.</span></li>
-              <li><strong>3</strong><span>Cotiza y confirma tu primera compra.</span></li>
+              <li><strong>3</strong><span>Revisa y confirma tu primer apoyo.</span></li>
             </ol>
             <button className="onboarding__action" onClick={finishOnboarding}>
-              Explorar mercado
+              Explorar liga
             </button>
           </section>
         </div>
@@ -762,7 +762,7 @@ function App() {
         <aside className="market-list">
           <div className="section-heading">
             <div>
-              <small>Mercado de atencion</small>
+              <small>Liga de atencion</small>
               <h1>Figuras</h1>
             </div>
             <span
@@ -787,7 +787,7 @@ function App() {
             <input
               type="search"
               placeholder="Buscar figura"
-              aria-label="Buscar figura en el mercado"
+              aria-label="Buscar figura en la liga"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
@@ -863,10 +863,11 @@ function App() {
             )}
           </div>
           <p className="disclaimer">
-            Precios y monedas ficticios. Este es un juego de popularidad, no una
-            inversion. <a href="/reglas">Reglas</a> ·{' '}
-            <a href="/privacidad">Privacidad</a> ·{' '}
-            <a href="/metodologia">Metodologia</a>
+            Precios y monedas ficticios. Es un juego gratuito de popularidad,
+            no una inversion. <a href="/reglas">Reglas</a>
+            {' | '}<a href="/privacidad">Privacidad</a>
+            {' | '}<a href="/metodologia">Metodologia</a>
+            {' | '}<a href="/guias">Guias</a>
             {' | '}<a href="/derechos">Derechos</a>
           </p>
         </aside>
@@ -1065,7 +1066,7 @@ function App() {
               </section>
             </>
           ) : (
-            <div className="loading-state">Cargando mercado...</div>
+            <div className="loading-state">Cargando liga...</div>
           )}
         </section>
 
@@ -1073,7 +1074,7 @@ function App() {
           <section className="order-ticket">
             <div className="section-heading section-heading--compact">
               <div>
-                <small>Operacion</small>
+                <small>Jugada</small>
                 <h3>{artist?.symbol ?? 'Figura'}</h3>
               </div>
               {selectedPosition && (
@@ -1085,13 +1086,13 @@ function App() {
                 className={side === 'buy' ? 'is-active' : ''}
                 onClick={() => { setSide('buy'); setQuote(null); }}
               >
-                Comprar
+                Sumar apoyo
               </button>
               <button
                 className={side === 'sell' ? 'is-active is-sell' : ''}
                 onClick={() => { setSide('sell'); setQuote(null); }}
               >
-                Vender
+                Retirar apoyo
               </button>
             </div>
             <label className="quantity-input">
@@ -1141,7 +1142,9 @@ function App() {
                   onClick={() => executeMutation.mutate()}
                   disabled={executeMutation.isPending}
                 >
-                  {executeMutation.isPending ? 'Registrando...' : `Confirmar ${side === 'buy' ? 'compra' : 'venta'}`}
+                  {executeMutation.isPending
+                    ? 'Registrando...'
+                    : `Confirmar ${side === 'buy' ? 'apoyo' : 'retiro'}`}
                 </button>
                 <small className="quote__expiry">La cotizacion vence en 15 segundos.</small>
               </div>
@@ -1161,20 +1164,20 @@ function App() {
                 }
               >
                 {currentSeason?.status !== 'active'
-                  ? 'Mercado temporalmente cerrado'
+                  ? 'Liga temporalmente cerrada'
                   : firebaseReady && !firebaseUser
-                  ? 'Inicia sesion para operar'
+                  ? 'Inicia sesion para jugar'
                   : !consentReady
                     ? 'Cargando acceso...'
                     : !consentAccepted
-                      ? 'Acepta las reglas para operar'
+                      ? 'Acepta las reglas para jugar'
                   : backendNeedsTurnstile && !turnstileSiteKey
                     ? 'Falta configurar seguridad'
                   : quoteMutation.isPending
                     ? 'Calculando...'
                     : !turnstileAccessReady
                       ? 'Verificando seguridad...'
-                    : `Revisar ${side === 'buy' ? 'compra' : 'venta'}`}
+                    : `Revisar ${side === 'buy' ? 'apoyo' : 'retiro'}`}
               </button>
             )}
             {notice && <p className="notice">{notice}</p>}
@@ -1193,7 +1196,7 @@ function App() {
             <div className="section-heading section-heading--compact">
               <div>
                 <small>Tu temporada</small>
-                <h3>Portafolio</h3>
+                <h3>Equipo</h3>
               </div>
               <BriefcaseBusiness size={19} />
             </div>
@@ -1228,7 +1231,7 @@ function App() {
                   ) : portfolio.dailyReward.status === 'no_positions' ? (
                     <>
                       <strong>Bonus diario disponible</strong>
-                      <span>Compra una figura y al volver entrara tu regalo.</span>
+                      <span>Suma apoyo a una figura y al volver entrara tu regalo.</span>
                     </>
                   ) : (
                     <>
@@ -1275,8 +1278,8 @@ function App() {
             >
               <div className="section-heading section-heading--compact">
                 <div>
-                  <small>Premios manuales</small>
-                  <h3>Wallet USDT Solana</h3>
+                  <small>Recompensas manuales</small>
+                  <h3>Wallet para recompensa</h3>
                 </div>
                 <WalletCards size={18} />
               </div>
@@ -1345,8 +1348,9 @@ function App() {
                 </small>
               )}
               <small>
-                Si ganas, usaremos esta wallet para pagarte USDT en red Solana
-                de forma manual.
+                Si ganas una temporada validada, usaremos esta direccion para
+                enviarte manualmente la recompensa promocional en USDT Solana.
+                No es retiro ni conversion de FameCoins.
               </small>
             </form>
           </section>
@@ -1363,6 +1367,7 @@ function App() {
         <span className="rights-notice__links">
           <a href="/reglas">Reglas</a>
           <a href="/privacidad">Privacidad</a>
+          <a href="/guias">Guias</a>
           <a href="/derechos">Derechos y correcciones</a>
         </span>
         <span className="rights-notice__social">
@@ -1378,10 +1383,10 @@ function App() {
 
       <nav className="mobile-nav" aria-label="Navegacion principal">
         <button className={mobileTab === 'market' ? 'is-active' : ''} onClick={() => selectTab('market')}>
-          <BarChart3 size={20} /> Mercado
+          <BarChart3 size={20} /> Liga
         </button>
         <button className={mobileTab === 'portfolio' ? 'is-active' : ''} onClick={() => selectTab('portfolio')}>
-          <WalletCards size={20} /> Portafolio
+          <WalletCards size={20} /> Equipo
         </button>
         <button
           className={mobileTab === 'ranking' ? 'is-active' : ''}

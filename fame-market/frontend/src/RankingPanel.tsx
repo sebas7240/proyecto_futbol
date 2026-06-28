@@ -48,7 +48,7 @@ function timeRemaining(season: Season) {
   );
   const days = Math.floor(milliseconds / 86_400_000);
   const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000);
-  return days > 0 ? `${days} d ${hours} h para operar` : `${hours} h para operar`;
+  return days > 0 ? `${days} d ${hours} h para jugar` : `${hours} h para jugar`;
 }
 
 function Avatar({ entry }: { entry: RankingEntry }) {
@@ -72,7 +72,7 @@ function Badges({ badges }: { badges: RankingEntry['badges'] }) {
         </span>
       )}
       {badges.includes('early_discoverer') && (
-        <span title="Primero en comprar un artista que termino al alza">
+        <span title="Primero en apoyar una figura que termino al alza">
           <Sparkles size={14} /> Descubridor
         </span>
       )}
@@ -110,7 +110,7 @@ export function RankingPanel({
     <main className="ranking-page">
       <header className="ranking-header">
         <button className="ranking-back" onClick={onBack}>
-          <ArrowLeft size={18} /> Mercado
+          <ArrowLeft size={18} /> Liga
         </button>
         <div>
           <small>Competencia de temporada</small>
@@ -140,7 +140,7 @@ export function RankingPanel({
           <div>
             <small>Temporada de lanzamiento</small>
             <h2>
-              Premios para el top {prizeStatus.topCount}
+              Recompensas para el top {prizeStatus.topCount}
             </h2>
             <p>{prizeStatus.note}</p>
           </div>
@@ -163,8 +163,8 @@ export function RankingPanel({
             </strong>
             <small>
               {prizeStatus.eligible
-                ? 'Meta alcanzada: el premio queda habilitado.'
-                : `Faltan ${prizeStatus.remainingUsers} para habilitar premios.`}
+                ? 'Meta alcanzada: la recompensa queda habilitada.'
+                : `Faltan ${prizeStatus.remainingUsers} para habilitar recompensas.`}
             </small>
           </div>
         </section>
@@ -209,9 +209,9 @@ export function RankingPanel({
             </div>
             <div className="leaderboard__labels" aria-hidden="true">
               <span>Posicion</span>
-              <span>Portafolio</span>
+              <span>Equipo</span>
               <span>Rendimiento</span>
-              <span>Operaciones</span>
+              <span>Jugadas</span>
             </div>
             <div className="leaderboard__rows">
               {rankings.map((entry) => (
@@ -257,7 +257,7 @@ export function RankingPanel({
         </>
       ) : (
         <div className="ranking-empty">
-          El ranking aparecera cuando el primer jugador abra su portafolio.
+          El ranking aparecera cuando el primer jugador abra su equipo.
         </div>
       )}
 
@@ -311,7 +311,7 @@ export function RankingPanel({
                 {expandedSeasonId === item.seasonId && (
                   <div className="season-trades">
                     {seasonTradesQuery.isLoading ? (
-                      <p>Cargando operaciones...</p>
+                      <p>Cargando jugadas...</p>
                     ) : seasonTradesQuery.data?.length ? (
                       seasonTradesQuery.data.map((trade) => (
                         <div className="season-trade" key={trade.id}>
@@ -329,7 +329,7 @@ export function RankingPanel({
                             </small>
                           </span>
                           <b className={trade.side === 'buy' ? 'profit' : 'loss'}>
-                            {trade.side === 'buy' ? 'Compra' : 'Venta'} x
+                            {trade.side === 'buy' ? 'Apoyo' : 'Retiro'} x
                             {trade.quantity}
                           </b>
                           <span>
@@ -341,7 +341,7 @@ export function RankingPanel({
                         </div>
                       ))
                     ) : (
-                      <p>No hubo operaciones en esta temporada.</p>
+                      <p>No hubo jugadas en esta temporada.</p>
                     )}
                   </div>
                 )}
@@ -350,7 +350,7 @@ export function RankingPanel({
           </div>
         ) : (
           <p className="ranking-empty">
-            Tu primera temporada aparecera al abrir el portafolio.
+            Tu primera temporada aparecera al abrir tu equipo.
           </p>
         )}
       </section>

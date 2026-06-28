@@ -65,7 +65,7 @@ export function NewsPulse({ data, loading = false }: NewsPulseProps) {
 
       <p className="news-pulse__note">
         Fame Plays revisa titulares publicos para enriquecer el contexto. Los
-        temas sensibles requieren revision antes de afectar el mercado.
+        temas sensibles requieren revision antes de afectar la liga.
       </p>
     </section>
   );

@@ -1,17 +1,17 @@
 # Fame Plays
 
 Juego independiente sobre la economia de la atencion. Web, PWA y futura APK comparten el
-mismo frontend, API, autenticacion y portafolio.
+mismo frontend, API, autenticacion y equipo ficticio de temporada.
 
 ## Estado actual
 
-- Mercado responsive con tres artistas iniciales.
+- Liga responsive con catalogo inicial administrado.
 - Grafica ficticia de precio.
 - Firebase Auth con Google.
 - PostgreSQL real con migraciones automaticas.
 - Cotizaciones de 15 segundos.
-- Compras y ventas transaccionales.
-- Ledger, posiciones, operaciones e historial persistentes.
+- Jugadas de apoyo y retiro con registro transaccional.
+- Ledger, posiciones, jugadas e historial persistentes.
 - Proteccion por idempotencia.
 - Panel admin para canales oficiales de YouTube.
 - Sincronizacion de playlist, videos y estadisticas publicas.
@@ -21,23 +21,23 @@ mismo frontend, API, autenticacion y portafolio.
 - Evaluacion de cobertura, dispersion y cambios de direccion sin tocar precios.
 - Canales oficiales verificados para Shakira, Karol G y Bad Bunny.
 - Busqueda, filtros por categoria, intereses y favoritos persistentes.
-- Marcadores personales de compra y venta sobre la grafica.
-- Onboarding corto para la primera operacion.
+- Marcadores personales de apoyo y retiro sobre la grafica.
+- Onboarding corto para la primera jugada.
 - Prueba de concurrencia e idempotencia contra PostgreSQL real.
 - Temporadas semanales con congelamiento y cierre automaticos.
 - Ranking en vivo, ranking final e historial personal.
 - Insignias semanales de mejor novato y descubridor temprano.
-- Historial detallado de operaciones separado por temporada.
+- Historial detallado de jugadas separado por temporada.
 - Revision antifraude del top con alertas y aprobacion administrativa.
-- Limite transaccional de 60 operaciones por 24 horas y pausa de 5 segundos.
-- Rate limits compartidos en PostgreSQL para trading y administracion.
-- Cloudflare Turnstile en la cotizacion previa a cada operacion.
+- Limite transaccional de 60 jugadas por 24 horas y pausa de 5 segundos.
+- Rate limits compartidos en PostgreSQL para jugadas y administracion.
+- Cloudflare Turnstile en la revision previa a cada jugada.
 - Congelamiento administrativo de usuarios y artistas con auditoria.
 - Controles administrativos para procesar el ciclo de temporada.
 - Health checks, metricas Prometheus y estado operativo en administracion.
 - Backups cifrados con restauracion automatica de prueba y salida opcional a R2.
 - Staging aislado con validacion previa de dominios, Firebase y base de datos.
-- Reglas y privacidad publicas con consentimiento versionado para operar.
+- Reglas y privacidad publicas con consentimiento versionado para jugar.
 - Aviso de no afiliacion, politica publica de derechos y canal de correccion.
 - Avatares abstractos para toda imagen sin licencia verificada.
 - Registro administrativo de fuente, licencia, atribucion y revision.
@@ -56,7 +56,7 @@ mismo frontend, API, autenticacion y portafolio.
   compatibilidad hacia los videos existentes de YouTube.
 - Eventos externos `external_events` para contexto excepcional revisado, sin
   aplicacion automatica de precio.
-- Mercado vivo automatico con estados por figura para que todos los precios
+- Liga viva automatica con estados por figura para que todos los precios
   tengan ticks aun cuando no existan noticias recientes.
 - Monitor externo en Cloudflare Workers con estado en KV y alertas Telegram.
 - PWA instalable.
@@ -451,4 +451,14 @@ eliminan operaciones ni modifican balances automaticamente.
 ## Importante
 
 FameCoins, precios y participaciones son ficticios. No representan acciones,
-dinero, inversiones ni activos convertibles.
+dinero, inversiones, apuestas, criptoactivos ni activos convertibles. Las
+recompensas promocionales, cuando existan, son manuales y no convierten
+FameCoins en dinero.
+
+## Publicidad y comunidad
+
+Para revisiones iniciales de AdSense/AdMob, la zona de chat y notas de voz debe
+mantenerse separada de anuncios. Los anuncios no deben flotar sobre mensajes,
+notas de voz, reportes ni controles de moderacion. Si se habilita publicidad,
+debe ubicarse en zonas editoriales o informativas del juego, no dentro del
+contenido generado por usuarios.

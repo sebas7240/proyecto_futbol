@@ -25,10 +25,11 @@ export function ConsentModal({
           <ShieldCheck size={21} />
         </span>
         <small>Beta cerrada</small>
-        <h2 id="consent-title">Antes de realizar tu primera operacion</h2>
+        <h2 id="consent-title">Antes de realizar tu primera jugada</h2>
         <p>
           Fame Plays es un juego con monedas y participaciones ficticias. No es
-          una inversion, no permite retiros y no promete premios.
+          una inversion, no permite retiros, no exige depositos y no promete
+          recompensas automaticas.
         </p>
         <label>
           <input
@@ -49,7 +50,7 @@ export function ConsentModal({
           </span>
         </label>
         <button onClick={onAccept} disabled={!confirmed || pending}>
-          {pending ? 'Registrando...' : 'Aceptar y entrar al mercado'}
+          {pending ? 'Registrando...' : 'Aceptar y entrar a la liga'}
         </button>
         <small className="consent-modal__version">
           Reglas {consent.rulesVersion} | Privacidad {consent.privacyVersion}

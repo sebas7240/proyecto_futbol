@@ -69,7 +69,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const body = await response.json();
   if (!response.ok) {
     throw new ApiError(
-      body?.error?.message || 'No se pudo completar la operacion.',
+      body?.error?.message || 'No se pudo completar la jugada.',
       body?.error?.code || 'REQUEST_FAILED',
       response.status
     );
