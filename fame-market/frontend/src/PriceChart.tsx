@@ -98,6 +98,9 @@ const indicatorOptions: Array<{
 const numberFormat = new Intl.NumberFormat('es-CO', {
   maximumFractionDigits: 2
 });
+const quantityFormat = new Intl.NumberFormat('es-CO', {
+  maximumFractionDigits: 4
+});
 
 function sortPoints(data: PricePoint[]) {
   return data
@@ -234,7 +237,7 @@ function markersFromTrades(trades: Trade[]) {
       position: trade.side === 'buy' ? 'belowBar' : 'aboveBar',
       color: trade.side === 'buy' ? '#168f5c' : '#d94b43',
       shape: trade.side === 'buy' ? 'arrowUp' : 'arrowDown',
-      text: `${trade.side === 'buy' ? 'Compra' : 'Venta'} ${trade.quantity}`,
+      text: `${trade.side === 'buy' ? 'Compra' : 'Venta'} ${quantityFormat.format(trade.quantity)}`,
       size: 1
     }))
     .sort((a, b) => Number(a.time) - Number(b.time));

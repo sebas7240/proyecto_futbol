@@ -49,6 +49,10 @@ const compact = new Intl.NumberFormat('es-CO', {
   notation: 'compact',
   maximumFractionDigits: 1
 });
+const quantityFormat = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 4
+});
 const storedInterestsKey = 'fame-plays:interests';
 const turnstilePassKey = 'fame-plays:turnstile-pass';
 
@@ -1071,7 +1075,9 @@ function App() {
                 <small>Operacion</small>
                 <h3>{artist?.symbol ?? 'Figura'}</h3>
               </div>
-              {selectedPosition && <span>{selectedPosition.quantity} tuyas</span>}
+              {selectedPosition && (
+                <span>{quantityFormat.format(selectedPosition.quantity)} tuyas</span>
+              )}
             </div>
             <div className="segmented">
               <button
@@ -1196,6 +1202,41 @@ function App() {
               <div><dt>Disponible</dt><dd>{money.format(portfolio?.balance ?? 0)}</dd></div>
               <div><dt>En figuras</dt><dd>{money.format(portfolio?.investedValue ?? 0)}</dd></div>
             </dl>
+            {portfolio?.dailyReward &&
+              portfolio.dailyReward.status !== 'disabled' && (
+                <div
+                  className={`daily-reward daily-reward--${portfolio.dailyReward.status}`}
+                >
+                  {portfolio.dailyReward.status === 'claimed' ? (
+                    <>
+                      <strong>
+                        Bonus diario +{money.format(portfolio.dailyReward.totalValue)} FC
+                      </strong>
+                      <span>
+                        Repartido en {portfolio.dailyReward.items.length}{' '}
+                        {portfolio.dailyReward.items.length === 1
+                          ? 'figura'
+                          : 'figuras'}.
+                      </span>
+                    </>
+                  ) : portfolio.dailyReward.status === 'already_claimed' ? (
+                    <>
+                      <strong>Bonus diario recibido</strong>
+                      <span>Vuelve manana para reclamar nuevas partes.</span>
+                    </>
+                  ) : portfolio.dailyReward.status === 'no_positions' ? (
+                    <>
+                      <strong>Bonus diario disponible</strong>
+                      <span>Compra una figura y al volver entrara tu regalo.</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Bonus pausado por limite</strong>
+                      <span>Diversifica posiciones para poder recibirlo.</span>
+                    </>
+                  )}
+                </div>
+              )}
             <div className="positions">
               {portfolio?.positions.length ? (
                 portfolio.positions.map((position) => (
@@ -1210,7 +1251,10 @@ function App() {
                     />
                     <span>
                       <strong>{position.artist.symbol}</strong>
-                      <small>{position.quantity} · entrada {money.format(position.averageCost)}</small>
+                      <small>
+                        {quantityFormat.format(position.quantity)} - entrada{' '}
+                        {money.format(position.averageCost)}
+                      </small>
                     </span>
                     <strong className={position.unrealizedPnl >= 0 ? 'profit' : 'loss'}>
                       {position.unrealizedPnl >= 0 ? '+' : ''}{money.format(position.unrealizedPnl)}
@@ -1313,7 +1357,11 @@ function App() {
         <span>
           <strong>Simulador independiente.</strong>{' '}
           Los nombres identifican figuras publicas con fines informativos. Fame
-          Market no esta afiliado, patrocinado ni aprobado por ellas o sus marcas.{' '}
+          Plays no esta afiliado, patrocinado ni aprobado por ellas o sus marcas.
+        </span>
+        <span className="rights-notice__links">
+          <a href="/reglas">Reglas</a>
+          <a href="/privacidad">Privacidad</a>
           <a href="/derechos">Derechos y correcciones</a>
         </span>
         <span className="rights-notice__social">

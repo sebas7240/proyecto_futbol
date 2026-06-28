@@ -14,7 +14,7 @@ import {
 import { api } from './api';
 import type { RightsRequestType } from './types';
 
-const updatedAt = '27 de junio de 2026';
+const updatedAt = '28 de junio de 2026';
 
 function formatDate(value: string | null) {
   if (!value) return 'Pendiente';
@@ -57,8 +57,10 @@ function RulesPage() {
           Cada temporada comienza con el mismo saldo ficticio. Los FameCoins no
           se compran, venden, retiran, convierten ni transfieren. Los precios se
           mueven por la actividad interna del juego y no representan el valor
-          economico de ninguna figura publica. Durante el modo sombra, las
-          senales externas se calculan y muestran, pero no modifican precios.
+          economico de ninguna figura publica. El bonus diario puede entregar
+          pequenas participaciones ficticias en las figuras que ya tengas,
+          normalmente hasta 25 FameCoins de valor total por dia, sin mover el
+          precio ni cobrar comision.
         </p>
       </section>
       <section>
@@ -66,7 +68,10 @@ function RulesPage() {
         <p>
           La clasificacion usa el rendimiento porcentual del portafolio. Para
           ser elegible se requieren al menos tres operaciones, actividad en dos
-          dias distintos y una cuenta sin alertas de abuso pendientes.
+          dias distintos y una cuenta sin alertas de abuso pendientes. Las
+          recompensas diarias cuentan dentro del portafolio porque son parte del
+          juego, pero no sustituyen los requisitos de actividad ni la revision
+          antifraude.
         </p>
       </section>
       <section>
@@ -75,7 +80,8 @@ function RulesPage() {
           Se prohiben multicuentas, automatizaciones no autorizadas, explotacion
           de errores, coordinacion para alterar precios y cualquier intento de
           manipular el ranking. Fame Plays puede congelar cuentas, artistas o
-          resultados mientras realiza una revision.
+          resultados mientras realiza una revision. Crear cuentas para reclamar
+          recompensas diarias multiples se considera abuso.
         </p>
       </section>
       <section>
@@ -142,8 +148,8 @@ function PrivacyPage() {
           Al iniciar sesion recibimos de Firebase el identificador de cuenta,
           nombre, correo y avatar disponibles. Guardamos favoritos, operaciones,
           posiciones, ranking, wallet publica de premios si decides registrarla,
-          aceptaciones legales y eventos necesarios para seguridad y prevencion
-          de fraude.
+          recompensas diarias reclamadas, aceptaciones legales y eventos
+          necesarios para seguridad y prevencion de fraude.
         </p>
       </section>
       <section>

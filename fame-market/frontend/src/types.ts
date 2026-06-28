@@ -177,6 +177,25 @@ export interface PortfolioPosition {
   unrealizedPnl: number;
 }
 
+export interface DailyPositionRewardItem {
+  artistId: string;
+  quantity: number;
+  marketValue: number;
+  price: number;
+}
+
+export interface DailyPositionReward {
+  status:
+    | 'claimed'
+    | 'already_claimed'
+    | 'no_positions'
+    | 'no_capacity'
+    | 'disabled';
+  rewardDate: string;
+  totalValue: number;
+  items: DailyPositionRewardItem[];
+}
+
 export interface Portfolio {
   userId: string;
   balance: number;
@@ -185,6 +204,7 @@ export interface Portfolio {
   portfolioValue: number;
   returnPercent: number;
   positions: PortfolioPosition[];
+  dailyReward?: DailyPositionReward | null;
 }
 
 export interface Quote {

@@ -10,6 +10,7 @@ import {
 } from './pricing.js';
 import type {
   AuthenticatedUser,
+  DailyPositionReward,
   MarketDataStore,
   Trade,
   TradeQuote,
@@ -61,6 +62,9 @@ interface WalletRow {
 
 const MAX_DAILY_TRADES = 60;
 const MIN_TRADE_INTERVAL_MS = 5_000;
+const DAILY_REWARD_RATE = 0.0025;
+const DAILY_REWARD_MAX_VALUE = 25;
+const DAILY_REWARD_TIMEZONE = 'America/Bogota';
 
 export class PostgresMarketStore implements MarketDataStore {
   readonly persistence = 'postgresql' as const;
@@ -136,8 +140,9 @@ export class PostgresMarketStore implements MarketDataStore {
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
-      const wallet = await this.ensureUserAndWallet(client, user);
-      const result = await this.walletView(client, wallet);
+      const wallet = await this.ensureUserAndWallet(client, user, true);
+      const dailyReward = await this.claimDailyPositionReward(client, wallet);
+      const result = await this.walletView(client, wallet, dailyReward);
       await client.query('COMMIT');
       return result;
     } catch (error) {
@@ -157,7 +162,7 @@ export class PostgresMarketStore implements MarketDataStore {
         id: string;
         artist_id: string;
         side: TradeSide;
-        quantity: number;
+        quantity: Numeric;
         average_price: Numeric;
         gross_amount: Numeric;
         fee: Numeric;
@@ -297,14 +302,15 @@ export class PostgresMarketStore implements MarketDataStore {
       }
 
       const positionResult = await client.query<{
-        quantity: number;
+        quantity: Numeric;
         average_cost: Numeric;
       }>(
         'SELECT quantity, average_cost FROM positions WHERE wallet_id = $1 AND artist_id = $2',
         [wallet.id, artistId]
       );
       const position = positionResult.rows[0];
-      if (side === 'sell' && (!position || position.quantity < quantity)) {
+      const positionQuantity = number(position?.quantity);
+      if (side === 'sell' && (!position || positionQuantity < quantity)) {
         throw new MarketError(
           'No tienes suficientes participaciones para esta venta.',
           'INSUFFICIENT_POSITION'
@@ -332,7 +338,7 @@ export class PostgresMarketStore implements MarketDataStore {
         await this.assertBuyPositionLimit(client, wallet, {
           currentArtistPrice: number(artist.current_price),
           nextArtistPrice: calculated.newPrice,
-          existingQuantity: position?.quantity ?? 0,
+          existingQuantity: positionQuantity,
           buyQuantity: quantity,
           netAmount: calculated.netAmount
         });
@@ -452,7 +458,7 @@ export class PostgresMarketStore implements MarketDataStore {
         id: string;
         artist_id: string;
         side: TradeSide;
-        quantity: number;
+        quantity: Numeric;
         average_price: Numeric;
         gross_amount: Numeric;
         fee: Numeric;
@@ -500,7 +506,7 @@ export class PostgresMarketStore implements MarketDataStore {
 
       const positionResult = await client.query<{
         id: string;
-        quantity: number;
+        quantity: Numeric;
         average_cost: Numeric;
         realized_pnl: Numeric;
       }>(
@@ -513,6 +519,8 @@ export class PostgresMarketStore implements MarketDataStore {
         [wallet.id, quote.artist_id]
       );
       const position = positionResult.rows[0];
+      const positionQuantity = number(position?.quantity);
+      const quoteQuantity = number(quote.quantity);
       let balance = number(wallet.available_balance);
       let realizedPnl = 0;
 
@@ -526,13 +534,13 @@ export class PostgresMarketStore implements MarketDataStore {
         await this.assertBuyPositionLimit(client, wallet, {
           currentArtistPrice: number(artist.current_price),
           nextArtistPrice: number(quote.new_price),
-          existingQuantity: position?.quantity ?? 0,
-          buyQuantity: quote.quantity,
+          existingQuantity: positionQuantity,
+          buyQuantity: quoteQuantity,
           netAmount: number(quote.net_amount)
         });
-        const oldQuantity = position?.quantity ?? 0;
+        const oldQuantity = positionQuantity;
         const oldCost = oldQuantity * number(position?.average_cost);
-        const newQuantity = oldQuantity + quote.quantity;
+        const newQuantity = oldQuantity + quoteQuantity;
         const averageCost = (oldCost + number(quote.gross_amount)) / newQuantity;
         balance = roundMoney(balance - number(quote.net_amount));
 
@@ -550,15 +558,15 @@ export class PostgresMarketStore implements MarketDataStore {
           [wallet.id, quote.artist_id, newQuantity, averageCost]
         );
       } else {
-        if (!position || position.quantity < quote.quantity) {
+        if (!position || positionQuantity < quoteQuantity) {
           throw new MarketError(
             'No tienes suficientes participaciones para esta venta.',
             'INSUFFICIENT_POSITION'
           );
         }
-        const newQuantity = position.quantity - quote.quantity;
+        const newQuantity = positionQuantity - quoteQuantity;
         realizedPnl = roundMoney(
-          number(quote.net_amount) - number(position.average_cost) * quote.quantity
+          number(quote.net_amount) - number(position.average_cost) * quoteQuantity
         );
         balance = roundMoney(balance + number(quote.net_amount));
         await client.query(
@@ -602,7 +610,7 @@ export class PostgresMarketStore implements MarketDataStore {
           wallet.id,
           quote.artist_id,
           quote.side,
-          quote.quantity,
+          quoteQuantity,
           quote.average_price,
           quote.gross_amount,
           quote.fee,
@@ -638,8 +646,8 @@ export class PostgresMarketStore implements MarketDataStore {
           quote.artist_id,
           wallet.season_id,
           quote.new_price,
-          quote.side === 'buy' ? quote.quantity : 0,
-          quote.side === 'sell' ? quote.quantity : 0
+          quote.side === 'buy' ? quoteQuantity : 0,
+          quote.side === 'sell' ? quoteQuantity : 0
         ]
       );
       await client.query('DELETE FROM trade_quotes WHERE id = $1', [quote.id]);
@@ -650,7 +658,7 @@ export class PostgresMarketStore implements MarketDataStore {
         userId: user.uid,
         artistId: quote.artist_id,
         side: quote.side,
-        quantity: quote.quantity,
+        quantity: quoteQuantity,
         averagePrice: number(quote.average_price),
         grossAmount: number(quote.gross_amount),
         fee: number(quote.fee),
@@ -778,10 +786,201 @@ export class PostgresMarketStore implements MarketDataStore {
     }
   }
 
-  private async walletView(client: PoolClient, wallet: WalletRow) {
+  private async claimDailyPositionReward(
+    client: PoolClient,
+    wallet: WalletRow
+  ): Promise<DailyPositionReward | null> {
+    const rewardDate = await this.currentRewardDate(client);
+    if (process.env.DAILY_POSITION_REWARD_ENABLED === 'false') {
+      return { status: 'disabled', rewardDate, totalValue: 0, items: [] };
+    }
+
+    const existing = await client.query<{
+      total_value: Numeric;
+      items: Array<{
+        artistId: string;
+        quantity: Numeric;
+        marketValue: Numeric;
+        price: Numeric;
+      }>;
+    }>(
+      `
+        SELECT reward.total_value,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'artistId', item.artist_id,
+                'quantity', item.quantity,
+                'marketValue', item.market_value,
+                'price', item.price
+              )
+              ORDER BY item.market_value DESC
+            ) FILTER (WHERE item.id IS NOT NULL),
+            '[]'::json
+          ) AS items
+        FROM daily_position_rewards reward
+        LEFT JOIN daily_position_reward_items item ON item.reward_id = reward.id
+        WHERE reward.wallet_id = $1 AND reward.reward_date = $2::date
+        GROUP BY reward.id, reward.total_value
+      `,
+      [wallet.id, rewardDate]
+    );
+    if (existing.rows[0]) {
+      return {
+        status: 'already_claimed',
+        rewardDate,
+        totalValue: roundMoney(number(existing.rows[0].total_value)),
+        items: existing.rows[0].items.map((item) => ({
+          artistId: item.artistId,
+          quantity: number(item.quantity),
+          marketValue: roundMoney(number(item.marketValue)),
+          price: number(item.price)
+        }))
+      };
+    }
+
+    const positionsResult = await client.query<{
+      id: string;
+      artist_id: string;
+      quantity: Numeric;
+      average_cost: Numeric;
+      current_price: Numeric;
+      market_value: Numeric;
+    }>(
+      `
+        SELECT position.id, position.artist_id, position.quantity,
+          position.average_cost, artist.current_price,
+          position.quantity * artist.current_price AS market_value
+        FROM positions position
+        JOIN artists artist ON artist.id = position.artist_id
+        WHERE position.wallet_id = $1
+          AND position.quantity > 0
+          AND artist.status = 'active'
+        ORDER BY market_value DESC
+        FOR UPDATE OF position
+      `,
+      [wallet.id]
+    );
+    if (!positionsResult.rows.length) {
+      return { status: 'no_positions', rewardDate, totalValue: 0, items: [] };
+    }
+
+    const portfolio = await this.walletView(client, wallet, null);
+    const targetValue = Math.min(
+      DAILY_REWARD_MAX_VALUE,
+      roundMoney(number(wallet.starting_balance) * DAILY_REWARD_RATE)
+    );
+    const grants = positionsResult.rows
+      .map((position) => {
+        const heldQuantity = number(position.quantity);
+        const marketValue = roundMoney(number(position.market_value));
+        const baseValue = roundMoney(
+          (targetValue * marketValue) / Math.max(portfolio.investedValue, 1)
+        );
+        const maxAdditionalValue = Math.max(
+          0,
+          roundMoney(
+            (portfolio.portfolioValue * MAX_POSITION_SHARE - marketValue) /
+              (1 - MAX_POSITION_SHARE)
+          )
+        );
+        const marketGrant = roundMoney(Math.min(baseValue, maxAdditionalValue));
+        const price = number(position.current_price);
+        const rewardQuantity = Number((marketGrant / price).toFixed(6));
+        return {
+          id: position.id,
+          artistId: position.artist_id,
+          heldQuantity,
+          averageCost: number(position.average_cost),
+          price,
+          marketGrant,
+          rewardQuantity
+        };
+      })
+      .filter((grant) => grant.marketGrant >= 0.01 && grant.rewardQuantity > 0);
+
+    if (!grants.length) {
+      return { status: 'no_capacity', rewardDate, totalValue: 0, items: [] };
+    }
+
+    const totalValue = roundMoney(
+      grants.reduce((sum, grant) => sum + grant.marketGrant, 0)
+    );
+    const rewardResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO daily_position_rewards (
+          wallet_id, reward_date, total_value, position_count
+        ) VALUES ($1, $2::date, $3, $4)
+        RETURNING id
+      `,
+      [wallet.id, rewardDate, totalValue, grants.length]
+    );
+    const rewardId = rewardResult.rows[0]!.id;
+
+    for (const grant of grants) {
+      const newQuantity = grant.heldQuantity + grant.rewardQuantity;
+      const oldCost = grant.heldQuantity * grant.averageCost;
+      const averageCost = newQuantity > 0 ? oldCost / newQuantity : 0;
+      await client.query(
+        `
+          UPDATE positions
+          SET quantity = $1,
+            average_cost = $2,
+            updated_at = NOW()
+          WHERE id = $3
+        `,
+        [newQuantity, averageCost, grant.id]
+      );
+      await client.query(
+        `
+          INSERT INTO daily_position_reward_items (
+            reward_id, artist_id, quantity, price, market_value
+          ) VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+          rewardId,
+          grant.artistId,
+          grant.rewardQuantity,
+          grant.price,
+          grant.marketGrant
+        ]
+      );
+    }
+
+    await client.query(
+      'UPDATE wallets SET version = version + 1 WHERE id = $1',
+      [wallet.id]
+    );
+
+    return {
+      status: 'claimed',
+      rewardDate,
+      totalValue,
+      items: grants.map((grant) => ({
+        artistId: grant.artistId,
+        quantity: grant.rewardQuantity,
+        marketValue: grant.marketGrant,
+        price: grant.price
+      }))
+    };
+  }
+
+  private async currentRewardDate(client: PoolClient) {
+    const result = await client.query<{ reward_date: string }>(
+      `SELECT (NOW() AT TIME ZONE $1)::date::text AS reward_date`,
+      [DAILY_REWARD_TIMEZONE]
+    );
+    return result.rows[0]?.reward_date ?? new Date().toISOString().slice(0, 10);
+  }
+
+  private async walletView(
+    client: PoolClient,
+    wallet: WalletRow,
+    dailyReward: DailyPositionReward | null = null
+  ) {
     const positionsResult = await client.query<{
       artist_id: string;
-      quantity: number;
+      quantity: Numeric;
       average_cost: Numeric;
       realized_pnl: Numeric;
       market_value: Numeric;
@@ -833,7 +1032,7 @@ export class PostgresMarketStore implements MarketDataStore {
 
     const positions = positionsResult.rows.map((position) => ({
       artistId: position.artist_id,
-      quantity: position.quantity,
+      quantity: number(position.quantity),
       averageCost: number(position.average_cost),
       realizedPnl: number(position.realized_pnl),
       marketValue: roundMoney(number(position.market_value)),
@@ -884,7 +1083,8 @@ export class PostgresMarketStore implements MarketDataStore {
       returnPercent: roundMoney(
         ((portfolioValue - startingBalance) / startingBalance) * 100
       ),
-      positions
+      positions,
+      dailyReward
     };
   }
 
@@ -925,7 +1125,7 @@ export class PostgresMarketStore implements MarketDataStore {
       id: string;
       artist_id: string;
       side: TradeSide;
-      quantity: number;
+      quantity: Numeric;
       average_price: Numeric;
       gross_amount: Numeric;
       fee: Numeric;
@@ -939,7 +1139,7 @@ export class PostgresMarketStore implements MarketDataStore {
       userId,
       artistId: trade.artist_id,
       side: trade.side,
-      quantity: trade.quantity,
+      quantity: number(trade.quantity),
       averagePrice: number(trade.average_price),
       grossAmount: number(trade.gross_amount),
       fee: number(trade.fee),

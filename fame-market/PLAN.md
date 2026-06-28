@@ -751,6 +751,32 @@ seguridad. El flujo normal se modela con las tablas siguientes.
 
 Solo se implementara despues de validar las reglas antiabuso.
 
+### daily_position_rewards
+
+- id
+- wallet_id
+- reward_date
+- total_value
+- position_count
+- created_at
+
+Regla inicial implementada: una vez por dia Colombia, si el usuario tiene
+posiciones activas, recibe hasta 0,25% del saldo inicial de temporada, con tope
+normal de 25 FameCoins de valor total. Se reparte proporcionalmente entre las
+posiciones existentes, no mueve precio, no cobra comision y respeta el limite
+del 20% por figura. No se marca como usado si el usuario aun no tiene
+posiciones.
+
+### daily_position_reward_items
+
+- id
+- reward_id
+- artist_id
+- quantity
+- price
+- market_value
+- created_at
+
 ### growth_milestones
 
 - id
@@ -1237,6 +1263,7 @@ La primera version publica debe incluir solo:
 - Login con Google.
 - 10.000 FameCoins por temporada.
 - Compra y venta ficticia.
+- Bonus diario pequeno en posiciones existentes para mejorar retencion.
 - Precio dominado por demanda interna.
 - Indice Automatico de Atencion con impacto pequeno, limitado y explicable.
 - Wikimedia como base universal y 30 dias iniciales en modo sombra.
@@ -1344,6 +1371,8 @@ La primera vertical tecnica ya incluye:
     temporada completa y pulso GDELT.
 57. Radio colombiana curada con categorias, buscador, favoritos, resolucion de
     streams verificados via Radio Browser y fallback a sitio oficial.
+58. Bonus diario automatico de posiciones: hasta 25 FameCoins de valor en
+    participaciones fraccionarias existentes, auditado y sin mover precio.
 
 Siguiente bloque recomendado:
 

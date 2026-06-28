@@ -623,13 +623,58 @@ button {
   font-weight: 800;
 }
 
+.rights-notice__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+}
+
 .rights-notice__social {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 8px;
   color: var(--ink);
   font-weight: 750;
 }
 
 .rights-notice__social a {
-  margin-left: 8px;
+  margin-left: 0;
+}
+
+.daily-reward {
+  display: grid;
+  gap: 3px;
+  margin: 12px 0 4px;
+  padding: 10px 11px;
+  border: 1px solid #d7e7dc;
+  color: #14563b;
+  background: #eef9f2;
+  border-radius: 6px;
+}
+
+.daily-reward strong {
+  font-size: 12px;
+}
+
+.daily-reward span {
+  color: #41725c;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.daily-reward--already_claimed {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #faf9f6;
+}
+
+.daily-reward--no_positions,
+.daily-reward--no_capacity {
+  border-color: #eadb89;
+  color: #684600;
+  background: #fff8d7;
 }
 
 .artist-list__empty {
@@ -4816,6 +4861,15 @@ button {
   .rights-notice {
     padding: 14px 14px 82px;
     text-align: left;
+  }
+
+  .rights-notice__links,
+  .rights-notice__social {
+    justify-content: flex-start;
+  }
+
+  .rights-notice__social a:first-of-type {
+    margin-left: 0;
   }
 }
 

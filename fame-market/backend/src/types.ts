@@ -82,11 +82,26 @@ export interface Position {
   realizedPnl: number;
 }
 
+export interface DailyPositionRewardItem {
+  artistId: string;
+  quantity: number;
+  marketValue: number;
+  price: number;
+}
+
+export interface DailyPositionReward {
+  status: 'claimed' | 'already_claimed' | 'no_positions' | 'no_capacity' | 'disabled';
+  rewardDate: string;
+  totalValue: number;
+  items: DailyPositionRewardItem[];
+}
+
 export interface Wallet {
   userId: string;
   balance: number;
   startingBalance: number;
   positions: Position[];
+  dailyReward?: DailyPositionReward | null;
 }
 
 export interface Trade {
