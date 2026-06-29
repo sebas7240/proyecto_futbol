@@ -6,6 +6,7 @@ Fame Plays now has a Capacitor Android shell.
 
 - App name: Fame Plays
 - Android package id: `com.fameplays.app`
+- AdMob Android app id: `ca-app-pub-7412596570813302~6287603522`
 - Web build directory: `frontend/dist`
 - Developer website for AdMob: `fameplays.com`
 
@@ -62,11 +63,17 @@ In AdMob or Google Play, use `fameplays.com` as the developer website domain.
 
 ## Native AdMob ads
 
-The publisher id `pub-7412596570813302` is not enough to show native app ads inside the APK.
+The AdMob app id is already configured in:
+
+```text
+android/app/src/main/res/values/strings.xml
+android/app/src/main/AndroidManifest.xml
+```
+
+The publisher id `pub-7412596570813302` and app id `ca-app-pub-7412596570813302~6287603522` are not enough to show native app ads inside the APK.
 
 For the next phase, create the app in AdMob and provide:
 
-- AdMob app id, format `ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy`
 - Banner/interstitial/rewarded ad unit ids, format `ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy`
 
 Then we can add the native Capacitor AdMob plugin and place mobile ads without depending only on web ads inside the WebView.
