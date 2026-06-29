@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
+    "build:android": "npm run build:android -w frontend && npx cap sync android",
     "build:staging": "npm run build -w backend && npm run build:staging -w frontend",
     "test": "npm run test -w backend",
     "start": "npm run start -w backend",
@@ -24,6 +25,9 @@
     "concurrently": "^10.0.3"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "hls.js": "^1.6.16"
   }
 }

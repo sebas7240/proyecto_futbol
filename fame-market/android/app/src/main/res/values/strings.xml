@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fame Plays</string>
+    <string name="title_activity_main">Fame Plays</string>
+    <string name="package_name">com.fameplays.app</string>
+    <string name="custom_url_scheme">com.fameplays.app</string>
+</resources>
