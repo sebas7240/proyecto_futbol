@@ -694,7 +694,7 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${nativeApp ? ' app-shell--native' : ''}`}>
       <header className="topbar">
         <div className="brand">
           <span className="brand__mark">

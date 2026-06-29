@@ -594,12 +594,37 @@ export interface ChatModerationReport {
   createdAt: string;
 }
 
+export interface ChatPollOption {
+  id: string;
+  label: string;
+  votes: number;
+}
+
+export interface ChatPoll {
+  id: string;
+  question: string;
+  status: 'active' | 'closed';
+  options: ChatPollOption[];
+  selectedOptionId: string | null;
+  totalVotes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ChatModerationOverview {
   roomId: string;
   recentMessages: ChatModerationMessage[];
   actions: ChatModerationAction[];
   reports: ChatModerationReport[];
+  poll: ChatPoll | null;
   generatedAt: string;
+}
+
+export interface ChatModerationBatchRoom {
+  roomId: string;
+  ok: boolean;
+  snapshot?: ChatModerationOverview;
+  error?: string;
 }
 
 export interface ArtistRightsRecord {

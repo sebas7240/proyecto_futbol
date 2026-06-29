@@ -91,6 +91,8 @@ export function AdminPanel() {
   >({});
   const [chatRoom, setChatRoom] = useState('general');
   const [chatReason, setChatReason] = useState('Moderacion manual');
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptionsDraft, setPollOptionsDraft] = useState('Si\nNo');
   const [adminSearch, setAdminSearch] = useState('');
   const [resetConfirm, setResetConfirm] = useState('');
   const [seasonDraft, setSeasonDraft] = useState({
@@ -157,13 +159,18 @@ export function AdminPanel() {
   const chatReportsQuery = useQuery({
     queryKey: ['chat-moderation-reports', adminContext, chatRoomOptionsKey],
     queryFn: async () => {
-      const snapshots = await Promise.all(
-        chatRoomOptions.map(async (room) => ({
-          room,
-          snapshot: await api.chatModeration(adminContext, room.roomId)
-        }))
+      const rooms = await api.chatModerationBatch(
+        adminContext,
+        chatRoomOptions.map((room) => room.roomId)
       );
-      return snapshots;
+      return rooms.map((result) => ({
+        room:
+          chatRoomOptions.find((item) => item.roomId === result.roomId) ?? {
+            roomId: result.roomId,
+            label: result.roomId
+          },
+        result
+      }));
     },
     enabled: canQueryAdmin && chatRoomOptions.length > 0,
     retry: false,
@@ -231,14 +238,15 @@ export function AdminPanel() {
     ) ?? [];
   const allChatReports =
     chatReportsQuery.data
-      ?.flatMap(({ room, snapshot }) =>
-        snapshot.reports.map((report) => {
-          const reportedMessage = snapshot.recentMessages.find(
+      ?.flatMap(({ room, result }) => {
+        if (!result.ok || !result.snapshot) return [];
+        return result.snapshot.reports.map((report) => {
+          const reportedMessage = result.snapshot!.recentMessages.find(
             (chatMessage) => chatMessage.id === report.messageId
           );
-          return { room, snapshot, report, reportedMessage };
-        })
-      )
+          return { room, snapshot: result.snapshot!, report, reportedMessage };
+        });
+      })
       .sort(
         (left, right) =>
           Date.parse(right.report.createdAt) - Date.parse(left.report.createdAt)
@@ -256,6 +264,14 @@ export function AdminPanel() {
         reportedMessage?.type
       )
   );
+  const failedChatReportRooms =
+    chatReportsQuery.data
+      ?.filter(({ result }) => !result.ok)
+      .map(({ room, result }) => `${room.label}: ${result.error ?? 'error'}`) ??
+    [];
+  const generalChatSnapshot =
+    chatReportsQuery.data?.find(({ room }) => room.roomId === 'general')?.result
+      .snapshot ?? (chatRoom === 'general' ? chatModerationQuery.data : null);
   const filteredRightsRequests = (rightsRequestsQuery.data ?? []).filter((request) =>
     matchesAdminSearch(
       request.subject,
@@ -592,13 +608,17 @@ export function AdminPanel() {
       | 'mute-user'
       | 'ban-user'
       | 'clear-user'
-      | 'reset-room',
+      | 'reset-room'
+      | 'set-poll'
+      | 'close-poll',
     input: {
       roomId?: string;
       messageId?: string;
       userId?: string;
       userName?: string;
       durationMinutes?: number;
+      question?: string;
+      options?: string[];
     } = {}
   ) => {
     setBusyArtist(`chat-${action}-${input.messageId ?? input.userId ?? 'room'}`);
@@ -614,6 +634,10 @@ export function AdminPanel() {
       setMessage(
         action === 'reset-room'
           ? 'Chat y notas de voz reiniciados para esta sala.'
+          : action === 'set-poll'
+            ? 'Encuesta publicada en el chat general.'
+            : action === 'close-poll'
+              ? 'Encuesta cerrada.'
           : 'Moderacion del chat aplicada.'
       );
       await chatModerationQuery.refetch();
@@ -627,6 +651,18 @@ export function AdminPanel() {
     } finally {
       setBusyArtist('');
     }
+  };
+
+  const publishGeneralPoll = () => {
+    const options = pollOptionsDraft
+      .split('\n')
+      .map((option) => option.trim())
+      .filter(Boolean);
+    moderateChat('set-poll', {
+      roomId: 'general',
+      question: pollQuestion.trim(),
+      options
+    });
   };
 
   const toggleArtist = async (artistId: string, frozen: boolean) => {
@@ -1663,15 +1699,76 @@ export function AdminPanel() {
           </button>
         </div>
 
+        <div className="chat-poll-admin">
+          <div>
+            <small>Encuesta fija del chat general</small>
+            <h3>Pregunta para la comunidad</h3>
+          </div>
+          <label>
+            Pregunta
+            <input
+              value={pollQuestion}
+              maxLength={140}
+              onChange={(event) => setPollQuestion(event.target.value)}
+              placeholder="Ej: ¿Que categoria deberia tener evento esta semana?"
+            />
+          </label>
+          <label>
+            Opciones, una por linea
+            <textarea
+              value={pollOptionsDraft}
+              maxLength={420}
+              onChange={(event) => setPollOptionsDraft(event.target.value)}
+              rows={4}
+            />
+          </label>
+          <div className="chat-poll-admin__actions">
+            <button
+              onClick={publishGeneralPoll}
+              disabled={
+                !adminContext ||
+                Boolean(busyArtist) ||
+                !pollQuestion.trim() ||
+                pollOptionsDraft.split('\n').filter((item) => item.trim()).length < 2
+              }
+            >
+              <Save size={16} /> Publicar encuesta
+            </button>
+            <button
+              className="danger-action"
+              onClick={() => moderateChat('close-poll', { roomId: 'general' })}
+              disabled={!adminContext || Boolean(busyArtist) || !generalChatSnapshot?.poll}
+            >
+              <Trash2 size={16} /> Cerrar encuesta
+            </button>
+          </div>
+          {generalChatSnapshot?.poll ? (
+            <div className="chat-poll-results">
+              <strong>{generalChatSnapshot.poll.question}</strong>
+              {generalChatSnapshot.poll.options.map((option) => {
+                const percent = generalChatSnapshot.poll?.totalVotes
+                  ? Math.round(
+                      (option.votes / generalChatSnapshot.poll.totalVotes) * 100
+                    )
+                  : 0;
+                return (
+                  <span key={option.id}>
+                    <b>{option.label}</b>
+                    <small>{option.votes} votos · {percent}%</small>
+                    <i style={{ width: `${percent}%` }} />
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p>No hay encuesta activa en el chat general.</p>
+          )}
+        </div>
+
         {!adminContext ? (
           <p>Inicia sesion con un email administrador para controlar el chat.</p>
         ) : chatModerationQuery.isLoading ? (
           <p>Cargando sala...</p>
-        ) : chatModerationQuery.isError ? (
-          <p>
-            No se pudo conectar la moderacion. El backend debe apuntar al
-            Worker de chat con el secreto configurado solo en el servidor.
-          </p>
         ) : (
           <div className="chat-moderation__grid">
             <div>
@@ -1679,7 +1776,12 @@ export function AdminPanel() {
                 <MessageCircle size={17} /> Mensajes recientes
               </h3>
               <div className="chat-moderation__messages">
-                {filteredChatMessages.length ? (
+                {chatModerationQuery.isError ? (
+                  <p>
+                    No se pudo cargar la sala seleccionada. Los reportes
+                    globales siguen consultandose abajo.
+                  </p>
+                ) : filteredChatMessages.length ? (
                   filteredChatMessages.map((chatMessage) => (
                     <article
                       className={`chat-moderation-card chat-moderation-card--${chatMessage.status}`}
@@ -1751,6 +1853,12 @@ export function AdminPanel() {
                 <Flag size={17} /> Reportes activos
                 {chatReportsQuery.isFetching ? ' actualizando...' : ''}
               </h3>
+              {failedChatReportRooms.length > 0 && (
+                <p className="chat-moderation-warning">
+                  Algunas salas no respondieron: {failedChatReportRooms.slice(0, 3).join(' | ')}
+                  {failedChatReportRooms.length > 3 ? '...' : ''}
+                </p>
+              )}
               <div className="chat-report-list">
                 {filteredAllChatReports.length ? (
                   filteredAllChatReports.map(({ room, report, reportedMessage }) => {

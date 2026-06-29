@@ -4,6 +4,7 @@ import type {
   AttentionEvaluationResponse,
   AttentionSourceOverview,
   CategoryOverview,
+  ChatModerationBatchRoom,
   ChatModerationOverview,
   ConsentStatus,
   EntityCategory,
@@ -441,6 +442,17 @@ export const api = {
       { headers: {} }
     );
   },
+  async chatModerationBatch(_adminContext: string, roomIds: string[]) {
+    const body = await request<{ rooms: ChatModerationBatchRoom[] }>(
+      '/admin/chat/moderation/batch',
+      {
+        method: 'POST',
+        headers: {},
+        body: JSON.stringify({ roomIds })
+      }
+    );
+    return body.rooms;
+  },
   async moderateChat(
     _adminContext: string,
     input: {
@@ -450,12 +462,16 @@ export const api = {
         | 'mute-user'
         | 'ban-user'
         | 'clear-user'
-        | 'reset-room';
+        | 'reset-room'
+        | 'set-poll'
+        | 'close-poll';
       messageId?: string;
       userId?: string;
       userName?: string;
       durationMinutes?: number;
       reason?: string;
+      question?: string;
+      options?: string[];
     }
   ) {
     return request<ChatModerationOverview>('/admin/chat/moderation', {

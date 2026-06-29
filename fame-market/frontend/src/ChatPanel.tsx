@@ -37,6 +37,20 @@ interface PresenceUser {
   name: string;
 }
 
+interface ChatPollOption {
+  id: string;
+  label: string;
+  votes: number;
+}
+
+interface ChatPoll {
+  id: string;
+  question: string;
+  options: ChatPollOption[];
+  selectedOptionId?: string | null;
+  totalVotes: number;
+}
+
 type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 type ComposerMode = 'text' | 'voice';
 type RecorderState = 'idle' | 'recording' | 'sending';
@@ -54,6 +68,7 @@ interface ReadyEvent {
   name: string;
   history: ChatMessage[];
   presence: PresenceUser[];
+  poll?: ChatPoll | null;
 }
 
 interface MessageEventPayload {
@@ -81,13 +96,19 @@ interface NoticeEvent {
   message: string;
 }
 
+interface PollUpdatedEvent {
+  type: 'poll-updated';
+  poll: ChatPoll | null;
+}
+
 type ChatEvent =
   | ReadyEvent
   | MessageEventPayload
   | PresenceEvent
   | HiddenEvent
   | RoomResetEvent
-  | NoticeEvent;
+  | NoticeEvent
+  | PollUpdatedEvent;
 
 const guestNameKey = 'fame-plays:chat-guest-name';
 const guestIdKey = 'fame-plays:chat-guest-id';
@@ -202,6 +223,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [input, setInput] = useState('');
   const [notice, setNotice] = useState('');
+  const [poll, setPoll] = useState<ChatPoll | null>(null);
   const [recorderState, setRecorderState] = useState<RecorderState>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(
@@ -286,6 +308,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         if (payload.type === 'ready') {
           setMessages(payload.history);
           setPresence(payload.presence);
+          setPoll(payload.poll ?? null);
           return;
         }
         if (payload.type === 'message') {
@@ -308,6 +331,10 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
         if (payload.type === 'room-reset') {
           setMessages([]);
           setNotice(payload.message);
+          return;
+        }
+        if (payload.type === 'poll-updated') {
+          setPoll(payload.poll);
           return;
         }
         setNotice(payload.message);
@@ -476,6 +503,16 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     setNotice('Reporte enviado a moderacion.');
   }
 
+  function votePoll(optionId: string) {
+    if (socketRef.current?.readyState !== WebSocket.OPEN || !poll) return;
+    socketRef.current.send(
+      JSON.stringify({
+        type: 'poll-vote',
+        optionId
+      })
+    );
+  }
+
   function toggleSound() {
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -551,6 +588,35 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
           <Send size={15} /> Telegram oficial
         </a>
       </div>
+
+      {activeRoom === 'general' && poll && (
+        <section className="chat-poll">
+          <strong>{poll.question}</strong>
+          <div>
+            {poll.options.map((option) => {
+              const selected = poll.selectedOptionId === option.id;
+              const percent = poll.totalVotes
+                ? Math.round((option.votes / poll.totalVotes) * 100)
+                : 0;
+              return (
+                <button
+                  className={selected ? 'is-selected' : ''}
+                  key={option.id}
+                  onClick={() => votePoll(option.id)}
+                  disabled={!connected}
+                  type="button"
+                >
+                  <span>
+                    <b>{option.label}</b>
+                    <small>{percent}% · {option.votes} votos</small>
+                  </span>
+                  <i style={{ width: `${percent}%` }} />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="chat-body" ref={listRef}>
         {messages.length ? (

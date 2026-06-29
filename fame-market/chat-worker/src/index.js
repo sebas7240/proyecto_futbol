@@ -149,6 +149,19 @@ function rowToMessage(row) {
   };
 }
 
+function cleanPollOptions(input) {
+  const seen = new Set();
+  return (Array.isArray(input) ? input : [])
+    .map((option) => cleanBody(option, 80))
+    .filter((option) => {
+      const key = option.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 6);
+}
+
 function isAdminRequest(request, env) {
   const secret = String(env.CHAT_ADMIN_SECRET || '');
   return Boolean(secret) && request.headers.get('x-chat-admin-secret') === secret;
@@ -213,6 +226,30 @@ export class ChatRoom {
       );
       CREATE INDEX IF NOT EXISTS reports_message_idx
         ON reports (message_id);
+      CREATE TABLE IF NOT EXISTS polls (
+        id TEXT PRIMARY KEY,
+        question TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS poll_options (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        position INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS poll_options_poll_idx
+        ON poll_options (poll_id, position);
+      CREATE TABLE IF NOT EXISTS poll_votes (
+        poll_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        option_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (poll_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS poll_votes_poll_idx
+        ON poll_votes (poll_id);
     `);
 
     for (const definition of [
@@ -269,7 +306,8 @@ export class ChatRoom {
         userId,
         name,
         history: this.historyRows(),
-        presence: this.presence()
+        presence: this.presence(),
+        poll: this.pollSnapshot(userId)
       })
     );
     this.broadcastPresence();
@@ -376,7 +414,66 @@ export class ChatRoom {
           reason: row.reason,
           createdAt: new Date(row.created_at).toISOString()
         })),
+      poll: this.pollSnapshot(),
       generatedAt: new Date().toISOString()
+    };
+  }
+
+  pollSnapshot(userId = '') {
+    const poll = this.ctx.storage.sql
+      .exec(
+        `
+          SELECT id, question, status, created_at, updated_at
+          FROM polls
+          WHERE status = 'active'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `
+      )
+      .toArray()[0];
+    if (!poll) return null;
+    const options = this.ctx.storage.sql
+      .exec(
+        `
+          SELECT option.id, option.label, option.position,
+                 COUNT(vote.option_id) AS votes
+          FROM poll_options option
+          LEFT JOIN poll_votes vote
+            ON vote.poll_id = option.poll_id
+           AND vote.option_id = option.id
+          WHERE option.poll_id = ?
+          GROUP BY option.id, option.label, option.position
+          ORDER BY option.position ASC
+        `,
+        poll.id
+      )
+      .toArray();
+    const selected = userId
+      ? this.ctx.storage.sql
+          .exec(
+            'SELECT option_id FROM poll_votes WHERE poll_id = ? AND user_id = ?',
+            poll.id,
+            userId
+          )
+          .toArray()[0]
+      : null;
+    const totalVotes = options.reduce(
+      (sum, option) => sum + Number(option.votes || 0),
+      0
+    );
+    return {
+      id: poll.id,
+      question: poll.question,
+      status: poll.status,
+      options: options.map((option) => ({
+        id: option.id,
+        label: option.label,
+        votes: Number(option.votes || 0)
+      })),
+      selectedOptionId: selected?.option_id || null,
+      totalVotes,
+      createdAt: new Date(poll.created_at).toISOString(),
+      updatedAt: new Date(poll.updated_at).toISOString()
     };
   }
 
@@ -417,6 +514,11 @@ export class ChatRoom {
 
     if (payload.type === 'report') {
       this.handleReport(ws, payload);
+      return;
+    }
+
+    if (payload.type === 'poll-vote') {
+      this.handlePollVote(ws, payload);
       return;
     }
 
@@ -648,6 +750,38 @@ export class ChatRoom {
     ws.send(JSON.stringify({ type: 'notice', message: 'Reporte recibido.' }));
   }
 
+  handlePollVote(ws, payload) {
+    const attachment = ws.deserializeAttachment() || {};
+    const poll = this.pollSnapshot(attachment.userId || 'anonymous');
+    if (!poll) {
+      ws.send(JSON.stringify({ type: 'error', message: 'No hay encuesta activa.' }));
+      return;
+    }
+    const optionId = String(payload.optionId || '').slice(0, 80);
+    const optionExists = poll.options.some((option) => option.id === optionId);
+    if (!optionExists) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Opcion invalida.' }));
+      return;
+    }
+    this.ctx.storage.sql.exec(
+      `
+        INSERT INTO poll_votes (poll_id, user_id, option_id, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(poll_id, user_id)
+        DO UPDATE SET option_id = excluded.option_id,
+                      created_at = excluded.created_at
+      `,
+      poll.id,
+      attachment.userId || 'anonymous',
+      optionId,
+      Date.now()
+    );
+    this.broadcast({
+      type: 'poll-updated',
+      poll: this.pollSnapshot()
+    });
+  }
+
   currentRestriction(userId, now) {
     return this.ctx.storage.sql
       .exec(
@@ -729,6 +863,52 @@ export class ChatRoom {
         type: 'room-reset',
         message: 'El chat de esta sala fue reiniciado por moderacion.'
       });
+      return this.moderationSnapshot(roomId);
+    }
+
+    if (action === 'set-poll') {
+      const question = cleanBody(body.question, 140);
+      const options = cleanPollOptions(body.options);
+      if (!question || options.length < 2) {
+        throw new Error('Poll question and at least two options are required');
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE polls SET status = 'closed', updated_at = ? WHERE status = 'active'",
+        now
+      );
+      const pollId = messageId();
+      this.ctx.storage.sql.exec(
+        `
+          INSERT INTO polls (id, question, status, created_at, updated_at)
+          VALUES (?, ?, 'active', ?, ?)
+        `,
+        pollId,
+        question,
+        now,
+        now
+      );
+      options.forEach((option, index) => {
+        this.ctx.storage.sql.exec(
+          `
+            INSERT INTO poll_options (id, poll_id, label, position)
+            VALUES (?, ?, ?, ?)
+          `,
+          messageId(),
+          pollId,
+          option,
+          index
+        );
+      });
+      this.broadcast({ type: 'poll-updated', poll: this.pollSnapshot() });
+      return this.moderationSnapshot(roomId);
+    }
+
+    if (action === 'close-poll') {
+      this.ctx.storage.sql.exec(
+        "UPDATE polls SET status = 'closed', updated_at = ? WHERE status = 'active'",
+        now
+      );
+      this.broadcast({ type: 'poll-updated', poll: null });
       return this.moderationSnapshot(roomId);
     }
 

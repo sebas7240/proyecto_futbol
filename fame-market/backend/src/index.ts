@@ -510,13 +510,21 @@ const chatModerationSchema = z.object({
     'mute-user',
     'ban-user',
     'clear-user',
-    'reset-room'
+    'reset-room',
+    'set-poll',
+    'close-poll'
   ]),
   messageId: z.string().trim().max(120).optional(),
   userId: z.string().trim().max(120).optional(),
   userName: z.string().trim().max(80).optional(),
   durationMinutes: z.number().int().min(1).max(10_080).optional(),
-  reason: z.string().trim().max(240).optional()
+  reason: z.string().trim().max(240).optional(),
+  question: z.string().trim().max(140).optional(),
+  options: z.array(z.string().trim().max(80)).min(2).max(6).optional()
+});
+
+const chatModerationBatchSchema = z.object({
+  roomIds: z.array(chatRoomSchema).min(1).max(80)
 });
 
 async function requestChatModeration(
@@ -1332,6 +1340,40 @@ app.get(
     try {
       const roomId = chatRoomSchema.parse(request.query.roomId ?? 'general');
       response.json(await requestChatModeration(roomId));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/chat/moderation/batch',
+  requireAdmin,
+  adminRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = chatModerationBatchSchema.parse(request.body);
+      const rooms = await Promise.all(
+        input.roomIds.map(async (roomId) => {
+          try {
+            return {
+              roomId,
+              ok: true,
+              snapshot: await requestChatModeration(roomId)
+            };
+          } catch (error) {
+            return {
+              roomId,
+              ok: false,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'No se pudo consultar la sala.'
+            };
+          }
+        })
+      );
+      response.json({ rooms });
     } catch (error) {
       next(error);
     }
