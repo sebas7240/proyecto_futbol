@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.fameplays.app',
   appName: 'Fame Plays',
   webDir: 'frontend/dist',
+  server: {
+    androidScheme: 'https'
+  },
   plugins: {
     FirebaseAuthentication: {
       authDomain: 'fameplays-b2cfb.firebaseapp.com',

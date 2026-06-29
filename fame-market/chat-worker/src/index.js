@@ -15,7 +15,9 @@ const defaultAllowedOrigins = [
   'https://fameplays.pages.dev',
   'http://localhost:5174',
   'http://localhost:5173',
-  'capacitor://localhost'
+  'capacitor://localhost',
+  'https://localhost',
+  'http://localhost'
 ];
 
 const blockedWords = [

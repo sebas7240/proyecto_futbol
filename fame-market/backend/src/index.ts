@@ -178,6 +178,7 @@ const allowedOrigins = [
   ...new Set([
     ...configuredOrigins,
     'capacitor://localhost',
+    'https://localhost',
     'http://localhost'
   ])
 ];
