@@ -15,6 +15,16 @@ interface MaintenanceRow {
   error_message: string | null;
 }
 
+interface ClientErrorRow {
+  id: string;
+  kind: string;
+  message: string;
+  source: string | null;
+  path: string;
+  release: string | null;
+  created_at: Date;
+}
+
 const monitoredJobs = [
   'attention-sync',
   'news-sync',
@@ -110,12 +120,14 @@ export async function runMonitoredJob<T>(
 }
 
 export async function getOperationalOverview() {
-  const [counts, jobs, successfulJobs, currentSeason] = await Promise.all([
+  const [counts, jobs, successfulJobs, clientErrors, currentSeason] =
+    await Promise.all([
     getPool().query<{
       users: string;
       trades: string;
       trades_24h: string;
       open_fraud_alerts: string;
+      client_errors_24h: string;
       database_bytes: string;
       attention_sources: string;
       attention_shadow_signals: string;
@@ -134,6 +146,11 @@ export async function getOperationalOverview() {
           FROM fraud_alerts
           WHERE status = 'open'
         ) AS open_fraud_alerts,
+        (
+          SELECT COUNT(*)
+          FROM client_error_reports
+          WHERE created_at >= NOW() - INTERVAL '24 hours'
+        ) AS client_errors_24h,
         (
           SELECT COUNT(*)
           FROM attention_sources
@@ -178,6 +195,14 @@ export async function getOperationalOverview() {
       `,
       [[...monitoredJobs]]
     ),
+    getPool().query<ClientErrorRow>(
+      `
+        SELECT id, kind, message, source, path, release, created_at
+        FROM client_error_reports
+        ORDER BY created_at DESC
+        LIMIT 10
+      `
+    ),
     getCurrentSeason()
   ]);
 
@@ -207,6 +232,7 @@ export async function getOperationalOverview() {
       trades: Number(row.trades),
       trades24h: Number(row.trades_24h),
       openFraudAlerts: Number(row.open_fraud_alerts),
+      clientErrors24h: Number(row.client_errors_24h),
       databaseBytes: Number(row.database_bytes),
       attentionSources: Number(row.attention_sources),
       attentionShadowSignals: Number(row.attention_shadow_signals),
@@ -220,6 +246,18 @@ export async function getOperationalOverview() {
     launch: {
       season: currentSeason,
       prizeStatus
+    },
+    clientErrors: {
+      last24h: Number(row.client_errors_24h),
+      recent: clientErrors.rows.map((error) => ({
+        id: String(error.id),
+        kind: error.kind,
+        message: error.message,
+        source: error.source,
+        path: error.path,
+        release: error.release,
+        createdAt: new Date(error.created_at).toISOString()
+      }))
     },
     jobs: latestJobs,
     generatedAt: new Date().toISOString()
@@ -268,6 +306,7 @@ export async function operationsMetrics() {
       trades: 0,
       trades24h: 0,
       openFraudAlerts: 0,
+      clientErrors24h: 0,
       databaseBytes: 0,
       attentionSources: 0,
       attentionShadowSignals: 0,

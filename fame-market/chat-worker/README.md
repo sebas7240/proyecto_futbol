@@ -29,7 +29,7 @@ Despues configura en Cloudflare Pages:
 
 ```text
 VITE_CHAT_WS_URL=https://fame-plays-chat.sebas7240.workers.dev
-VITE_CHAT_VOICE_ENABLED=false
+VITE_CHAT_VOICE_ENABLED=true
 ```
 
 Configura el secreto de moderacion:
@@ -42,4 +42,4 @@ El backend debe usar la misma clave en `CHAT_ADMIN_SECRET` y apuntar al Worker
 con `CHAT_WORKER_ADMIN_URL`. Las notas de voz se guardan como mensajes de 1 a
 10 segundos; no usan WebRTC ni llamadas en vivo. El Worker acepta MIME con
 parametros de codec, como `audio/webm;codecs=opus`, y limita cada mensaje a
-500 KB.
+800 KB por defecto.

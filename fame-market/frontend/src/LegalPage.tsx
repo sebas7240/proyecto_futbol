@@ -724,10 +724,71 @@ function GuidesPage() {
   );
 }
 
+function HowToPage() {
+  return (
+    <>
+      <header className="legal-heading">
+        <span><BookOpenText size={20} /> Como jugar</span>
+        <h1>Forma tu equipo de fama en pocos pasos</h1>
+        <p>
+          Fame Plays es gratis y usa FameCoins ficticias. Tu objetivo es leer
+          tendencias culturales, apoyar figuras y subir en el ranking de la
+          temporada sin usar dinero real.
+        </p>
+      </header>
+
+      <section className="how-to-steps">
+        <article>
+          <strong>1</strong>
+          <h2>Elige una figura</h2>
+          <p>
+            Revisa precio ficticio, grafica, noticias, contenido reciente y
+            categoria antes de decidir.
+          </p>
+        </article>
+        <article>
+          <strong>2</strong>
+          <h2>Suma apoyo</h2>
+          <p>
+            Indica cuantas participaciones quieres, verifica seguridad cuando
+            el sistema lo pida y revisa la cotizacion.
+          </p>
+        </article>
+        <article>
+          <strong>3</strong>
+          <h2>Confirma la jugada</h2>
+          <p>
+            Si aceptas el precio promedio y la comision ficticia, confirma. La
+            jugada aparece en tu equipo y puede cambiar tu ranking.
+          </p>
+        </article>
+        <article>
+          <strong>4</strong>
+          <h2>Compite limpio</h2>
+          <p>
+            El ranking premia rendimiento porcentual. Las recompensas
+            promocionales, si existen, pasan por revision antifraude.
+          </p>
+        </article>
+      </section>
+
+      <section>
+        <h2>Lo importante</h2>
+        <p>
+          Los FameCoins no se compran, no se retiran y no se convierten en
+          dinero. Fame Plays no es inversion, bolsa ni apuesta: es un juego de
+          estrategia sobre atencion publica.
+        </p>
+        <a href="/reglas">Leer reglas completas</a>
+      </section>
+    </>
+  );
+}
+
 export function LegalPage({
   page
 }: {
-  page: 'rules' | 'privacy' | 'methodology' | 'rights' | 'guides';
+  page: 'rules' | 'privacy' | 'methodology' | 'rights' | 'guides' | 'howto';
 }) {
   return (
     <main className="legal-page">
@@ -741,6 +802,8 @@ export function LegalPage({
         <PrivacyPage />
       ) : page === 'methodology' ? (
         <MethodologyPage />
+      ) : page === 'howto' ? (
+        <HowToPage />
       ) : page === 'guides' ? (
         <GuidesPage />
       ) : (

@@ -372,6 +372,7 @@ export interface OperationsOverview {
     trades: number;
     trades24h: number;
     openFraudAlerts: number;
+    clientErrors24h: number;
     databaseBytes: number;
     attentionSources: number;
     attentionShadowSignals: number;
@@ -385,6 +386,18 @@ export interface OperationsOverview {
   launch: {
     season: Season | null;
     prizeStatus: SeasonPrizeStatus | null;
+  };
+  clientErrors: {
+    last24h: number;
+    recent: Array<{
+      id: string;
+      kind: 'error' | 'unhandledrejection' | 'react' | 'manual';
+      message: string;
+      source: string | null;
+      path: string;
+      release: string | null;
+      createdAt: string;
+    }>;
   };
   jobs: {
     'attention-sync': MaintenanceRun | null;

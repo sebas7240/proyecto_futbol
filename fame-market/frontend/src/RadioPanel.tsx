@@ -657,7 +657,7 @@ export function RadioPanel() {
       if (audio.canPlayType('application/vnd.apple.mpegurl')) {
         audio.src = currentStream;
       } else {
-        import('hls.js')
+        import('hls.js/dist/hls.light.mjs')
           .then(({ default: Hls }) => {
             if (cancelled) return;
             if (!Hls.isSupported()) {

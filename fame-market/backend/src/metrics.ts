@@ -7,6 +7,7 @@ const counters = new Map<string, number>([
   ['trades_executed_total', 0],
   ['turnstile_success_total', 0],
   ['turnstile_failure_total', 0],
+  ['client_errors_total', 0],
   ['maintenance_success_total', 0],
   ['maintenance_failure_total', 0]
 ]);
@@ -36,6 +37,7 @@ export function prometheusMetrics(database: {
   trades: number;
   trades24h: number;
   openFraudAlerts: number;
+  clientErrors24h?: number;
   databaseBytes: number;
   attentionSources: number;
   attentionShadowSignals: number;
@@ -74,6 +76,12 @@ export function prometheusMetrics(database: {
       'Open fraud review alerts.',
       'gauge',
       database.openFraudAlerts
+    ),
+    metric(
+      'fame_market_client_errors_24h',
+      'Client-side error reports during the last 24 hours.',
+      'gauge',
+      database.clientErrors24h ?? 0
     ),
     metric(
       'fame_market_database_bytes',

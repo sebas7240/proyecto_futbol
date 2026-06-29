@@ -28,3 +28,7 @@ interface Window {
     remove(widgetId: string): void;
   };
 }
+
+declare module 'hls.js/dist/hls.light.mjs' {
+  export { default } from 'hls.js';
+}

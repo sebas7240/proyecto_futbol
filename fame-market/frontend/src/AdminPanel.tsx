@@ -935,6 +935,54 @@ export function AdminPanel() {
             }
           />
         </article>
+        <article>
+          <Activity size={20} />
+          <span>
+            <small>Errores frontend 24h</small>
+            <strong>
+              {operationsQuery.data
+                ? operationsQuery.data.clientErrors.last24h.toLocaleString('es-CO')
+                : '0'}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.clientErrors.last24h === 0
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+      </section>
+
+      <section className="client-errors-panel">
+        <div className="section-heading section-heading--compact">
+          <div>
+            <small>Frontend</small>
+            <h3>Errores recientes de usuarios</h3>
+          </div>
+          <span>
+            {operationsQuery.data?.clientErrors.recent.length ?? 0} ultimos
+          </span>
+        </div>
+        {!operationsQuery.data ? (
+          <p>Inicia sesion como administrador para consultar errores.</p>
+        ) : operationsQuery.data.clientErrors.recent.length ? (
+          operationsQuery.data.clientErrors.recent.map((error) => (
+            <article key={error.id}>
+              <span>
+                <strong>{error.message}</strong>
+                <small>
+                  {error.kind} / {error.path} /{' '}
+                  {new Date(error.createdAt).toLocaleString('es-CO')}
+                </small>
+              </span>
+              <b>{error.release ?? 'prod'}</b>
+            </article>
+          ))
+        ) : (
+          <p>No hay errores frontend reportados recientemente.</p>
+        )}
       </section>
 
       <div className="admin-section-title attention-heading">

@@ -5,6 +5,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
+  BookOpenText,
   BriefcaseBusiness,
   ChevronRight,
   Play,
@@ -214,6 +215,8 @@ function App() {
   const [turnstilePass, setTurnstilePass] =
     useState<TurnstilePassState | null>(readStoredTurnstilePass);
   const [turnstileReset, setTurnstileReset] = useState(0);
+  const [turnstileRequested, setTurnstileRequested] = useState(false);
+  const [quoteAfterTurnstile, setQuoteAfterTurnstile] = useState(false);
   const [prizeWalletDraft, setPrizeWalletDraft] = useState('');
   const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
   const [prizeProfileMessage, setPrizeProfileMessage] = useState('');
@@ -230,6 +233,8 @@ function App() {
       : undefined;
   const turnstileAccessReady =
     !backendNeedsTurnstile || Boolean(activeTurnstilePass || turnstileToken);
+  const needsTurnstileBeforeQuote =
+    backendNeedsTurnstile && !activeTurnstilePass && !turnstileToken;
 
   function clearTurnstilePass() {
     setTurnstilePass(null);
@@ -249,6 +254,11 @@ function App() {
     } catch {
       // The in-memory pass still avoids repeated challenges on this page.
     }
+  }
+
+  function handleTurnstileToken(token: string | null) {
+    setTurnstileToken(token);
+    if (token) setNotice('Verificacion lista. Preparando cotizacion...');
   }
 
   useEffect(() => {
@@ -377,6 +387,8 @@ function App() {
       ),
     onSuccess: (result) => {
       setQuote(result.quote);
+      setTurnstileRequested(false);
+      setQuoteAfterTurnstile(false);
       if (result.turnstilePass && result.turnstilePassExpiresAt) {
         saveTurnstilePass(
           result.turnstilePass,
@@ -392,11 +404,13 @@ function App() {
         ['TURNSTILE_REQUIRED', 'TURNSTILE_REJECTED'].includes(error.code)
       ) {
         clearTurnstilePass();
+        setTurnstileRequested(true);
       }
       if (turnstileSiteKey && turnstileToken) {
         setTurnstileToken(null);
         setTurnstileReset((current) => current + 1);
       }
+      setQuoteAfterTurnstile(false);
       setNotice(error.message);
     }
   });
@@ -446,6 +460,18 @@ function App() {
     },
     onError: (error) => setNotice(error.message)
   });
+
+  useEffect(() => {
+    if (!quoteAfterTurnstile || !turnstileAccessReady) return;
+    if (!artistQuery.data || quoteMutation.isPending) return;
+    setQuoteAfterTurnstile(false);
+    quoteMutation.mutate();
+  }, [
+    artistQuery.data,
+    quoteAfterTurnstile,
+    quoteMutation,
+    turnstileAccessReady
+  ]);
 
   const prizeProfileMutation = useMutation({
     mutationFn: () => {
@@ -624,6 +650,16 @@ function App() {
     setOnboardingOpen(false);
   };
 
+  const reviewQuote = () => {
+    if (needsTurnstileBeforeQuote) {
+      setTurnstileRequested(true);
+      setQuoteAfterTurnstile(true);
+      setNotice('Completando verificacion antifraude solo para esta jugada.');
+      return;
+    }
+    quoteMutation.mutate();
+  };
+
   const selectTab = (tab: 'market' | 'portfolio' | 'ranking') => {
     setMobileTab(tab);
     const path = tab === 'ranking' ? '/ranking' : '/';
@@ -670,6 +706,10 @@ function App() {
           />
         </label>
         <div className="topbar__stats">
+          <a className="how-to-link" href="/como-jugar">
+            <BookOpenText size={16} />
+            Como jugar
+          </a>
           <OnlineCounter />
           <button
             className="topbar-stat-button"
@@ -1112,6 +1152,7 @@ function App() {
             {backendNeedsTurnstile &&
               turnstileSiteKey &&
               !activeTurnstilePass &&
+              turnstileRequested &&
               !quote &&
               (!firebaseReady || Boolean(firebaseUser)) &&
               consentAccepted &&
@@ -1119,7 +1160,7 @@ function App() {
                 <TurnstileWidget
                   siteKey={turnstileSiteKey}
                   resetSignal={turnstileReset}
-                  onToken={setTurnstileToken}
+                  onToken={handleTurnstileToken}
                   onError={() =>
                     setNotice(
                       'No se pudo cargar la verificacion de seguridad.'
@@ -1151,7 +1192,7 @@ function App() {
             ) : (
               <button
                 className={`primary-action ${side === 'sell' ? 'primary-action--sell' : ''}`}
-                onClick={() => quoteMutation.mutate()}
+                onClick={reviewQuote}
                 disabled={
                   !artist ||
                   quoteMutation.isPending ||
@@ -1159,7 +1200,6 @@ function App() {
                   !consentReady ||
                   !consentAccepted ||
                   currentSeason?.status !== 'active' ||
-                  !turnstileAccessReady ||
                   (backendNeedsTurnstile && !turnstileSiteKey)
                 }
               >
@@ -1175,8 +1215,10 @@ function App() {
                     ? 'Falta configurar seguridad'
                   : quoteMutation.isPending
                     ? 'Calculando...'
-                    : !turnstileAccessReady
+                    : quoteAfterTurnstile || (turnstileRequested && !turnstileAccessReady)
                       ? 'Verificando seguridad...'
+                    : needsTurnstileBeforeQuote
+                      ? `Verificar y revisar ${side === 'buy' ? 'apoyo' : 'retiro'}`
                     : `Revisar ${side === 'buy' ? 'apoyo' : 'retiro'}`}
               </button>
             )}

@@ -147,6 +147,20 @@ export const api = {
     });
     return body.presence;
   },
+  async reportClientError(input: {
+    kind: 'error' | 'unhandledrejection' | 'react' | 'manual';
+    message: string;
+    stack?: string;
+    source?: string;
+    path?: string;
+    release?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    return request<{ ok: boolean }>('/client-errors', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
   async portfolio() {
     const body = await request<{ portfolio: Portfolio }>('/me/portfolio');
     return body.portfolio;

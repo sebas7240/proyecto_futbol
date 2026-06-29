@@ -224,6 +224,12 @@ const presenceRateLimit = rateLimit({
   windowMs: 60_000,
   key: requestIp
 });
+const clientErrorRateLimit = rateLimit({
+  action: 'client-error-report',
+  maxRequests: 20,
+  windowMs: 60_000,
+  key: requestIp
+});
 const monitoringSecret = process.env.MONITORING_SECRET;
 
 app.disable('x-powered-by');
@@ -320,6 +326,17 @@ const presenceHeartbeatSchema = z.object({
     .regex(/^[a-zA-Z0-9:_-]{12,96}$/),
   path: z.string().trim().max(180).default('/')
 });
+const clientErrorSchema = z.object({
+  kind: z
+    .enum(['error', 'unhandledrejection', 'react', 'manual'])
+    .default('error'),
+  message: z.string().trim().min(1).max(1000),
+  stack: z.string().max(6000).optional().default(''),
+  source: z.string().trim().max(500).optional().default(''),
+  path: z.string().trim().max(240).optional().default('/'),
+  release: z.string().trim().max(80).optional().default('production'),
+  metadata: z.record(z.string(), z.unknown()).optional().default({})
+});
 
 app.get('/api/presence', async (_request, response, next) => {
   try {
@@ -342,6 +359,42 @@ app.post(
           path: input.path
         })
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.post(
+  '/api/client-errors',
+  clientErrorRateLimit,
+  async (request, response, next) => {
+    try {
+      const input = clientErrorSchema.parse(request.body);
+      if (databaseConfigured()) {
+        await getPool().query(
+          `
+            INSERT INTO client_error_reports (
+              kind, message, stack, source, path, user_agent, release, metadata
+            )
+            VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6, $7, $8)
+          `,
+          [
+            input.kind,
+            input.message,
+            input.stack,
+            input.source,
+            input.path || '/',
+            request.header('user-agent')?.slice(0, 500) ?? null,
+            input.release,
+            input.metadata
+          ]
+        );
+      } else {
+        console.warn('[ClientError]', input.kind, input.message);
+      }
+      incrementMetric('client_errors_total');
+      response.status(202).json({ ok: true });
     } catch (error) {
       next(error);
     }

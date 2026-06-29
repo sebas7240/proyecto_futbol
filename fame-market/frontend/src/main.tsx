@@ -3,7 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { AdminPanel } from './AdminPanel';
+import { ErrorBoundary } from './ErrorBoundary';
 import { LegalPage } from './LegalPage';
+import { installClientErrorReporting } from './errorReporting';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -21,24 +23,30 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   });
 }
 
+installClientErrorReporting();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      {window.location.pathname.startsWith('/admin') ? (
-        <AdminPanel />
-      ) : window.location.pathname.startsWith('/reglas') ? (
-        <LegalPage page="rules" />
-      ) : window.location.pathname.startsWith('/privacidad') ? (
-        <LegalPage page="privacy" />
-      ) : window.location.pathname.startsWith('/metodologia') ? (
-        <LegalPage page="methodology" />
-      ) : window.location.pathname.startsWith('/guias') ? (
-        <LegalPage page="guides" />
-      ) : window.location.pathname.startsWith('/derechos') ? (
-        <LegalPage page="rights" />
-      ) : (
-        <App />
-      )}
+      <ErrorBoundary>
+        {window.location.pathname.startsWith('/admin') ? (
+          <AdminPanel />
+        ) : window.location.pathname.startsWith('/reglas') ? (
+          <LegalPage page="rules" />
+        ) : window.location.pathname.startsWith('/privacidad') ? (
+          <LegalPage page="privacy" />
+        ) : window.location.pathname.startsWith('/metodologia') ? (
+          <LegalPage page="methodology" />
+        ) : window.location.pathname.startsWith('/como-jugar') ? (
+          <LegalPage page="howto" />
+        ) : window.location.pathname.startsWith('/guias') ? (
+          <LegalPage page="guides" />
+        ) : window.location.pathname.startsWith('/derechos') ? (
+          <LegalPage page="rights" />
+        ) : (
+          <App />
+        )}
+      </ErrorBoundary>
     </QueryClientProvider>
   </React.StrictMode>
 );
