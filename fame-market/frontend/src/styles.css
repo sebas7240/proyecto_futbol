@@ -1977,7 +1977,22 @@ button {
 
 .loading-state {
   padding: 90px 0;
+  display: grid;
+  gap: 8px;
   text-align: center;
+}
+
+.loading-state strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.loading-state small {
+  width: min(360px, 100%);
+  margin: 0 auto;
+  display: block;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .mobile-nav {
@@ -4765,13 +4780,23 @@ button {
   }
 
   .topbar {
-    min-height: 60px;
-    padding: 8px 13px;
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: calc(8px + env(safe-area-inset-top)) 13px 10px;
   }
 
   .brand__mark {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand {
+    width: 100%;
+  }
+
+  .brand strong {
+    font-size: 15px;
   }
 
   .brand small,
@@ -4781,7 +4806,11 @@ button {
   }
 
   .topbar__stats {
-    gap: 10px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 7px;
+    align-items: center;
   }
 
   .topbar__stats span {
@@ -4807,6 +4836,12 @@ button {
   .avatar {
     width: 34px;
     height: 34px;
+  }
+
+  .login-button {
+    min-height: 34px;
+    justify-self: end;
+    padding: 0 12px;
   }
 
   .workspace {
@@ -4841,6 +4876,15 @@ button {
   .chart-shell {
     order: 3;
     margin: 14px 14px 0;
+  }
+
+  .loading-state {
+    order: 12;
+    margin: 12px 14px 0;
+    padding: 22px 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    border-radius: 8px;
   }
 
   .order-ticket {

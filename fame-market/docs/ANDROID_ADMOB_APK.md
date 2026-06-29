@@ -61,6 +61,19 @@ https://fameplays.com/app-ads.txt
 
 In AdMob or Google Play, use `fameplays.com` as the developer website domain.
 
+If AdMob says it cannot verify an Android app named `Mustique`, but the file above returns HTTP 200, the usual cause is not the file content. It means the app registered in AdMob or Google Play does not match this Fame Plays Android package/developer website.
+
+For this APK, the current package is:
+
+```text
+com.fameplays.app
+```
+
+Use one consistent identity before submitting to Google Play:
+
+1. Recommended: create/use the AdMob and Play Console app as Fame Plays with package `com.fameplays.app` and developer website `https://fameplays.com`.
+2. Alternative: if Play Console already permanently uses another package such as `org.FameplayLtd.MustiqueApp`, change the Capacitor/Android package before the first public Play release. Do not do this casually: package names cannot be changed after the app is published.
+
 ## Native AdMob ads
 
 The AdMob app id is already configured in:
@@ -77,3 +90,40 @@ For the next phase, create the app in AdMob and provide:
 - Banner/interstitial/rewarded ad unit ids, format `ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy`
 
 Then we can add the native Capacitor AdMob plugin and place mobile ads without depending only on web ads inside the WebView.
+
+## Android Google login
+
+The Android APK uses native Firebase Authentication through:
+
+```text
+@capacitor-firebase/authentication
+```
+
+For Google login to work inside the APK, Firebase Console must have an Android app registered with:
+
+```text
+Package name: com.fameplays.app
+```
+
+Then download the Firebase Android config file and place it here:
+
+```text
+android/app/google-services.json
+```
+
+Also add the SHA-1/SHA-256 fingerprints from the signing key used to build the APK in Firebase Console. Debug APKs and Play Store release builds use different fingerprints.
+
+Current local debug APK fingerprints:
+
+```text
+SHA1: 8A:53:61:AA:F7:D2:F9:CD:B2:43:33:56:DE:84:30:F6:09:D9:AA:F2
+SHA-256: F7:8A:27:BD:75:AB:96:AE:F8:6F:55:3C:45:1C:A7:E7:65:7A:F6:90:AA:EC:0D:57:2F:A3:38:26:AA:8E:BF:92
+```
+
+After adding the Android app in Firebase, place the downloaded file at:
+
+```text
+android/app/google-services.json
+```
+
+Then rebuild the APK.

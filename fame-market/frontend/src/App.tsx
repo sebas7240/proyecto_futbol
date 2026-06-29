@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { User } from 'firebase/auth';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError, setTokenProvider } from './api';
 import {
+  type AuthUser,
   currentIdToken,
   firebaseReady,
   loginWithGoogle,
@@ -203,8 +203,9 @@ function App() {
     useState<'market' | 'portfolio' | 'ranking'>(
       window.location.pathname.startsWith('/ranking') ? 'ranking' : 'market'
     );
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [slowLeagueLoad, setSlowLeagueLoad] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [artistFilter, setArtistFilter] =
     useState<ArtistFilter>('trending');
@@ -540,6 +541,16 @@ function App() {
   const artists = artistsQuery.data ?? [];
   const artist = artistQuery.data;
   const portfolio = portfolioQuery.data;
+
+  useEffect(() => {
+    if (artist || artistsQuery.error) {
+      setSlowLeagueLoad(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSlowLeagueLoad(true), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [artist, artistsQuery.error]);
+
   const currentSeason = rankingQuery.data?.season;
   const myCurrentSeason = seasonHistoryQuery.data?.find(
     (season) => season.seasonId === currentSeason?.id
@@ -1106,7 +1117,15 @@ function App() {
               </section>
             </>
           ) : (
-            <div className="loading-state">Cargando liga...</div>
+            <div className="loading-state">
+              <strong>Cargando liga...</strong>
+              {slowLeagueLoad && (
+                <small>
+                  Si tarda demasiado, revisa tu conexion o toca actualizar. La
+                  app sigue intentando conectar con Fame Plays.
+                </small>
+              )}
+            </div>
           )}
         </section>
 

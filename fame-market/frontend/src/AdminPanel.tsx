@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { User } from 'firebase/auth';
 import {
   ArrowLeft,
   Activity,
@@ -29,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api, setTokenProvider } from './api';
 import {
+  type AuthUser,
   currentIdToken,
   firebaseReady,
   loginWithGoogle,
@@ -62,7 +62,7 @@ export function AdminPanel() {
     .split(',')
     .map((email: string) => email.trim().toLowerCase())
     .filter(Boolean);
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [loginPending, setLoginPending] = useState(false);
   const adminContext = 'firebase-rbac';
