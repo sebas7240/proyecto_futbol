@@ -211,6 +211,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
   const recordingStartedAtRef = useRef(0);
   const recordingTimerRef = useRef<number | undefined>(undefined);
   const autoStopTimerRef = useRef<number | undefined>(undefined);
+  const connectionSeqRef = useRef(0);
 
   const identity = useMemo(
     () => ({
@@ -231,8 +232,13 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     let pingTimer: number | undefined;
     let closedByEffect = false;
     let reconnectAttempt = 0;
+    const connectionSeq = ++connectionSeqRef.current;
+
+    const isCurrentConnection = () =>
+      !closedByEffect && connectionSeqRef.current === connectionSeq;
 
     const connect = () => {
+      if (!isCurrentConnection()) return;
       setStatus('connecting');
       if (reconnectAttempt === 0) setNotice('');
       const socket = new WebSocket(
@@ -242,6 +248,10 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       let opened = false;
 
       socket.addEventListener('open', () => {
+        if (!isCurrentConnection()) {
+          socket.close(1000, 'stale connection');
+          return;
+        }
         opened = true;
         reconnectAttempt = 0;
         setStatus('connected');
@@ -254,6 +264,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       });
 
       socket.addEventListener('message', (event) => {
+        if (!isCurrentConnection()) return;
         let payload: ChatEvent;
         try {
           payload = JSON.parse(event.data) as ChatEvent;
@@ -293,7 +304,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
 
       socket.addEventListener('close', () => {
         if (pingTimer) window.clearInterval(pingTimer);
-        if (closedByEffect) return;
+        if (!isCurrentConnection()) return;
         setStatus('disconnected');
         reconnectAttempt += 1;
         if (opened) {
@@ -304,7 +315,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       });
 
       socket.addEventListener('error', () => {
-        if (!opened) {
+        if (isCurrentConnection() && !opened) {
           setNotice('Reconectando chat...');
         }
       });
@@ -316,7 +327,17 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       closedByEffect = true;
       if (retryTimer) window.clearTimeout(retryTimer);
       if (pingTimer) window.clearInterval(pingTimer);
-      socketRef.current?.close();
+      const socket = socketRef.current;
+      if (!socket) return;
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.addEventListener(
+          'open',
+          () => socket.close(1000, 'component changed'),
+          { once: true }
+        );
+        return;
+      }
+      socket.close(1000, 'component changed');
     };
   }, [identity.name, identity.userId, roomId, soundEnabled]);
 
