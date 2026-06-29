@@ -282,11 +282,9 @@ button {
 
 .workspace.workspace--hidden {
   position: absolute;
+  left: -10000px;
   width: 1px;
   height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
   pointer-events: none;
 }
 
@@ -1299,6 +1297,15 @@ button {
   width: 100%;
 }
 
+.radio-player-shell {
+  display: grid;
+  gap: 6px;
+}
+
+.radio-player-shell > span {
+  display: none;
+}
+
 .radio-panel > a {
   display: inline-flex;
   align-items: center;
@@ -1595,6 +1602,37 @@ button {
   color: #12633c;
   border-color: #bfe5ce;
   background: #e5f6ed;
+}
+
+.chat-room-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 9px;
+  padding: 3px;
+  background: #e8e7e2;
+  border-radius: 6px;
+}
+
+.chat-room-tabs button {
+  min-height: 32px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.chat-room-tabs .is-active {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.chat-room-tabs button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .community-links {
@@ -4912,6 +4950,55 @@ button {
     margin: 14px 14px 0;
   }
 
+  .radio-panel--native.radio-panel--has-stream {
+    padding-bottom: 88px;
+  }
+
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell {
+    position: fixed;
+    z-index: 21;
+    right: 10px;
+    bottom: calc(69px + env(safe-area-inset-bottom));
+    left: 10px;
+    display: grid;
+    grid-template-columns: minmax(82px, 0.55fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(25, 32, 44, 0.16);
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(20, 30, 40, 0.18);
+    pointer-events: auto;
+  }
+
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell > span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell strong,
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell strong {
+    font-size: 11px;
+  }
+
+  .radio-panel--native.radio-panel--has-stream .radio-player-shell small {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .radio-panel--native.radio-panel--has-stream audio {
+    height: 36px;
+  }
+
   .strategy-note {
     order: 7;
     margin: 14px 14px 0;
@@ -5175,7 +5262,18 @@ button {
   }
 
   .topbar__stats > span {
+    display: inline-grid;
+  }
+
+  .topbar__stats > span:not(.online-counter) {
     display: none;
+  }
+
+  .online-counter {
+    min-width: 74px;
+    justify-self: start;
+    border-color: #9bd5b1;
+    background: #eaf8ef;
   }
 
   .topbar__stats strong {

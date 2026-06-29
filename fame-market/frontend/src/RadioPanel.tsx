@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type Hls from 'hls.js';
+import { isNativeApp } from './auth';
 
 type RadioCategory = 'deportes' | 'noticias' | 'musica';
 
@@ -552,6 +553,7 @@ async function resolveStation(station: CuratedStation) {
 }
 
 export function RadioPanel() {
+  const nativeApp = isNativeApp();
   const [selectedId, setSelectedId] = useState(stations[0]!.id);
   const [category, setCategory] = useState<'todas' | RadioCategory>('todas');
   const [country, setCountry] = useState('todas');
@@ -703,7 +705,11 @@ export function RadioPanel() {
   };
 
   return (
-    <section className="radio-panel">
+    <section
+      className={`radio-panel${nativeApp ? ' radio-panel--native' : ''}${
+        currentStream ? ' radio-panel--has-stream' : ''
+      }`}
+    >
       <div className="section-heading section-heading--compact">
         <div>
           <small>Radio internacional</small>
@@ -808,7 +814,13 @@ export function RadioPanel() {
       </div>
 
       {currentStream ? (
-        <audio ref={audioRef} controls preload="none" />
+        <div className="radio-player-shell">
+          <span>
+            <strong>{selected.name}</strong>
+            <small>{status}</small>
+          </span>
+          <audio ref={audioRef} controls preload="none" />
+        </div>
       ) : (
         <p>
           Fame Plays solo muestra emisoras que puedan reproducirse dentro de la

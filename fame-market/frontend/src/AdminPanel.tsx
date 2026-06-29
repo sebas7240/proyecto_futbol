@@ -144,6 +144,31 @@ export function AdminPanel() {
     retry: false,
     refetchInterval: 15_000
   });
+  const chatRoomOptions = [
+    { roomId: 'general', label: 'General' },
+    ...(artistsQuery.data ?? []).map((artist) => ({
+      roomId: `entity:${artist.slug}`,
+      label: `${artist.symbol} - ${artist.name}`
+    }))
+  ];
+  const chatRoomOptionsKey = chatRoomOptions
+    .map((room) => room.roomId)
+    .join('|');
+  const chatReportsQuery = useQuery({
+    queryKey: ['chat-moderation-reports', adminContext, chatRoomOptionsKey],
+    queryFn: async () => {
+      const snapshots = await Promise.all(
+        chatRoomOptions.map(async (room) => ({
+          room,
+          snapshot: await api.chatModeration(adminContext, room.roomId)
+        }))
+      );
+      return snapshots;
+    },
+    enabled: canQueryAdmin && chatRoomOptions.length > 0,
+    retry: false,
+    refetchInterval: 15_000
+  });
   const prizeProfilesQuery = useQuery({
     queryKey: ['prize-profiles', adminContext],
     queryFn: () => api.prizeProfiles(adminContext),
@@ -204,20 +229,33 @@ export function AdminPanel() {
         chatMessage.status
       )
     ) ?? [];
-  const filteredChatReports =
-    chatModerationQuery.data?.reports.filter((report) => {
-      const reportedMessage = chatModerationQuery.data?.recentMessages.find(
-        (chatMessage) => chatMessage.id === report.messageId
-      );
-      return matchesAdminSearch(
+  const allChatReports =
+    chatReportsQuery.data
+      ?.flatMap(({ room, snapshot }) =>
+        snapshot.reports.map((report) => {
+          const reportedMessage = snapshot.recentMessages.find(
+            (chatMessage) => chatMessage.id === report.messageId
+          );
+          return { room, snapshot, report, reportedMessage };
+        })
+      )
+      .sort(
+        (left, right) =>
+          Date.parse(right.report.createdAt) - Date.parse(left.report.createdAt)
+      ) ?? [];
+  const filteredAllChatReports = allChatReports.filter(
+    ({ room, report, reportedMessage }) =>
+      matchesAdminSearch(
+        room.label,
+        room.roomId,
         report.reason,
         report.userId,
         report.messageId,
         reportedMessage?.name,
         reportedMessage?.body,
         reportedMessage?.type
-      );
-    }) ?? [];
+      )
+  );
   const filteredRightsRequests = (rightsRequestsQuery.data ?? []).filter((request) =>
     matchesAdminSearch(
       request.subject,
@@ -556,6 +594,7 @@ export function AdminPanel() {
       | 'clear-user'
       | 'reset-room',
     input: {
+      roomId?: string;
       messageId?: string;
       userId?: string;
       userName?: string;
@@ -564,9 +603,10 @@ export function AdminPanel() {
   ) => {
     setBusyArtist(`chat-${action}-${input.messageId ?? input.userId ?? 'room'}`);
     setMessage('');
+    const targetRoomId = input.roomId ?? chatRoom;
     try {
       await api.moderateChat(adminContext, {
-        roomId: chatRoom,
+        roomId: targetRoomId,
         action,
         reason: chatReason.trim() || 'Moderacion manual',
         ...input
@@ -577,6 +617,7 @@ export function AdminPanel() {
           : 'Moderacion del chat aplicada.'
       );
       await chatModerationQuery.refetch();
+      await chatReportsQuery.refetch();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -1591,10 +1632,9 @@ export function AdminPanel() {
               value={chatRoom}
               onChange={(event) => setChatRoom(event.target.value)}
             >
-              <option value="general">General</option>
-              {(artistsQuery.data ?? []).map((artist) => (
-                <option value={`entity:${artist.slug}`} key={artist.id}>
-                  {artist.symbol} - {artist.name}
+              {chatRoomOptions.map((room) => (
+                <option value={room.roomId} key={room.roomId}>
+                  {room.label}
                 </option>
               ))}
             </select>
@@ -1708,15 +1748,12 @@ export function AdminPanel() {
 
             <div>
               <h3>
-                <Flag size={17} /> Reportes recientes
+                <Flag size={17} /> Reportes activos
+                {chatReportsQuery.isFetching ? ' actualizando...' : ''}
               </h3>
               <div className="chat-report-list">
-                {filteredChatReports.length ? (
-                  filteredChatReports.map((report) => {
-                    const reportedMessage =
-                      chatModerationQuery.data?.recentMessages.find(
-                        (chatMessage) => chatMessage.id === report.messageId
-                      );
+                {filteredAllChatReports.length ? (
+                  filteredAllChatReports.map(({ room, report, reportedMessage }) => {
                     return (
                       <article className="chat-report-card" key={report.id}>
                         <span>
@@ -1724,7 +1761,7 @@ export function AdminPanel() {
                             {reportedMessage?.name ?? 'Mensaje ya retirado'}
                           </strong>
                           <small>
-                            Reportado por {report.userId} -{' '}
+                            {room.label} - Reportado por {report.userId} -{' '}
                             {new Date(report.createdAt).toLocaleTimeString(
                               'es-CO',
                               { hour: '2-digit', minute: '2-digit' }
@@ -1746,6 +1783,7 @@ export function AdminPanel() {
                             <button
                               onClick={() =>
                                 moderateChat('hide-message', {
+                                  roomId: room.roomId,
                                   messageId: reportedMessage.id
                                 })
                               }
@@ -1756,6 +1794,7 @@ export function AdminPanel() {
                             <button
                               onClick={() =>
                                 moderateChat('mute-user', {
+                                  roomId: room.roomId,
                                   userId: reportedMessage.userId,
                                   userName: reportedMessage.name,
                                   durationMinutes: 15
@@ -1769,6 +1808,7 @@ export function AdminPanel() {
                               className="danger-action"
                               onClick={() =>
                                 moderateChat('ban-user', {
+                                  roomId: room.roomId,
                                   userId: reportedMessage.userId,
                                   userName: reportedMessage.name,
                                   durationMinutes: 1440
@@ -1784,7 +1824,7 @@ export function AdminPanel() {
                     );
                   })
                 ) : (
-                  <p>No hay reportes recientes en esta sala.</p>
+                  <p>No hay reportes recientes en las salas monitoreadas.</p>
                 )}
               </div>
 

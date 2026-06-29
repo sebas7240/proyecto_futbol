@@ -192,6 +192,10 @@ function playChatSound() {
 }
 
 export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelProps) {
+  const hasFigureRoom = roomId !== 'general';
+  const [activeRoom, setActiveRoom] = useState<'figure' | 'general'>(
+    hasFigureRoom ? 'figure' : 'general'
+  );
   const [mode, setMode] = useState<ComposerMode>('text');
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -212,6 +216,9 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
   const recordingTimerRef = useRef<number | undefined>(undefined);
   const autoStopTimerRef = useRef<number | undefined>(undefined);
   const connectionSeqRef = useRef(0);
+  const effectiveRoomId = activeRoom === 'general' || !hasFigureRoom ? 'general' : roomId;
+  const effectiveRoomLabel =
+    activeRoom === 'general' || !hasFigureRoom ? 'General' : roomLabel;
 
   const identity = useMemo(
     () => ({
@@ -220,6 +227,10 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
     }),
     [displayName, userId]
   );
+
+  useEffect(() => {
+    setActiveRoom(hasFigureRoom ? 'figure' : 'general');
+  }, [hasFigureRoom, roomId]);
 
   useEffect(() => {
     if (!chatBaseUrl) {
@@ -242,7 +253,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       setStatus('connecting');
       if (reconnectAttempt === 0) setNotice('');
       const socket = new WebSocket(
-        buildRoomUrl(chatBaseUrl, roomId, identity.userId, identity.name)
+        buildRoomUrl(chatBaseUrl, effectiveRoomId, identity.userId, identity.name)
       );
       socketRef.current = socket;
       let opened = false;
@@ -339,7 +350,7 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       }
       socket.close(1000, 'component changed');
     };
-  }, [identity.name, identity.userId, roomId, soundEnabled]);
+  }, [effectiveRoomId, identity.name, identity.userId, soundEnabled]);
 
   useEffect(() => {
     listRef.current?.scrollTo({
@@ -485,12 +496,34 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
       <div className="section-heading section-heading--compact">
         <div>
           <small>Comunidad</small>
-          <h3>{roomLabel}</h3>
+          <h3>{effectiveRoomLabel}</h3>
         </div>
         <span className={`chat-status chat-status--${status}`}>
           {connected ? <Wifi size={15} /> : <WifiOff size={15} />}
           {presence.length || 0}
         </span>
+      </div>
+
+      <div className="chat-room-tabs" role="tablist" aria-label="Sala de chat">
+        <button
+          className={activeRoom === 'general' ? 'is-active' : ''}
+          onClick={() => setActiveRoom('general')}
+          role="tab"
+          aria-selected={activeRoom === 'general'}
+          type="button"
+        >
+          General
+        </button>
+        <button
+          className={activeRoom === 'figure' ? 'is-active' : ''}
+          onClick={() => setActiveRoom('figure')}
+          disabled={!hasFigureRoom}
+          role="tab"
+          aria-selected={activeRoom === 'figure'}
+          type="button"
+        >
+          Figura
+        </button>
       </div>
 
       <button
@@ -557,7 +590,9 @@ export function ChatPanel({ roomId, roomLabel, userId, displayName }: ChatPanelP
           ))
         ) : (
           <p className="chat-empty">
-            Se el primero en comentar esta figura. Sin links, sin spam y maximo 160 caracteres.
+            {activeRoom === 'general'
+              ? 'Chat general de Fame Plays. Sin links, sin spam y maximo 160 caracteres.'
+              : 'Se el primero en comentar esta figura. Sin links, sin spam y maximo 160 caracteres.'}
           </p>
         )}
       </div>
