@@ -184,6 +184,11 @@ const allowedOrigins = [
 ];
 let market: MarketDataStore;
 
+function isNativeAppRequest(request: express.Request) {
+  const origin = String(request.headers.origin ?? '').toLowerCase();
+  return origin === 'https://localhost' || origin === 'capacitor://localhost';
+}
+
 const userRateKey = (request: express.Request) =>
   request.authenticatedUser?.uid ?? requestIp(request);
 const adminRateLimit = rateLimit({
@@ -904,13 +909,15 @@ app.post(
   async (request, response, next) => {
     try {
       const input = quoteSchema.parse(request.body);
-      const turnstile = await verifyTurnstileAccess(
-        input.turnstileToken,
-        input.turnstilePass,
-        request.authenticatedUser!.uid,
-        requestIp(request),
-        'trade_quote'
-      );
+      const turnstile = isNativeAppRequest(request)
+        ? { pass: null, expiresAt: null }
+        : await verifyTurnstileAccess(
+            input.turnstileToken,
+            input.turnstilePass,
+            request.authenticatedUser!.uid,
+            requestIp(request),
+            'trade_quote'
+          );
       response.json({
         quote: await market.createQuote(
           request.authenticatedUser!,

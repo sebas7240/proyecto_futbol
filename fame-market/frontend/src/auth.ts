@@ -36,7 +36,7 @@ auth?.useDeviceLanguage();
 
 export type AuthUser = Pick<User, 'uid' | 'email' | 'displayName'>;
 
-function isNativeAuthPlatform() {
+export function isNativeApp() {
   return Capacitor.isNativePlatform();
 }
 
@@ -74,7 +74,7 @@ function readableAuthError(error: unknown) {
 }
 
 export function subscribeToAuth(callback: (user: AuthUser | null) => void) {
-  if (isNativeAuthPlatform()) {
+  if (isNativeApp()) {
     let active = true;
     let listener: { remove: () => Promise<void> } | null = null;
 
@@ -108,7 +108,7 @@ export function subscribeToAuth(callback: (user: AuthUser | null) => void) {
 }
 
 export async function loginWithGoogle() {
-  if (isNativeAuthPlatform()) {
+  if (isNativeApp()) {
     try {
       const result = await FirebaseAuthentication.signInWithGoogle({
         useCredentialManager: true
@@ -142,7 +142,7 @@ export async function loginWithGoogle() {
 }
 
 export async function logout() {
-  if (isNativeAuthPlatform()) {
+  if (isNativeApp()) {
     await FirebaseAuthentication.signOut();
     return;
   }
@@ -150,7 +150,7 @@ export async function logout() {
 }
 
 export async function currentIdToken() {
-  if (isNativeAuthPlatform()) {
+  if (isNativeApp()) {
     try {
       return (await FirebaseAuthentication.getIdToken({ forceRefresh: false })).token;
     } catch {

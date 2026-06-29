@@ -19,6 +19,7 @@ import {
   type AuthUser,
   currentIdToken,
   firebaseReady,
+  isNativeApp,
   loginWithGoogle,
   logout,
   subscribeToAuth
@@ -196,7 +197,7 @@ function App() {
   });
   const [selectedSlug, setSelectedSlug] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [quantity, setQuantity] = useState(5);
+  const [quantityInput, setQuantityInput] = useState('5');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [notice, setNotice] = useState('');
   const [mobileTab, setMobileTab] =
@@ -222,10 +223,18 @@ function App() {
   const [prizeNotesDraft, setPrizeNotesDraft] = useState('');
   const [prizeProfileMessage, setPrizeProfileMessage] = useState('');
   const [prizeWalletEditing, setPrizeWalletEditing] = useState(true);
+  const nativeApp = isNativeApp();
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
   const appEnvironment = import.meta.env.VITE_APP_ENV ?? 'development';
   const backendNeedsTurnstile =
-    statusQuery.data?.turnstileConfigured ?? Boolean(turnstileSiteKey);
+    !nativeApp && (statusQuery.data?.turnstileConfigured ?? Boolean(turnstileSiteKey));
+  const trimmedQuantityInput = quantityInput.trim();
+  const quantityInputNumber = Number(trimmedQuantityInput);
+  const quantityInputValid =
+    /^[0-9]+$/.test(trimmedQuantityInput) &&
+    quantityInputNumber >= 1 &&
+    quantityInputNumber <= 500;
+  const quantity = quantityInputValid ? quantityInputNumber : 1;
   const turnstileUserId = firebaseUser?.uid ?? (!firebaseReady ? 'local-demo' : '');
   const activeTurnstilePass =
     turnstilePass?.userId === turnstileUserId &&
@@ -662,6 +671,11 @@ function App() {
   };
 
   const reviewQuote = () => {
+    if (!quantityInputValid) {
+      setQuote(null);
+      setNotice('Escribe una cantidad entre 1 y 500.');
+      return;
+    }
     if (needsTurnstileBeforeQuote) {
       setTurnstileRequested(true);
       setQuoteAfterTurnstile(true);
@@ -798,7 +812,7 @@ function App() {
         />
       )}
 
-      {mobileTab === 'ranking' ? (
+      {mobileTab === 'ranking' && (
         <RankingPanel
           season={rankingQuery.data?.season ?? null}
           prizeStatus={rankingQuery.data?.prizeStatus ?? null}
@@ -808,8 +822,12 @@ function App() {
           loading={rankingQuery.isLoading}
           onBack={() => selectTab('market')}
         />
-      ) : (
-      <main className={`workspace workspace--${mobileTab}`}>
+      )}
+      <main
+        className={`workspace workspace--${mobileTab}${
+          mobileTab === 'ranking' ? ' workspace--hidden' : ''
+        }`}
+      >
         <aside className="market-list">
           <div className="section-heading">
             <div>
@@ -1157,13 +1175,21 @@ function App() {
             <label className="quantity-input">
               <span>Cantidad</span>
               <input
-                type="number"
-                min="1"
-                max="500"
-                value={quantity}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={quantityInput}
                 onChange={(event) => {
-                  setQuantity(Math.max(1, Number(event.target.value)));
+                  const nextValue = event.target.value.replace(/\D/g, '');
+                  setQuantityInput(nextValue);
                   setQuote(null);
+                }}
+                onBlur={() => {
+                  if (!quantityInputValid) {
+                    setQuantityInput('1');
+                    return;
+                  }
+                  setQuantityInput(String(quantity));
                 }}
               />
               <small>participaciones</small>
@@ -1417,7 +1443,6 @@ function App() {
           </section>
         </aside>
       </main>
-      )}
 
       <footer className="rights-notice">
         <span>
