@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "94103317869",
+    "project_id": "fameplays-b2cfb",
+    "storage_bucket": "fameplays-b2cfb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:94103317869:android:6fa3201ab32703644dbe64",
+        "android_client_info": {
+          "package_name": "com.fameplays.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "94103317869-5k1p86a2mfpsvptgsgeo9rh021l2mef7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fameplays.app",
+            "certificate_hash": "8a5361aaf7d2f9cdb2433356de8430f609d9aaf2"
+          }
+        },
+        {
+          "client_id": "94103317869-5r4km5vnvbo25nctqhns281m8u25g97p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLnRyFihU1JQFsaKlyRIEkdgvJThOVeTM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "94103317869-5r4km5vnvbo25nctqhns281m8u25g97p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
