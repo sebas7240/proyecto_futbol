@@ -583,8 +583,11 @@ export class PostgresMarketStore implements MarketDataStore {
         await client.query(
           `
             UPDATE positions
-            SET quantity = $1,
-              average_cost = CASE WHEN $1 = 0 THEN 0 ELSE average_cost END,
+            SET quantity = $1::numeric,
+              average_cost = CASE
+                WHEN $1::numeric = 0::numeric THEN 0
+                ELSE average_cost
+              END,
               realized_pnl = realized_pnl + $2,
               updated_at = NOW()
             WHERE id = $3
