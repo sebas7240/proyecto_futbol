@@ -1,0 +1,4 @@
+storeFile=fameplays-upload-key.jks
+storePassword=change-this-store-password
+keyAlias=fameplays-upload
+keyPassword=change-this-key-password

@@ -13,3 +13,7 @@ ops/monitor-worker/worker-configuration.d.ts
 .local-postgres/
 .screenshots/
 backups/
+android/*.jks
+android/*.keystore
+android/play-release.properties
+android/upload_certificate.pem
