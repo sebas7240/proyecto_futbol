@@ -130,6 +130,10 @@ jobs:
           set_env_value MARKET_MAKER_MIN_TICK_MINUTES 10
           set_env_value MARKET_MAKER_PRICE_BAND_BPS 1000
           set_env_value MARKET_MAKER_MAX_TICK_BPS 90
+          set_env_value MARKET_MAKER_MEAN_REVERSION_BPS 34
+          set_env_value MARKET_MAKER_BALANCE_NOISE_BPS 22
+          set_env_value MARKET_MAKER_OVERHEAT_THRESHOLD_BPS 430
+          set_env_value MARKET_MAKER_OVERHEAT_COOLDOWN_BPS 58
 
           docker compose -p fameplays --env-file .env config --quiet
           docker compose -p fameplays --env-file .env up --build -d

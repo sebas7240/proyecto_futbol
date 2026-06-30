@@ -504,6 +504,206 @@ const stations: CuratedStation[] = [
     countryCode: 'CL',
     query: 'Play FM'
   },
+  {
+    id: 'pr-notiuno',
+    name: 'NotiUno 630',
+    category: 'noticias',
+    tags: 'Puerto Rico, noticias y opinion',
+    officialUrl: 'https://www.notiuno.com/',
+    country: 'Puerto Rico',
+    countryCode: 'PR',
+    query: ['NotiUno 630', 'NotiUno']
+  },
+  {
+    id: 'pr-salsoul',
+    name: 'Salsoul',
+    category: 'musica',
+    tags: 'Puerto Rico, salsa y musica tropical',
+    officialUrl: 'https://www.salsoul.com/',
+    country: 'Puerto Rico',
+    countryCode: 'PR',
+    query: ['Salsoul 99.1', 'Salsoul']
+  },
+  {
+    id: 'mx-los40',
+    name: 'LOS40 Mexico',
+    category: 'musica',
+    tags: 'Mexico, pop y hits',
+    officialUrl: 'https://los40.com.mx/',
+    country: 'Mexico',
+    countryCode: 'MX',
+    query: ['LOS40 Mexico', 'Los 40 Principales Mexico']
+  },
+  {
+    id: 'mx-imagen-radio',
+    name: 'Imagen Radio',
+    category: 'noticias',
+    tags: 'Mexico, noticias y analisis',
+    officialUrl: 'https://www.imagenradio.com.mx/',
+    country: 'Mexico',
+    countryCode: 'MX',
+    query: ['Imagen Radio', 'Imagen Informativa']
+  },
+  {
+    id: 'br-bandnews',
+    name: 'BandNews FM',
+    category: 'noticias',
+    tags: 'Brasil, noticias 24 horas',
+    officialUrl: 'https://www.band.uol.com.br/bandnews-fm',
+    country: 'Brasil',
+    countryCode: 'BR',
+    query: ['BandNews FM', 'Band News FM']
+  },
+  {
+    id: 'br-radio-itatiaia',
+    name: 'Radio Itatiaia',
+    category: 'deportes',
+    tags: 'Brasil, deportes y noticias',
+    officialUrl: 'https://www.itatiaia.com.br/',
+    country: 'Brasil',
+    countryCode: 'BR',
+    query: ['Radio Itatiaia', 'Itatiaia']
+  },
+  {
+    id: 'uk-talksport',
+    name: 'TalkSport',
+    category: 'deportes',
+    tags: 'Reino Unido, deportes y futbol',
+    officialUrl: 'https://talksport.com/',
+    country: 'Reino Unido',
+    countryCode: 'GB',
+    query: ['TalkSport', 'talkSPORT']
+  },
+  {
+    id: 'uk-capital-fm',
+    name: 'Capital FM',
+    category: 'musica',
+    tags: 'Reino Unido, pop y hits',
+    officialUrl: 'https://www.capitalfm.com/',
+    country: 'Reino Unido',
+    countryCode: 'GB',
+    query: ['Capital FM UK', 'Capital London']
+  },
+  {
+    id: 'us-wnyc',
+    name: 'WNYC',
+    category: 'noticias',
+    tags: 'USA, radio publica y actualidad',
+    officialUrl: 'https://www.wnyc.org/',
+    country: 'USA',
+    countryCode: 'US',
+    query: ['WNYC', 'WNYC 93.9']
+  },
+  {
+    id: 'us-wfmu',
+    name: 'WFMU',
+    category: 'musica',
+    tags: 'USA, alternativa e independiente',
+    officialUrl: 'https://wfmu.org/',
+    country: 'USA',
+    countryCode: 'US',
+    query: 'WFMU'
+  },
+  {
+    id: 'ca-ici-premiere',
+    name: 'ICI Premiere',
+    category: 'noticias',
+    tags: 'Canada, radio publica en frances',
+    officialUrl: 'https://ici.radio-canada.ca/ohdio/premiere',
+    country: 'Canada',
+    countryCode: 'CA',
+    query: ['ICI Premiere', 'Radio-Canada Premiere']
+  },
+  {
+    id: 'ca-tsn-1050',
+    name: 'TSN 1050',
+    category: 'deportes',
+    tags: 'Canada, deportes',
+    officialUrl: 'https://www.tsn.ca/radio/toronto-1050',
+    country: 'Canada',
+    countryCode: 'CA',
+    query: ['TSN 1050', 'TSN Radio 1050']
+  },
+  {
+    id: 'es-cope',
+    name: 'COPE',
+    category: 'noticias',
+    tags: 'Espana, noticias y deportes',
+    officialUrl: 'https://www.cope.es/',
+    country: 'Espana',
+    countryCode: 'ES',
+    query: ['COPE', 'COPE Madrid']
+  },
+  {
+    id: 'es-onda-cero',
+    name: 'Onda Cero',
+    category: 'noticias',
+    tags: 'Espana, actualidad y deportes',
+    officialUrl: 'https://www.ondacero.es/',
+    country: 'Espana',
+    countryCode: 'ES',
+    query: 'Onda Cero'
+  },
+  {
+    id: 'ar-radio-mitre',
+    name: 'Radio Mitre',
+    category: 'noticias',
+    tags: 'Argentina, noticias y opinion',
+    officialUrl: 'https://radiomitre.cienradios.com/',
+    country: 'Argentina',
+    countryCode: 'AR',
+    query: ['Radio Mitre', 'Mitre AM 790']
+  },
+  {
+    id: 'ar-cadena-3',
+    name: 'Cadena 3',
+    category: 'noticias',
+    tags: 'Argentina, noticias y deportes',
+    officialUrl: 'https://www.cadena3.com/',
+    country: 'Argentina',
+    countryCode: 'AR',
+    query: 'Cadena 3'
+  },
+  {
+    id: 'pt-rfm',
+    name: 'RFM',
+    category: 'musica',
+    tags: 'Portugal, pop y entretenimiento',
+    officialUrl: 'https://rfm.sapo.pt/',
+    country: 'Portugal',
+    countryCode: 'PT',
+    query: 'RFM'
+  },
+  {
+    id: 'pt-renascenca',
+    name: 'Renascenca',
+    category: 'noticias',
+    tags: 'Portugal, noticias y actualidad',
+    officialUrl: 'https://rr.sapo.pt/',
+    country: 'Portugal',
+    countryCode: 'PT',
+    query: ['Renascenca', 'Radio Renascenca']
+  },
+  {
+    id: 'cl-adn-radio',
+    name: 'ADN Radio',
+    category: 'deportes',
+    tags: 'Chile, deportes y noticias',
+    officialUrl: 'https://www.adnradio.cl/',
+    country: 'Chile',
+    countryCode: 'CL',
+    query: ['ADN Radio', 'ADN Radio Chile']
+  },
+  {
+    id: 'cl-los40',
+    name: 'LOS40 Chile',
+    category: 'musica',
+    tags: 'Chile, pop y hits',
+    officialUrl: 'https://los40.cl/',
+    country: 'Chile',
+    countryCode: 'CL',
+    query: ['LOS40 Chile', 'Los 40 Chile']
+  },
 ];
 
 function streamUrl(station: RadioBrowserStation) {

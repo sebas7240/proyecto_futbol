@@ -59,7 +59,7 @@ export interface MarketMove {
   halted: boolean;
 }
 
-const MARKET_ALGORITHM_VERSION = 'live-market-v1';
+const MARKET_ALGORITHM_VERSION = 'live-market-v2';
 const DEFAULT_INTERVAL_MINUTES = 15;
 const DEFAULT_PRICE_BAND_BPS = 1_000;
 const DEFAULT_MAX_TICK_BPS = 90;
@@ -113,6 +113,22 @@ function marketMakerPriceBandBps() {
 
 function marketMakerMaxTickBps() {
   return numberEnv('MARKET_MAKER_MAX_TICK_BPS', DEFAULT_MAX_TICK_BPS, 10, 150);
+}
+
+function marketMakerMeanReversionBps() {
+  return numberEnv('MARKET_MAKER_MEAN_REVERSION_BPS', 34, 0, 100);
+}
+
+function marketMakerBalanceNoiseBps() {
+  return numberEnv('MARKET_MAKER_BALANCE_NOISE_BPS', 22, 0, 70);
+}
+
+function marketMakerOverheatThresholdBps() {
+  return numberEnv('MARKET_MAKER_OVERHEAT_THRESHOLD_BPS', 430, 100, 1_100);
+}
+
+function marketMakerOverheatCooldownBps() {
+  return numberEnv('MARKET_MAKER_OVERHEAT_COOLDOWN_BPS', 58, 0, 120);
 }
 
 function seededFloat(seed: string, salt: string) {
@@ -347,7 +363,6 @@ export function calculateLiveMarketMove(input: MarketMoveInput): MarketMove {
       ? marketMakerMaxTickBps()
       : profileMaxTick[input.volatilityProfile]
   );
-  requestedDeltaBps = clamp(requestedDeltaBps, -maxTick, maxTick);
 
   if (requestedDeltaBps === 0) {
     requestedDeltaBps = seededFloat(seed, 'minimum') < 0.5 ? -1 : 1;
@@ -356,6 +371,61 @@ export function calculateLiveMarketMove(input: MarketMoveInput): MarketMove {
   const priceBandBps = input.priceBandBps ?? marketMakerPriceBandBps();
   const lowerBand = input.anchorPrice * (1 - priceBandBps / 10_000);
   const upperBand = input.anchorPrice * (1 + priceBandBps / 10_000);
+  const distanceFromAnchorBps =
+    input.anchorPrice > 0
+      ? ((input.currentPrice / input.anchorPrice) - 1) * 10_000
+      : 0;
+  const normalizedDistance = clamp(distanceFromAnchorBps / priceBandBps, -1, 1);
+  const reversionBps = Math.round(
+    -normalizedDistance *
+      marketMakerMeanReversionBps() *
+      (0.7 + Math.min(input.hypeScore, 100) / 250)
+  );
+  const balanceNoiseBps = Math.round(
+    seededNoise(`${seed}:balance`) * marketMakerBalanceNoiseBps()
+  );
+  const overheatThreshold = marketMakerOverheatThresholdBps();
+  let overheatBps = 0;
+  if (distanceFromAnchorBps > overheatThreshold) {
+    overheatBps = -Math.round(
+      ((distanceFromAnchorBps - overheatThreshold) / Math.max(1, priceBandBps - overheatThreshold)) *
+        marketMakerOverheatCooldownBps()
+    );
+  } else if (distanceFromAnchorBps < -overheatThreshold) {
+    overheatBps = Math.round(
+      ((Math.abs(distanceFromAnchorBps) - overheatThreshold) /
+        Math.max(1, priceBandBps - overheatThreshold)) *
+        marketMakerOverheatCooldownBps()
+    );
+  }
+
+  requestedDeltaBps += reversionBps + balanceNoiseBps + overheatBps;
+  if (
+    input.marketState === 'viral' &&
+    Math.abs(distanceFromAnchorBps) < overheatThreshold &&
+    Math.abs(requestedDeltaBps) < 22
+  ) {
+    const direction = Math.sign(requestedDeltaBps || input.trendBiasBps || 1);
+    requestedDeltaBps = direction * 22;
+  }
+  requestedDeltaBps = clamp(requestedDeltaBps, -maxTick, maxTick);
+
+  const pullbackRoll = seededFloat(seed, 'pullback');
+  if (
+    distanceFromAnchorBps > overheatThreshold &&
+    requestedDeltaBps > 0 &&
+    pullbackRoll < 0.58
+  ) {
+    requestedDeltaBps = -Math.max(2, Math.min(maxTick, Math.abs(reversionBps + overheatBps) || 4));
+  }
+  if (
+    distanceFromAnchorBps < -overheatThreshold &&
+    requestedDeltaBps < 0 &&
+    pullbackRoll < 0.5
+  ) {
+    requestedDeltaBps = Math.max(2, Math.min(maxTick, Math.abs(reversionBps + overheatBps) || 4));
+  }
+
   if (input.currentPrice >= upperBand && requestedDeltaBps > 0) {
     requestedDeltaBps = -Math.max(2, Math.min(maxTick, Math.abs(requestedDeltaBps)));
   }

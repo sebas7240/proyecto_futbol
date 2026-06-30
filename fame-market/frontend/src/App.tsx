@@ -208,6 +208,7 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [slowLeagueLoad, setSlowLeagueLoad] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [tradeSearchTerm, setTradeSearchTerm] = useState('');
   const [artistFilter, setArtistFilter] =
     useState<ArtistFilter>('trending');
   const [selectedInterests, setSelectedInterests] =
@@ -550,6 +551,13 @@ function App() {
   const artists = artistsQuery.data ?? [];
   const artist = artistQuery.data;
   const portfolio = portfolioQuery.data;
+  const heldPositions = useMemo(
+    () =>
+      (portfolio?.positions ?? [])
+        .filter((position) => position.quantity > 0)
+        .sort((left, right) => right.marketValue - left.marketValue),
+    [portfolio?.positions]
+  );
 
   useEffect(() => {
     if (artist || artistsQuery.error) {
@@ -643,6 +651,44 @@ function App() {
       return right.currentPrice - left.currentPrice;
     });
   }, [artistFilter, artists, favoriteIds, searchTerm, selectedInterests]);
+
+  const tradePickerPositions = useMemo(() => {
+    const query = tradeSearchTerm.trim().toLocaleLowerCase('es');
+    return heldPositions.filter((position) =>
+      [
+        position.artist.name,
+        position.artist.symbol,
+        position.artist.country,
+        position.artist.category,
+        position.artist.profession
+      ].some((value) => value.toLocaleLowerCase('es').includes(query))
+    );
+  }, [heldPositions, tradeSearchTerm]);
+
+  const tradePickerArtists = useMemo(() => {
+    const query = tradeSearchTerm.trim().toLocaleLowerCase('es');
+    return artists
+      .filter((item) =>
+        !query ||
+        [
+          item.name,
+          item.symbol,
+          item.country,
+          item.genre,
+          item.category,
+          item.subcategory,
+          item.profession
+        ].some((value) => value.toLocaleLowerCase('es').includes(query))
+      )
+      .sort((left, right) => right.currentPrice - left.currentPrice)
+      .slice(0, 8);
+  }, [artists, tradeSearchTerm]);
+
+  const selectTradeArtist = (slug: string) => {
+    setSelectedSlug(slug);
+    setTradeSearchTerm('');
+    setQuote(null);
+  };
 
   const toggleFavorite = (artistId: string) => {
     if (!authReady || (firebaseReady && !firebaseUser)) {
@@ -1161,16 +1207,100 @@ function App() {
             <div className="segmented">
               <button
                 className={side === 'buy' ? 'is-active' : ''}
-                onClick={() => { setSide('buy'); setQuote(null); }}
+                onClick={() => { setSide('buy'); setTradeSearchTerm(''); setQuote(null); }}
               >
                 Sumar apoyo
               </button>
               <button
                 className={side === 'sell' ? 'is-active is-sell' : ''}
-                onClick={() => { setSide('sell'); setQuote(null); }}
+                onClick={() => {
+                  setSide('sell');
+                  setTradeSearchTerm('');
+                  if (!selectedPosition && heldPositions[0]) {
+                    setSelectedSlug(heldPositions[0].artist.slug);
+                  }
+                  setQuote(null);
+                }}
               >
                 Retirar apoyo
               </button>
+            </div>
+            <div className="trade-asset-picker">
+              <label className="search trade-asset-picker__search">
+                <Search size={15} />
+                <input
+                  type="search"
+                  value={tradeSearchTerm}
+                  onChange={(event) => setTradeSearchTerm(event.target.value)}
+                  placeholder={
+                    side === 'sell'
+                      ? 'Buscar entre tus posiciones'
+                      : 'Buscar figura para apoyar'
+                  }
+                />
+              </label>
+              <div className="trade-asset-picker__list" role="list">
+                {side === 'sell'
+                  ? tradePickerPositions.map((position) => (
+                      <button
+                        className={
+                          position.artist.slug === selectedSlug ? 'is-active' : ''
+                        }
+                        key={position.artistId}
+                        onClick={() => selectTradeArtist(position.artist.slug)}
+                        type="button"
+                      >
+                        <EntityAvatar
+                          name={position.artist.name}
+                          symbol={position.artist.symbol}
+                          imageUrl={position.artist.imageUrl}
+                          imageUsageStatus={position.artist.imageUsageStatus}
+                          imageAttribution={position.artist.imageAttribution}
+                          size="small"
+                        />
+                        <span>
+                          <strong>{position.artist.symbol}</strong>
+                          <small>
+                            {quantityFormat.format(position.quantity)} tuyas -{' '}
+                            {money.format(position.marketValue)} FC
+                          </small>
+                        </span>
+                        <ChevronRight size={16} />
+                      </button>
+                    ))
+                  : tradePickerArtists.map((item) => (
+                      <button
+                        className={item.slug === selectedSlug ? 'is-active' : ''}
+                        key={item.id}
+                        onClick={() => selectTradeArtist(item.slug)}
+                        type="button"
+                      >
+                        <EntityAvatar
+                          name={item.name}
+                          symbol={item.symbol}
+                          imageUrl={item.imageUrl}
+                          imageUsageStatus={item.imageUsageStatus}
+                          imageAttribution={item.imageAttribution}
+                          size="small"
+                        />
+                        <span>
+                          <strong>{item.symbol}</strong>
+                          <small>
+                            {item.name} - {money.format(item.currentPrice)} FC
+                          </small>
+                        </span>
+                        <ChevronRight size={16} />
+                      </button>
+                    ))}
+                {((side === 'sell' && !tradePickerPositions.length) ||
+                  (side === 'buy' && !tradePickerArtists.length)) && (
+                  <p>
+                    {side === 'sell'
+                      ? 'Todavia no tienes posiciones para retirar.'
+                      : 'No encontramos figuras con esa busqueda.'}
+                  </p>
+                )}
+              </div>
             </div>
             <label className="quantity-input">
               <span>Cantidad</span>
