@@ -58,6 +58,12 @@ import {
 } from './interests.js';
 import { incrementMetric } from './metrics.js';
 import {
+  hasValidTradeQuantityPrecision,
+  MAX_TRADE_QUANTITY,
+  MIN_TRADE_QUANTITY,
+  roundQuantity
+} from './pricing.js';
+import {
   getNewsPulseBySlug,
   newsSignalMode,
   syncNewsPulse
@@ -904,7 +910,14 @@ app.delete(
 const quoteSchema = z.object({
   artistId: z.string().uuid(),
   side: z.enum(['buy', 'sell']),
-  quantity: z.number().int().min(1).max(500),
+  quantity: z.number()
+    .finite()
+    .min(MIN_TRADE_QUANTITY)
+    .max(MAX_TRADE_QUANTITY)
+    .refine(hasValidTradeQuantityPrecision, {
+      message: 'La cantidad admite maximo 6 decimales.'
+    })
+    .transform(roundQuantity),
   turnstileToken: z.string().max(2048).optional(),
   turnstilePass: z.string().max(4096).optional()
 });

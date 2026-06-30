@@ -1406,6 +1406,37 @@ button {
   padding: 8px 2px;
 }
 
+.sell-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: -5px 0 14px;
+}
+
+.sell-quick-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #f6f4ed;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sell-quick-actions button:hover,
+.sell-quick-actions button:focus-visible {
+  border-color: var(--red);
+  background: #fff3f1;
+}
+
+.sell-quick-actions span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .quantity-input {
   position: relative;
   display: block;
@@ -5018,6 +5049,7 @@ button {
   }
 
   .radio-search,
+  .trade-asset-picker__search,
   .admin-filter-bar .search {
     display: flex;
   }
@@ -5415,6 +5447,18 @@ button {
     border: 1px solid var(--line);
     background: var(--paper);
     border-radius: 6px;
+  }
+
+  .trade-asset-picker__search {
+    display: flex;
+  }
+
+  .trade-asset-picker__list {
+    max-height: 186px;
+  }
+
+  .sell-quick-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .portfolio-summary {

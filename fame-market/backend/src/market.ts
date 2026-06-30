@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import {
   calculateQuote,
+  isValidTradeQuantity,
   MAX_DAILY_MOVE,
   MAX_POSITION_SHARE,
   QUOTE_LIFETIME_MS,
   roundMoney,
+  roundQuantity,
   STARTING_BALANCE
 } from './pricing.js';
 import { artists as seededArtists } from './seed.js';
@@ -117,9 +119,10 @@ export class MarketStore implements MarketDataStore {
     quantity: number
   ) {
     const userId = user.uid;
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+    const tradeQuantity = roundQuantity(quantity);
+    if (!isValidTradeQuantity(quantity)) {
       throw new MarketError(
-        'La cantidad debe ser un entero entre 1 y 500.',
+        'La cantidad debe estar entre 0.000001 y 500, con maximo 6 decimales.',
         'INVALID_QUANTITY'
       );
     }
@@ -131,7 +134,7 @@ export class MarketStore implements MarketDataStore {
 
     const wallet = this.ensureWallet(userId);
     const position = this.findPosition(wallet, artistId);
-    if (side === 'sell' && (!position || position.quantity < quantity)) {
+    if (side === 'sell' && (!position || position.quantity < tradeQuantity)) {
       throw new MarketError(
         'No tienes suficientes participaciones para esta venta.',
         'INSUFFICIENT_POSITION'
@@ -143,7 +146,7 @@ export class MarketStore implements MarketDataStore {
       artist.dailyAnchorPrice,
       artist.liquidity,
       side,
-      quantity
+      tradeQuantity
     );
     if (Math.abs(calculated.dailyReturn) > MAX_DAILY_MOVE) {
       throw new MarketError(
@@ -161,7 +164,7 @@ export class MarketStore implements MarketDataStore {
         currentArtistPrice: artist.currentPrice,
         nextArtistPrice: calculated.newPrice,
         existingQuantity: position?.quantity ?? 0,
-        buyQuantity: quantity,
+        buyQuantity: tradeQuantity,
         netAmount: calculated.netAmount
       });
     }
@@ -171,7 +174,7 @@ export class MarketStore implements MarketDataStore {
       userId,
       artistId,
       side,
-      quantity,
+      quantity: tradeQuantity,
       averagePrice: calculated.averagePrice,
       grossAmount: calculated.grossAmount,
       fee: calculated.fee,
@@ -231,12 +234,12 @@ export class MarketStore implements MarketDataStore {
       });
       const previousCost = position.quantity * position.averageCost;
       wallet.balance = roundMoney(wallet.balance - quote.netAmount);
-      position.quantity += quote.quantity;
+      position.quantity = roundQuantity(position.quantity + quote.quantity);
       position.averageCost = roundMoney(
         (previousCost + quote.grossAmount) / position.quantity
       );
     } else {
-      if (position.quantity < quote.quantity) {
+      if (position.quantity + 0.0000005 < quote.quantity) {
         throw new MarketError(
           'No tienes suficientes participaciones para esta venta.',
           'INSUFFICIENT_POSITION'
@@ -246,9 +249,12 @@ export class MarketStore implements MarketDataStore {
       realizedPnl = roundMoney(
         quote.netAmount - position.averageCost * quote.quantity
       );
-      position.quantity -= quote.quantity;
+      position.quantity = roundQuantity(position.quantity - quote.quantity);
       position.realizedPnl = roundMoney(position.realizedPnl + realizedPnl);
-      if (position.quantity === 0) position.averageCost = 0;
+      if (position.quantity <= 0.0000005) {
+        position.quantity = 0;
+        position.averageCost = 0;
+      }
     }
 
     artist.currentPrice = quote.newPrice;

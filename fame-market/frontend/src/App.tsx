@@ -55,8 +55,41 @@ const quantityFormat = new Intl.NumberFormat('es-CO', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 4
 });
+const tradeQuantityFormat = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 6
+});
 const storedInterestsKey = 'fame-plays:interests';
 const turnstilePassKey = 'fame-plays:turnstile-pass';
+const maxTradeQuantity = 500;
+const minTradeQuantity = 0.000001;
+const tradeQuantityDecimals = 6;
+
+function sanitizeQuantityInput(value: string) {
+  const normalized = value.replace(',', '.').replace(/[^\d.]/g, '');
+  const [head = '', ...tail] = normalized.split('.');
+  return tail.length ? `${head}.${tail.join('').slice(0, tradeQuantityDecimals)}` : head;
+}
+
+function parseQuantityInput(value: string) {
+  return Number(value.trim().replace(',', '.'));
+}
+
+function formatTradeQuantity(value: number) {
+  if (!Number.isFinite(value)) return '';
+  return value
+    .toFixed(tradeQuantityDecimals)
+    .replace(/\.?0+$/, '');
+}
+
+function percentageQuantity(value: number, percentage: number) {
+  if (percentage >= 1) return Number(value.toFixed(tradeQuantityDecimals));
+  return Math.max(
+    minTradeQuantity,
+    Math.floor(value * percentage * 10 ** tradeQuantityDecimals) /
+      10 ** tradeQuantityDecimals
+  );
+}
 
 interface TurnstilePassState {
   value: string;
@@ -230,12 +263,14 @@ function App() {
   const backendNeedsTurnstile =
     !nativeApp && (statusQuery.data?.turnstileConfigured ?? Boolean(turnstileSiteKey));
   const trimmedQuantityInput = quantityInput.trim();
-  const quantityInputNumber = Number(trimmedQuantityInput);
+  const quantityInputNumber = parseQuantityInput(trimmedQuantityInput);
   const quantityInputValid =
-    /^[0-9]+$/.test(trimmedQuantityInput) &&
-    quantityInputNumber >= 1 &&
-    quantityInputNumber <= 500;
-  const quantity = quantityInputValid ? quantityInputNumber : 1;
+    /^\d+(?:[.,]\d{0,6})?$/.test(trimmedQuantityInput) &&
+    quantityInputNumber >= minTradeQuantity &&
+    quantityInputNumber <= maxTradeQuantity;
+  const quantity = quantityInputValid
+    ? Number(quantityInputNumber.toFixed(tradeQuantityDecimals))
+    : minTradeQuantity;
   const turnstileUserId = firebaseUser?.uid ?? (!firebaseReady ? 'local-demo' : '');
   const activeTurnstilePass =
     turnstilePass?.userId === turnstileUserId &&
@@ -684,9 +719,19 @@ function App() {
       .slice(0, 8);
   }, [artists, tradeSearchTerm]);
 
-  const selectTradeArtist = (slug: string) => {
+  const selectTradeArtist = (slug: string, nextQuantity?: number) => {
     setSelectedSlug(slug);
     setTradeSearchTerm('');
+    if (nextQuantity !== undefined) {
+      setQuantityInput(formatTradeQuantity(nextQuantity));
+    }
+    setQuote(null);
+  };
+
+  const setSellPercentage = (percentage: number) => {
+    if (!selectedPosition) return;
+    const nextQuantity = percentageQuantity(selectedPosition.quantity, percentage);
+    setQuantityInput(formatTradeQuantity(nextQuantity));
     setQuote(null);
   };
 
@@ -719,7 +764,7 @@ function App() {
   const reviewQuote = () => {
     if (!quantityInputValid) {
       setQuote(null);
-      setNotice('Escribe una cantidad entre 1 y 500.');
+      setNotice('Escribe una cantidad entre 0.000001 y 500.');
       return;
     }
     if (needsTurnstileBeforeQuote) {
@@ -1247,7 +1292,12 @@ function App() {
                           position.artist.slug === selectedSlug ? 'is-active' : ''
                         }
                         key={position.artistId}
-                        onClick={() => selectTradeArtist(position.artist.slug)}
+                        onClick={() =>
+                          selectTradeArtist(
+                            position.artist.slug,
+                            position.quantity
+                          )
+                        }
                         type="button"
                       >
                         <EntityAvatar
@@ -1306,24 +1356,40 @@ function App() {
               <span>Cantidad</span>
               <input
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
                 value={quantityInput}
                 onChange={(event) => {
-                  const nextValue = event.target.value.replace(/\D/g, '');
+                  const nextValue = sanitizeQuantityInput(event.target.value);
                   setQuantityInput(nextValue);
                   setQuote(null);
                 }}
                 onBlur={() => {
                   if (!quantityInputValid) {
-                    setQuantityInput('1');
+                    setQuantityInput(formatTradeQuantity(minTradeQuantity));
                     return;
                   }
-                  setQuantityInput(String(quantity));
+                  setQuantityInput(formatTradeQuantity(quantity));
                 }}
               />
               <small>participaciones</small>
             </label>
+            {side === 'sell' && selectedPosition && (
+              <div className="sell-quick-actions">
+                {[0.25, 0.5, 0.75, 1].map((percentage) => (
+                  <button
+                    key={percentage}
+                    onClick={() => setSellPercentage(percentage)}
+                    type="button"
+                  >
+                    {percentage === 1 ? 'Todo' : `${Math.round(percentage * 100)}%`}
+                  </button>
+                ))}
+                <span>
+                  Disponible: {tradeQuantityFormat.format(selectedPosition.quantity)}
+                </span>
+              </div>
+            )}
             {backendNeedsTurnstile &&
               turnstileSiteKey &&
               !activeTurnstilePass &&
@@ -1375,7 +1441,8 @@ function App() {
                   !consentReady ||
                   !consentAccepted ||
                   currentSeason?.status !== 'active' ||
-                  (backendNeedsTurnstile && !turnstileSiteKey)
+                  (backendNeedsTurnstile && !turnstileSiteKey) ||
+                  !quantityInputValid
                 }
               >
                 {currentSeason?.status !== 'active'
@@ -1388,6 +1455,8 @@ function App() {
                       ? 'Acepta las reglas para jugar'
                   : backendNeedsTurnstile && !turnstileSiteKey
                     ? 'Falta configurar seguridad'
+                  : !quantityInputValid
+                    ? 'Cantidad invalida'
                   : quoteMutation.isPending
                     ? 'Calculando...'
                     : quoteAfterTurnstile || (turnstileRequested && !turnstileAccessReady)

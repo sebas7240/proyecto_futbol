@@ -54,6 +54,22 @@ describe('MarketStore', () => {
     expect(after.portfolioValue).toBeGreaterThan(0);
   });
 
+  it('allows fractional positions to be sold completely', () => {
+    const market = new MarketStore();
+    const artist = market.listArtists()[0]!;
+    const buyQuote = market.createQuote(user, artist.id, 'buy', 2.1471);
+    market.executeQuote(user, buyQuote.id, 'fractional-buy-0001');
+
+    const sellQuote = market.createQuote(user, artist.id, 'sell', 2.1471);
+    const trade = market.executeQuote(user, sellQuote.id, 'fractional-sell-0001');
+    const after = market.getWallet(user);
+
+    expect(trade.side).toBe('sell');
+    expect(trade.quantity).toBe(2.1471);
+    expect(after.positions.find((position) => position.artistId === artist.id))
+      .toBeUndefined();
+  });
+
   it('returns the same operation when the idempotency key is repeated', () => {
     const market = new MarketStore();
     const artist = market.listArtists()[0]!;

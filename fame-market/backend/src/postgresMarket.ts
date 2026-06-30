@@ -3,10 +3,13 @@ import { getPool } from './database.js';
 import { MarketError } from './market.js';
 import {
   calculateQuote,
+  isValidTradeQuantity,
   MAX_DAILY_MOVE,
   MAX_POSITION_SHARE,
   QUOTE_LIFETIME_MS,
-  roundMoney
+  roundMoney,
+  roundQuantity,
+  TRADE_QUANTITY_EPSILON
 } from './pricing.js';
 import type {
   AuthenticatedUser,
@@ -273,9 +276,10 @@ export class PostgresMarketStore implements MarketDataStore {
     side: TradeSide,
     quantity: number
   ) {
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+    const tradeQuantity = roundQuantity(quantity);
+    if (!isValidTradeQuantity(quantity)) {
       throw new MarketError(
-        'La cantidad debe ser un entero entre 1 y 500.',
+        'La cantidad debe estar entre 0.000001 y 500, con maximo 6 decimales.',
         'INVALID_QUANTITY'
       );
     }
@@ -310,7 +314,10 @@ export class PostgresMarketStore implements MarketDataStore {
       );
       const position = positionResult.rows[0];
       const positionQuantity = number(position?.quantity);
-      if (side === 'sell' && (!position || positionQuantity < quantity)) {
+      if (
+        side === 'sell' &&
+        (!position || positionQuantity + TRADE_QUANTITY_EPSILON < tradeQuantity)
+      ) {
         throw new MarketError(
           'No tienes suficientes participaciones para esta venta.',
           'INSUFFICIENT_POSITION'
@@ -322,7 +329,7 @@ export class PostgresMarketStore implements MarketDataStore {
         number(artist.daily_anchor_price),
         number(artist.liquidity),
         side,
-        quantity
+        tradeQuantity
       );
       if (Math.abs(calculated.dailyReturn) > MAX_DAILY_MOVE) {
         throw new MarketError(
@@ -339,7 +346,7 @@ export class PostgresMarketStore implements MarketDataStore {
           currentArtistPrice: number(artist.current_price),
           nextArtistPrice: calculated.newPrice,
           existingQuantity: positionQuantity,
-          buyQuantity: quantity,
+          buyQuantity: tradeQuantity,
           netAmount: calculated.netAmount
         });
       }
@@ -360,7 +367,7 @@ export class PostgresMarketStore implements MarketDataStore {
           wallet.id,
           artistId,
           side,
-          quantity,
+          tradeQuantity,
           calculated.averagePrice,
           calculated.grossAmount,
           calculated.fee,
@@ -377,7 +384,7 @@ export class PostgresMarketStore implements MarketDataStore {
         userId: user.uid,
         artistId,
         side,
-        quantity,
+        quantity: tradeQuantity,
         averagePrice: calculated.averagePrice,
         grossAmount: calculated.grossAmount,
         fee: calculated.fee,
@@ -540,7 +547,7 @@ export class PostgresMarketStore implements MarketDataStore {
         });
         const oldQuantity = positionQuantity;
         const oldCost = oldQuantity * number(position?.average_cost);
-        const newQuantity = oldQuantity + quoteQuantity;
+        const newQuantity = roundQuantity(oldQuantity + quoteQuantity);
         const averageCost = (oldCost + number(quote.gross_amount)) / newQuantity;
         balance = roundMoney(balance - number(quote.net_amount));
 
@@ -558,13 +565,17 @@ export class PostgresMarketStore implements MarketDataStore {
           [wallet.id, quote.artist_id, newQuantity, averageCost]
         );
       } else {
-        if (!position || positionQuantity < quoteQuantity) {
+        if (!position || positionQuantity + TRADE_QUANTITY_EPSILON < quoteQuantity) {
           throw new MarketError(
             'No tienes suficientes participaciones para esta venta.',
             'INSUFFICIENT_POSITION'
           );
         }
-        const newQuantity = positionQuantity - quoteQuantity;
+        const rawNewQuantity = positionQuantity - quoteQuantity;
+        const newQuantity =
+          Math.abs(rawNewQuantity) <= TRADE_QUANTITY_EPSILON
+            ? 0
+            : roundQuantity(rawNewQuantity);
         realizedPnl = roundMoney(
           number(quote.net_amount) - number(position.average_cost) * quoteQuantity
         );
