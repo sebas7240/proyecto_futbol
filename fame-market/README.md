@@ -307,11 +307,24 @@ MARKET_MAKER_INTERVAL_MINUTES=15
 MARKET_MAKER_MIN_TICK_MINUTES=10
 MARKET_MAKER_PRICE_BAND_BPS=1000
 MARKET_MAKER_MAX_TICK_BPS=90
+MARKET_MAKER_MIN_EFFECTIVE_MOVE_BPS=2
 ```
 
 Las noticias reales siguen teniendo su propio origen `source_type=news` y pueden
 actuar como catalizador. El mercado vivo solo evita graficas congeladas y crea
 tendencias jugables con coste practicamente cero.
+
+Funcionamiento operativo:
+
+- Cada figura activa debe recibir al menos un tick de mercado dentro de 24 horas
+  mientras exista una temporada activa y `MARKET_MAKER_ENABLED=true`.
+- Si una figura no tiene noticias, el pulso base usa su perfil de volatilidad,
+  riesgo, hype, holders, ruido deterministico y reversion a la media.
+- Si el precio se acerca demasiado a la banda diaria, el motor fuerza rebotes
+  pequenos en lugar de dejar la grafica plana.
+- El panel admin muestra `Sin tick 24h`; ese valor debe ser `0` antes de abrir
+  una temporada fuerte al publico.
+- Figuras congeladas o temporadas cerradas no reciben ticks automaticos.
 
 ## Eventos externos
 

@@ -15,7 +15,7 @@ import {
 import { api } from './api';
 import type { RightsRequestType } from './types';
 
-const updatedAt = '28 de junio de 2026';
+const updatedAt = '30 de junio de 2026';
 
 const guideArticles = [
   {
@@ -31,7 +31,7 @@ const guideArticles = [
   {
     title: 'Como leer la grafica sin confundirla con inversion',
     body:
-      'La grafica muestra una dinamica ficticia de popularidad. Puede moverse por actividad del juego, noticias publicas revisadas y estados internos controlados. No representa valor economico real de una persona, marca, cancion, carrera deportiva ni empresa.'
+      'La grafica muestra una dinamica ficticia de popularidad. Puede moverse por apoyos y retiros del juego, noticias publicas revisadas y Liga Viva, un pulso automatico controlado que evita graficas congeladas. No representa valor economico real de una persona, marca, cancion, carrera deportiva ni empresa.'
   },
   {
     title: 'Premios promocionales y revision antifraude',
@@ -85,11 +85,13 @@ function RulesPage() {
         <p>
           Cada temporada comienza con el mismo saldo ficticio. Los FameCoins no
           se compran, venden, retiran, convierten ni transfieren. Los precios se
-          mueven por la actividad interna del juego y no representan el valor
-          economico de ninguna figura publica. El bonus diario puede entregar
-          pequenas participaciones ficticias en las figuras que ya tengas,
-          normalmente hasta 25 FameCoins de valor total por dia, sin mover el
-          precio ni cobrar comision.
+          mueven por la actividad interna del juego, noticias publicas
+          revisadas y Liga Viva, un pulso automatico de baja intensidad que
+          mantiene activas las graficas de figuras sin noticias recientes. No
+          representan el valor economico de ninguna figura publica. El bonus
+          diario puede entregar pequenas participaciones ficticias en las
+          figuras que ya tengas, normalmente hasta 25 FameCoins de valor total
+          por dia, sin mover el precio ni cobrar comision.
         </p>
       </section>
       <section>
@@ -325,6 +327,10 @@ function MethodologyPage() {
           suavizado, deduplicacion, zonas neutrales y limites por fuente. Las
           apoyos y retiros del juego siguen influyendo mediante la liga
           ficticia; las senales externas solo agregan una variacion controlada.
+          Cuando no hay senales externas suficientes, Liga Viva puede generar
+          ticks pequenos con perfil de volatilidad, reversion a la media y
+          bandas de seguridad para evitar que una figura activa pase el dia sin
+          movimiento.
         </p>
       </section>
       <section>

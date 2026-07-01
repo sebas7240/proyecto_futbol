@@ -42,6 +42,9 @@ export function prometheusMetrics(database: {
   attentionSources: number;
   attentionShadowSignals: number;
   attentionReadyArtists: number;
+  activeArtists?: number;
+  marketTicks24h?: number;
+  marketStaleArtists24h?: number;
   lastBackupAgeSeconds: number | null;
   lastAttentionSyncAgeSeconds: number | null;
   lastYouTubeSyncAgeSeconds: number | null;
@@ -106,6 +109,24 @@ export function prometheusMetrics(database: {
       'Artists with at least 30 shadow windows.',
       'gauge',
       database.attentionReadyArtists
+    ),
+    metric(
+      'fame_market_active_artists',
+      'Active public figures available in the game.',
+      'gauge',
+      database.activeArtists ?? 0
+    ),
+    metric(
+      'fame_market_market_ticks_24h',
+      'Live market maker ticks persisted during the last 24 hours.',
+      'gauge',
+      database.marketTicks24h ?? 0
+    ),
+    metric(
+      'fame_market_market_stale_artists_24h',
+      'Active public figures without a live market maker tick in the last 24 hours.',
+      'gauge',
+      database.marketStaleArtists24h ?? 0
     ),
     metric(
       'fame_market_last_backup_age_seconds',

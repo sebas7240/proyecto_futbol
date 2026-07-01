@@ -798,6 +798,41 @@ export function RadioPanel() {
   const currentStream = resolved[selected.id] ? streamUrl(resolved[selected.id]!) : '';
 
   useEffect(() => {
+    if (!('mediaSession' in navigator)) return undefined;
+    navigator.mediaSession.metadata = currentStream
+      ? new MediaMetadata({
+          title: selected.name,
+          artist: 'Fame Plays Radio',
+          album: selected.country ?? 'Radio internacional',
+          artwork: [
+            { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        })
+      : null;
+
+    const play = () => {
+      void audioRef.current?.play().catch(() => undefined);
+    };
+    const pause = () => audioRef.current?.pause();
+    const stop = () => {
+      audioRef.current?.pause();
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+    };
+
+    navigator.mediaSession.setActionHandler('play', play);
+    navigator.mediaSession.setActionHandler('pause', pause);
+    navigator.mediaSession.setActionHandler('stop', stop);
+
+    return () => {
+      navigator.mediaSession.setActionHandler('play', null);
+      navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('stop', null);
+      navigator.mediaSession.playbackState = 'none';
+    };
+  }, [currentStream, selected.country, selected.name]);
+
+  useEffect(() => {
     if (!unavailableIds.includes(selectedId)) return;
     const nextStation = filteredStations.find((station) => station.id !== selectedId);
     if (nextStation) setSelectedId(nextStation.id);
@@ -876,9 +911,16 @@ export function RadioPanel() {
       audio.src = currentStream;
     }
 
-    const onPlay = () => setStatus('En vivo');
-    const onPause = () => setStatus('Pausada');
+    const onPlay = () => {
+      setStatus('En vivo');
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+    };
+    const onPause = () => {
+      setStatus('Pausada');
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    };
     const onError = () => {
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
       setStatus('No disponible');
       setUnavailableIds((current) =>
         current.includes(selected.id) ? current : [...current, selected.id]

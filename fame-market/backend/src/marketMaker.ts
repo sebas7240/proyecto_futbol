@@ -63,6 +63,7 @@ const MARKET_ALGORITHM_VERSION = 'live-market-v2';
 const DEFAULT_INTERVAL_MINUTES = 15;
 const DEFAULT_PRICE_BAND_BPS = 1_000;
 const DEFAULT_MAX_TICK_BPS = 90;
+const DEFAULT_MIN_EFFECTIVE_MOVE_BPS = 2;
 
 const profileBaseVolatility: Record<VolatilityProfile, number> = {
   stable: 5,
@@ -113,6 +114,15 @@ function marketMakerPriceBandBps() {
 
 function marketMakerMaxTickBps() {
   return numberEnv('MARKET_MAKER_MAX_TICK_BPS', DEFAULT_MAX_TICK_BPS, 10, 150);
+}
+
+function marketMakerMinEffectiveMoveBps() {
+  return numberEnv(
+    'MARKET_MAKER_MIN_EFFECTIVE_MOVE_BPS',
+    DEFAULT_MIN_EFFECTIVE_MOVE_BPS,
+    1,
+    12
+  );
 }
 
 function marketMakerMeanReversionBps() {
@@ -364,8 +374,11 @@ export function calculateLiveMarketMove(input: MarketMoveInput): MarketMove {
       : profileMaxTick[input.volatilityProfile]
   );
 
-  if (requestedDeltaBps === 0) {
-    requestedDeltaBps = seededFloat(seed, 'minimum') < 0.5 ? -1 : 1;
+  const minEffectiveMove = Math.min(marketMakerMinEffectiveMoveBps(), maxTick);
+
+  if (Math.abs(requestedDeltaBps) < minEffectiveMove) {
+    const direction = Math.sign(requestedDeltaBps || seededNoise(`${seed}:minimum`) || 1);
+    requestedDeltaBps = direction * minEffectiveMove;
   }
 
   const priceBandBps = input.priceBandBps ?? marketMakerPriceBandBps();
@@ -427,15 +440,34 @@ export function calculateLiveMarketMove(input: MarketMoveInput): MarketMove {
   }
 
   if (input.currentPrice >= upperBand && requestedDeltaBps > 0) {
-    requestedDeltaBps = -Math.max(2, Math.min(maxTick, Math.abs(requestedDeltaBps)));
+    requestedDeltaBps = -Math.max(
+      minEffectiveMove,
+      Math.min(maxTick, Math.abs(requestedDeltaBps))
+    );
   }
   if (input.currentPrice <= lowerBand && requestedDeltaBps < 0) {
-    requestedDeltaBps = Math.max(2, Math.min(maxTick, Math.abs(requestedDeltaBps)));
+    requestedDeltaBps = Math.max(
+      minEffectiveMove,
+      Math.min(maxTick, Math.abs(requestedDeltaBps))
+    );
   }
 
-  const rawNextPrice = input.currentPrice * (1 + requestedDeltaBps / 10_000);
-  const nextPrice = clamp(rawNextPrice, lowerBand, upperBand);
-  const appliedDeltaBps = Math.round(((nextPrice / input.currentPrice) - 1) * 10_000);
+  let rawNextPrice = input.currentPrice * (1 + requestedDeltaBps / 10_000);
+  let nextPrice = clamp(rawNextPrice, lowerBand, upperBand);
+  let appliedDeltaBps = Math.round(((nextPrice / input.currentPrice) - 1) * 10_000);
+
+  if (!appliedDeltaBps && input.currentPrice > 0) {
+    const fallbackDirection =
+      input.currentPrice >= upperBand
+        ? -1
+        : input.currentPrice <= lowerBand
+          ? 1
+          : Math.sign(requestedDeltaBps || input.trendBiasBps || seededNoise(`${seed}:fallback`) || 1);
+    requestedDeltaBps = fallbackDirection * minEffectiveMove;
+    rawNextPrice = input.currentPrice * (1 + requestedDeltaBps / 10_000);
+    nextPrice = clamp(rawNextPrice, lowerBand, upperBand);
+    appliedDeltaBps = Math.round(((nextPrice / input.currentPrice) - 1) * 10_000);
+  }
 
   return {
     requestedDeltaBps,

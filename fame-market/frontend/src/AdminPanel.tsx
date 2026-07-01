@@ -1015,6 +1015,48 @@ export function AdminPanel() {
         <article>
           <Activity size={20} />
           <span>
+            <small>Ticks mercado 24h</small>
+            <strong>
+              {operationsQuery.data
+                ? `${(operationsQuery.data.database.marketTicks24h ?? 0).toLocaleString(
+                    'es-CO'
+                  )} / ${(operationsQuery.data.database.activeArtists ?? 0).toLocaleString(
+                    'es-CO'
+                  )} figs.`
+                : '0 / 0 figs.'}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.database.marketTicks24h
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
+          <Activity size={20} />
+          <span>
+            <small>Sin tick 24h</small>
+            <strong>
+              {operationsQuery.data
+                ? (operationsQuery.data.database.marketStaleArtists24h ?? 0).toLocaleString(
+                    'es-CO'
+                  )
+                : '0'}
+            </strong>
+          </span>
+          <i
+            className={
+              operationsQuery.data?.database.marketStaleArtists24h === 0
+                ? 'is-healthy'
+                : ''
+            }
+          />
+        </article>
+        <article>
+          <Activity size={20} />
+          <span>
             <small>Errores frontend 24h</small>
             <strong>
               {operationsQuery.data

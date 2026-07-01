@@ -47,7 +47,29 @@ describe('live market movement', () => {
     });
 
     expect(move.appliedDeltaBps).not.toBe(0);
+    expect(Math.abs(move.appliedDeltaBps)).toBeGreaterThanOrEqual(2);
     expect(move.nextPrice).not.toBe(100);
+  });
+
+  it('rebounds instead of halting when the price is already at the upper band', () => {
+    const move = calculateLiveMarketMove({
+      artistId: '10000000-0000-4000-8000-000000000008',
+      currentPrice: 110,
+      anchorPrice: 100,
+      marketState: 'bull',
+      volatilityProfile: 'stable',
+      riskLevel: 2,
+      hypeScore: 60,
+      trendBiasBps: 20,
+      volatilityBps: 5,
+      minutesSinceLastTick: 15,
+      now,
+      priceBandBps: 1000
+    });
+
+    expect(move.halted).toBe(false);
+    expect(move.appliedDeltaBps).toBeLessThan(0);
+    expect(move.nextPrice).toBeLessThan(110);
   });
 
   it('keeps the price inside the configured band', () => {

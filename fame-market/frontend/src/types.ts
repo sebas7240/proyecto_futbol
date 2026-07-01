@@ -377,6 +377,9 @@ export interface OperationsOverview {
     attentionSources: number;
     attentionShadowSignals: number;
     attentionReadyArtists: number;
+    activeArtists: number;
+    marketTicks24h: number;
+    marketStaleArtists24h: number;
     lastBackupAgeSeconds: number | null;
     lastAttentionSyncAgeSeconds: number | null;
     lastYouTubeSyncAgeSeconds: number | null;

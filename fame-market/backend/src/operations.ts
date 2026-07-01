@@ -132,6 +132,9 @@ export async function getOperationalOverview() {
       attention_sources: string;
       attention_shadow_signals: string;
       attention_ready_artists: string;
+      active_artists: string;
+      market_ticks_24h: string;
+      market_stale_artists_24h: string;
     }>(`
       SELECT
         (SELECT COUNT(*) FROM users) AS users,
@@ -171,6 +174,29 @@ export async function getOperationalOverview() {
             HAVING COUNT(DISTINCT window_ends_on) >= 30
           ) ready
         ) AS attention_ready_artists,
+        (
+          SELECT COUNT(*)
+          FROM artists
+          WHERE status = 'active'
+        ) AS active_artists,
+        (
+          SELECT COUNT(*)
+          FROM price_ticks
+          WHERE source_type = 'market'
+            AND created_at >= NOW() - INTERVAL '24 hours'
+        ) AS market_ticks_24h,
+        (
+          SELECT COUNT(*)
+          FROM artists artist
+          WHERE artist.status = 'active'
+            AND NOT EXISTS (
+              SELECT 1
+              FROM price_ticks tick
+              WHERE tick.artist_id = artist.id
+                AND tick.source_type = 'market'
+                AND tick.created_at >= NOW() - INTERVAL '24 hours'
+            )
+        ) AS market_stale_artists_24h,
         pg_database_size(current_database()) AS database_bytes
     `),
     getPool().query<MaintenanceRow>(
@@ -237,6 +263,9 @@ export async function getOperationalOverview() {
       attentionSources: Number(row.attention_sources),
       attentionShadowSignals: Number(row.attention_shadow_signals),
       attentionReadyArtists: Number(row.attention_ready_artists),
+      activeArtists: Number(row.active_artists),
+      marketTicks24h: Number(row.market_ticks_24h),
+      marketStaleArtists24h: Number(row.market_stale_artists_24h),
       lastBackupAgeSeconds: age('database-backup'),
       lastAttentionSyncAgeSeconds: age('attention-sync'),
       lastYouTubeSyncAgeSeconds: age('youtube-sync'),
@@ -311,6 +340,9 @@ export async function operationsMetrics() {
       attentionSources: 0,
       attentionShadowSignals: 0,
       attentionReadyArtists: 0,
+      activeArtists: 0,
+      marketTicks24h: 0,
+      marketStaleArtists24h: 0,
       lastBackupAgeSeconds: null,
       lastAttentionSyncAgeSeconds: null,
       lastYouTubeSyncAgeSeconds: null,
