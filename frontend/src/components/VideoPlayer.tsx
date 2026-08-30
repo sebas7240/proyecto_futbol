@@ -8,14 +8,24 @@ interface VideoPlayerProps {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const isHlsStream = /\.m3u8(?:$|[?#])/i.test(src);
+  const isNativeVideo = /\.(?:mp4|webm|ogg)(?:$|[?#])/i.test(src);
+  const isEmbedPage = !isHlsStream && !isNativeVideo;
 
   useEffect(() => {
     let hls: any = null;
+    let nativeVideo: HTMLVideoElement | null = null;
+    const playNativeVideo = () => {
+      nativeVideo?.play().catch(e => console.error('Autoplay prevented', e));
+    };
+    setError(null);
+
+    if (isEmbedPage) return undefined;
 
     if (videoRef.current) {
       const video = videoRef.current;
 
-      if (Hls.isSupported()) {
+      if (isHlsStream && Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -46,12 +56,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
             }
           }
         });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // For Safari
+      } else {
+        nativeVideo = video;
         video.src = src;
-        video.addEventListener('loadedmetadata', () => {
-          video.play();
-        });
+        video.addEventListener('loadedmetadata', playNativeVideo);
       }
     }
 
@@ -59,8 +67,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
       if (hls) {
         hls.destroy();
       }
+      nativeVideo?.removeEventListener('loadedmetadata', playNativeVideo);
     };
-  }, [src]);
+  }, [isEmbedPage, isHlsStream, src]);
+
+  if (isEmbedPage) {
+    return (
+      <div className="w-full h-full bg-black">
+        <iframe
+          src={src}
+          title="Señal en vivo"
+          data-golea-player-iframe="true"
+          className="w-full h-full border-0 bg-black"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          allowFullScreen
+          referrerPolicy="origin-when-cross-origin"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-black relative">
